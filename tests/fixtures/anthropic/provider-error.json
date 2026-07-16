@@ -1,0 +1,6 @@
+{
+  "error": {
+    "type": "fake_anthropic_upstream_error",
+    "message": "fake Anthropic upstream error"
+  }
+}

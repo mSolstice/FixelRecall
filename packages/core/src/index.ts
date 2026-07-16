@@ -134,6 +134,11 @@ export interface PolicyCostEstimate {
   readonly sidecarCost: number;
 }
 
+export type PolicyRendererResult =
+  | { readonly status: "not_attempted" }
+  | { readonly status: "succeeded" }
+  | { readonly status: "failed"; readonly reason: "renderer_failure" };
+
 export interface PolicyEvaluationInput {
   readonly block: NormalizedBlock;
   readonly scannerResult: PolicyScannerResult;
@@ -143,6 +148,7 @@ export interface PolicyEvaluationInput {
   readonly recoverability: Recoverability;
   readonly modelProfileStatus: ModelProfileStatus;
   readonly estimatedCost: PolicyCostEstimate;
+  readonly rendererResult?: PolicyRendererResult;
   readonly mode: PolicyMode;
   readonly timestamp: IsoTimestamp;
 }
@@ -163,11 +169,112 @@ export interface ModelProfileSummary {
   readonly profileId: string;
   readonly provider: ProviderFamily;
   readonly modelFamily: string;
+  readonly modelVersion?: string;
   readonly status: ModelProfileStatus["kind"] | "canary" | "retest_required";
   readonly origin: EvidenceOrigin;
   readonly issuedAt: IsoTimestamp;
   readonly expiresAt: IsoTimestamp;
   readonly signatureStatus?: "not_required" | "verified" | "invalid";
+}
+
+export type ImageTokenAccountingRule =
+  | { readonly kind: "fixed_per_image"; readonly tokensPerImage: number }
+  | { readonly kind: "pixels"; readonly baseTokens: number; readonly tokensPerMegapixel: number };
+
+export interface ImageDimensionLimits {
+  readonly maxWidthPx: number;
+  readonly maxHeightPx: number;
+  readonly maxPages: number;
+}
+
+export interface GlyphDensityProfile {
+  readonly maxGlyphsPerPage: number;
+  readonly maxGlyphsPerSquareInch: number;
+}
+
+export interface LanguageCoverage {
+  readonly primaryLanguages: readonly string[];
+  readonly partiallySupportedLanguages: readonly string[];
+  readonly unsupportedLanguages: readonly string[];
+}
+
+export interface ModelProfileScores {
+  readonly gist: number;
+  readonly structure: number;
+  readonly exactString: number;
+}
+
+export interface ModelProfileThresholds {
+  readonly minimumGist: number;
+  readonly minimumStructure: number;
+  readonly minimumExactString: number;
+}
+
+export interface VersionedModelProfile {
+  readonly profileId: string;
+  readonly provider: ProviderFamily;
+  readonly modelFamily: string;
+  readonly modelVersion: string;
+  readonly status: ModelProfileStatus["kind"] | "canary" | "retest_required";
+  readonly lastTestedAt: IsoTimestamp;
+  readonly expiresAt: IsoTimestamp;
+  readonly imageDimensions: ImageDimensionLimits;
+  readonly glyphDensity: GlyphDensityProfile;
+  readonly languageCoverage: LanguageCoverage;
+  readonly imageTokenAccountingRule: ImageTokenAccountingRule;
+  readonly scores: ModelProfileScores;
+  readonly thresholds: ModelProfileThresholds;
+  readonly origin: EvidenceOrigin;
+  readonly approval: {
+    readonly approvedBy: "synthetic_canary" | "manual_review" | "benchmark";
+    readonly approvedAt: IsoTimestamp;
+    readonly notes: string;
+  };
+}
+
+export type CanaryWorkloadKind =
+  | "prose"
+  | "code_like_structure"
+  | "tables"
+  | "paths"
+  | "uuids"
+  | "hashes"
+  | "numbers"
+  | "mixed_punctuation";
+
+export interface CanaryWorkload {
+  readonly kind: CanaryWorkloadKind;
+  readonly label: string;
+  readonly syntheticOrigin: true;
+  readonly content: string;
+  readonly expectedFragments: readonly string[];
+}
+
+export interface CanaryEvaluationResult {
+  readonly profileId: string;
+  readonly evaluatedAt: IsoTimestamp;
+  readonly passed: boolean;
+  readonly scores: ModelProfileScores;
+  readonly failedWorkloads: readonly CanaryWorkloadKind[];
+  readonly syntheticOrigin: true;
+}
+
+export interface ModelProfileRegistry {
+  readonly profiles: readonly VersionedModelProfile[];
+  findProfile(input: {
+    readonly provider: ProviderFamily;
+    readonly modelFamily: string;
+    readonly modelVersion: string;
+    readonly at: IsoTimestamp;
+  }): VersionedModelProfile | null;
+  resolveStatus(input: {
+    readonly provider: ProviderFamily;
+    readonly modelFamily: string;
+    readonly modelVersion: string;
+    readonly at: IsoTimestamp;
+    readonly canary?: CanaryEvaluationResult;
+  }): ModelProfileStatus;
+  getSummary(profileId: string): ModelProfileSummary | null;
 }
 
 export interface PolicyBundleSummary {
@@ -736,6 +843,156 @@ export function createNormalizedRequest(input: {
   };
 }
 
+export function createModelProfileRegistry(
+  profiles: readonly VersionedModelProfile[]
+): ModelProfileRegistry {
+  const stableProfiles = [...profiles].sort((left, right) =>
+    left.profileId.localeCompare(right.profileId)
+  );
+  return {
+    profiles: stableProfiles,
+    findProfile: (input) =>
+      stableProfiles.find(
+        (profile) =>
+          profile.provider === input.provider &&
+          profile.modelFamily === input.modelFamily &&
+          profile.modelVersion === input.modelVersion &&
+          profile.status !== "disabled" &&
+          profile.status !== "retest_required" &&
+          profile.status !== "canary" &&
+          !profileIsExpired(profile, input.at)
+      ) ?? null,
+    resolveStatus: (input) => {
+      const profile = stableProfiles.find(
+        (candidate) =>
+          candidate.provider === input.provider &&
+          candidate.modelFamily === input.modelFamily &&
+          candidate.modelVersion === input.modelVersion
+      );
+      if (profile === undefined) {
+        return { kind: "disabled", profileId: unknownProfileId(input) };
+      }
+      if (profileIsExpired(profile, input.at)) {
+        return { kind: "expired", profileId: profile.profileId };
+      }
+      if (profile.status !== "enabled") {
+        return { kind: "disabled", profileId: profile.profileId };
+      }
+      if (profileScoresPass(profile.scores, profile.thresholds) !== true) {
+        return { kind: "disabled", profileId: profile.profileId };
+      }
+      if (input.canary !== undefined && canaryPassesProfile(profile, input.canary) !== true) {
+        return { kind: "disabled", profileId: profile.profileId };
+      }
+      return { kind: "enabled", profileId: profile.profileId };
+    },
+    getSummary: (profileId) => {
+      const profile = stableProfiles.find((candidate) => candidate.profileId === profileId);
+      if (profile === undefined) {
+        return null;
+      }
+      return summarizeModelProfile(profile);
+    }
+  };
+}
+
+export function createSyntheticCanaryWorkloads(): readonly CanaryWorkload[] {
+  return [
+    {
+      kind: "prose",
+      label: "Synthetic prose",
+      syntheticOrigin: true,
+      content: "A calm paragraph explains a local cache without requiring exact wording.",
+      expectedFragments: ["local cache", "exact wording"]
+    },
+    {
+      kind: "code_like_structure",
+      label: "Synthetic code-like structure",
+      syntheticOrigin: true,
+      content: "function fakeExample(input) { return input.value ?? 'fallback'; }",
+      expectedFragments: ["function", "fallback"]
+    },
+    {
+      kind: "tables",
+      label: "Synthetic table",
+      syntheticOrigin: true,
+      content: "| name | count |\n| alpha | 12 |\n| beta | 34 |",
+      expectedFragments: ["alpha", "34"]
+    },
+    {
+      kind: "paths",
+      label: "Synthetic paths",
+      syntheticOrigin: true,
+      content: "/tmp/context-diet/synthetic-file.ts and C:\\temp\\synthetic-file.ts",
+      expectedFragments: ["/tmp/context-diet", "C:\\temp"]
+    },
+    {
+      kind: "uuids",
+      label: "Synthetic UUIDs",
+      syntheticOrigin: true,
+      content: "00000000-1111-2222-3333-444444444444",
+      expectedFragments: ["00000000-1111-2222-3333-444444444444"]
+    },
+    {
+      kind: "hashes",
+      label: "Synthetic hashes",
+      syntheticOrigin: true,
+      content: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      expectedFragments: ["sha256:", "aaaaaaaa"]
+    },
+    {
+      kind: "numbers",
+      label: "Synthetic numbers",
+      syntheticOrigin: true,
+      content: "42 files, 19.5 ms, $12.34, and 87%",
+      expectedFragments: ["42", "19.5", "$12.34", "87%"]
+    },
+    {
+      kind: "mixed_punctuation",
+      label: "Synthetic mixed punctuation",
+      syntheticOrigin: true,
+      content: "alpha_beta::gamma/delta?x=1&y=(2)[3]{4}",
+      expectedFragments: ["alpha_beta::gamma", "(2)[3]{4}"]
+    }
+  ];
+}
+
+export function evaluateSyntheticCanaries(input: {
+  readonly profile: VersionedModelProfile;
+  readonly observedFragmentsByKind: Readonly<Record<CanaryWorkloadKind, readonly string[]>>;
+  readonly evaluatedAt: IsoTimestamp;
+  readonly workloads?: readonly CanaryWorkload[];
+}): CanaryEvaluationResult {
+  const workloads = input.workloads ?? createSyntheticCanaryWorkloads();
+  const failedWorkloads = workloads
+    .filter((workload) => {
+      const observed = input.observedFragmentsByKind[workload.kind];
+      return workload.expectedFragments.some((fragment) => !observed.includes(fragment));
+    })
+    .map((workload) => workload.kind);
+  const coverage = (workloads.length - failedWorkloads.length) / workloads.length;
+  const exactFailures = failedWorkloads.filter((kind) =>
+    ["paths", "uuids", "hashes", "numbers", "mixed_punctuation"].includes(kind)
+  ).length;
+  const structureFailures = failedWorkloads.filter((kind) =>
+    ["code_like_structure", "tables"].includes(kind)
+  ).length;
+  const scores = {
+    gist: Math.round(coverage * 100),
+    structure: Math.round(((workloads.length - structureFailures) / workloads.length) * 100),
+    exactString: Math.round(((workloads.length - exactFailures) / workloads.length) * 100)
+  };
+
+  return {
+    profileId: input.profile.profileId,
+    evaluatedAt: input.evaluatedAt,
+    passed: failedWorkloads.length === 0 && profileScoresPass(scores, input.profile.thresholds),
+    scores,
+    failedWorkloads,
+    syntheticOrigin: true
+  };
+}
+
 export function sortByOrder<T extends { readonly order: OrderIndex }>(
   items: readonly T[]
 ): readonly T[] {
@@ -763,6 +1020,9 @@ function selectTransformationDecision(input: PolicyEvaluationInput): Transformat
   }
   if (input.modelProfileStatus.kind === "expired") {
     return keepNativeDecision(mergeReasonCodes(["profile_expired"], input));
+  }
+  if (input.rendererResult?.status === "failed") {
+    return keepNativeDecision(mergeReasonCodes([input.rendererResult.reason], input));
   }
   if (safeModeBlocks(input)) {
     return keepNativeDecision(mergeReasonCodes(safeModeBlockReasons(input), input));
@@ -862,6 +1122,54 @@ function originalContentIsPreserved(decision: TransformationDecision): boolean {
     decision.action === "RENDER_RECOVERABLE" ||
     decision.action === "REFERENCE_ONLY"
   );
+}
+
+function summarizeModelProfile(profile: VersionedModelProfile): ModelProfileSummary {
+  return {
+    profileId: profile.profileId,
+    provider: profile.provider,
+    modelFamily: profile.modelFamily,
+    modelVersion: profile.modelVersion,
+    status: profile.status,
+    origin: profile.origin,
+    issuedAt: profile.lastTestedAt,
+    expiresAt: profile.expiresAt,
+    signatureStatus: "not_required"
+  };
+}
+
+function profileIsExpired(profile: VersionedModelProfile, at: IsoTimestamp): boolean {
+  return Date.parse(profile.expiresAt) <= Date.parse(at);
+}
+
+function profileScoresPass(
+  scores: ModelProfileScores,
+  thresholds: ModelProfileThresholds
+): boolean {
+  return (
+    scores.gist >= thresholds.minimumGist &&
+    scores.structure >= thresholds.minimumStructure &&
+    scores.exactString >= thresholds.minimumExactString
+  );
+}
+
+function canaryPassesProfile(
+  profile: VersionedModelProfile,
+  canary: CanaryEvaluationResult
+): boolean {
+  return (
+    canary.profileId === profile.profileId &&
+    canary.passed === true &&
+    profileScoresPass(canary.scores, profile.thresholds)
+  );
+}
+
+function unknownProfileId(input: {
+  readonly provider: ProviderFamily;
+  readonly modelFamily: string;
+  readonly modelVersion: string;
+}): string {
+  return `unknown:${input.provider}:${input.modelFamily}:${input.modelVersion}`;
 }
 
 function assertNonEmptyReasons(

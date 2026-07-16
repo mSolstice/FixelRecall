@@ -1,0 +1,60 @@
+{
+  "id": "request-neutral-unknown",
+  "provider": "unknown",
+  "mode": "safe",
+  "providerMetadata": {
+    "provider": "unknown",
+    "endpoint": "/v1/future",
+    "preservedHeaders": ["x-fake-cache-control"],
+    "rawShape": "unknown"
+  },
+  "messages": [
+    {
+      "id": "message-unknown",
+      "order": 0,
+      "role": "unknown",
+      "providerMetadata": {
+        "provider": "unknown",
+        "endpoint": "/v1/future",
+        "preservedHeaders": ["x-fake-cache-control"],
+        "rawShape": "unknown"
+      },
+      "blocks": [
+        {
+          "id": "block-unknown",
+          "order": 0,
+          "kind": "unknown",
+          "sourceCategory": "unknown",
+          "exactnessRisk": "unknown_risk",
+          "recoverability": {
+            "kind": "not_recoverable",
+            "reason": "unknown_shape"
+          },
+          "providerMetadata": {
+            "provider": "unknown",
+            "endpoint": "/v1/future",
+            "preservedHeaders": ["x-fake-cache-control"],
+            "rawShape": "unknown"
+          },
+          "passThrough": {
+            "encoding": "json",
+            "raw": {
+              "type": "future_provider_block",
+              "body": {
+                "unknownNestedValue": "preserve exactly"
+              }
+            },
+            "integrity": {
+              "algorithm": "sha256",
+              "digest": "fake-sha256-digest-for-unknown-fixture"
+            }
+          },
+          "decision": {
+            "action": "PASS_THROUGH_UNKNOWN",
+            "reasonCodes": ["unknown_shape"]
+          }
+        }
+      ]
+    }
+  ]
+}

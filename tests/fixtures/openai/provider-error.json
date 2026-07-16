@@ -1,0 +1,6 @@
+{
+  "error": {
+    "type": "fake_openai_upstream_error",
+    "message": "fake OpenAI upstream error"
+  }
+}

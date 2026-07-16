@@ -1,0 +1,33 @@
+{
+  "name": "context-diet",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "check:environment": "node scripts/check-environment.mjs",
+    "check:skills": "node scripts/check-skills.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "smoke:anthropic": "node scripts/smoke/anthropic-fake-gateway.mjs",
+    "smoke:openai": "node scripts/smoke/openai-fake-gateway.mjs",
+    "test": "vitest run",
+    "test:compatibility": "vitest run tests/compatibility",
+    "typecheck": "tsc -b tsconfig.build.json --pretty false"
+  },
+  "engines": {
+    "node": ">=24 <27",
+    "pnpm": ">=11 <12"
+  },
+  "packageManager": "pnpm@11.13.0",
+  "devDependencies": {
+    "@eslint/js": "9.31.0",
+    "@types/node": "24.0.14",
+    "eslint": "9.31.0",
+    "prettier": "3.6.2",
+    "typescript": "5.8.3",
+    "typescript-eslint": "8.36.0",
+    "vitest": "3.2.4"
+  }
+}

@@ -1,0 +1,8 @@
+.agents/
+.claude/
+.git/
+.pnpm-store/
+node_modules/
+dist/
+coverage/
+skill-source/context-diet/.git/

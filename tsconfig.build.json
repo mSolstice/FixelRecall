@@ -1,0 +1,18 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/firewall" },
+    { "path": "packages/renderer" },
+    { "path": "packages/providers-openai" },
+    { "path": "packages/providers-anthropic" },
+    { "path": "packages/proxy" },
+    { "path": "packages/vault" },
+    { "path": "packages/retrieval-mcp" },
+    { "path": "packages/test-data" },
+    { "path": "packages/metrics" },
+    { "path": "packages/benchmark" },
+    { "path": "packages/cli" },
+    { "path": "apps/dashboard" }
+  ]
+}

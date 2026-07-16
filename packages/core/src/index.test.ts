@@ -8,6 +8,9 @@ import {
   createProviderMetadata,
   createTextBlock,
   createUnknownBlock,
+  createModelProfileRegistry,
+  createSyntheticCanaryWorkloads,
+  evaluateSyntheticCanaries,
   evaluatePolicyDecision,
   decisionDefaultReasons,
   explainDecisionRecordForCli,
@@ -27,6 +30,7 @@ import {
   type DecisionAction,
   type ExactnessRisk,
   type ModelProfileSource,
+  type CanaryWorkloadKind,
   type OriginalPassThroughFragment,
   type PolicyMode,
   type PolicyScannerResult,
@@ -34,6 +38,7 @@ import {
   type RendererHealthService,
   type SavingsProjectionEngine,
   type UsageHistorySource,
+  type VersionedModelProfile,
   type ReasonCode
 } from "./index.js";
 
@@ -416,6 +421,183 @@ describe("provider-neutral policy engine", () => {
       expect(result.decision).toBe("KEEP_NATIVE");
       expect(result.reasons).toContain(status.reason);
     }
+  });
+
+  it("selects original text when renderer reports a failure", () => {
+    const result = evaluatePolicyDecision({
+      block: policyBlock("gist_safe"),
+      scannerResult: scanner("gist_safe"),
+      contextAgeMs: 3_600_000,
+      sourceCategory: "conversation_history",
+      taskExactnessRequirement: "gist_ok",
+      recoverability: recoverable("project-1", "session-1", blockId("renderer-failure")),
+      modelProfileStatus: { kind: "enabled", profileId: "profile-safe-image-v1" },
+      estimatedCost: { textCost: 100, imageCost: 10, sidecarCost: 10 },
+      rendererResult: { status: "failed", reason: "renderer_failure" },
+      mode: "max",
+      timestamp
+    });
+
+    expect(result.decision).toBe("KEEP_NATIVE");
+    expect(result.originalContentPreserved).toBe(true);
+    expect(result.reasons).toContain("renderer_failure");
+  });
+});
+
+describe("versioned model-profile registry", () => {
+  const now = isoTimestamp("2026-07-16T00:00:00.000Z");
+  const future = isoTimestamp("2026-08-16T00:00:00.000Z");
+  const past = isoTimestamp("2026-07-01T00:00:00.000Z");
+  const profile: VersionedModelProfile = {
+    profileId: "openai-gpt-synthetic-2026-07",
+    provider: "openai",
+    modelFamily: "gpt-synthetic",
+    modelVersion: "2026-07-01",
+    status: "enabled",
+    lastTestedAt: past,
+    expiresAt: future,
+    imageDimensions: { maxWidthPx: 1_568, maxHeightPx: 728, maxPages: 4 },
+    glyphDensity: { maxGlyphsPerPage: 2_400, maxGlyphsPerSquareInch: 220 },
+    languageCoverage: {
+      primaryLanguages: ["en", "es"],
+      partiallySupportedLanguages: ["hi", "ja"],
+      unsupportedLanguages: ["synthetic-unsupported"]
+    },
+    imageTokenAccountingRule: { kind: "pixels", baseTokens: 85, tokensPerMegapixel: 170 },
+    scores: { gist: 98, structure: 96, exactString: 95 },
+    thresholds: { minimumGist: 95, minimumStructure: 94, minimumExactString: 94 },
+    origin: "synthetic",
+    approval: {
+      approvedBy: "synthetic_canary",
+      approvedAt: past,
+      notes: "Synthetic fixture profile for registry tests."
+    }
+  };
+
+  function observedAllFragments() {
+    return Object.fromEntries(
+      createSyntheticCanaryWorkloads().map((workload) => [
+        workload.kind,
+        workload.expectedFragments
+      ])
+    ) as Record<CanaryWorkloadKind, readonly string[]>;
+  }
+
+  it("approves only current enabled profiles whose canaries meet thresholds", () => {
+    const registry = createModelProfileRegistry([profile]);
+    const canary = evaluateSyntheticCanaries({
+      profile,
+      observedFragmentsByKind: observedAllFragments(),
+      evaluatedAt: now
+    });
+
+    expect(canary).toMatchObject({
+      profileId: profile.profileId,
+      passed: true,
+      failedWorkloads: []
+    });
+    expect(
+      registry.resolveStatus({
+        provider: "openai",
+        modelFamily: "gpt-synthetic",
+        modelVersion: "2026-07-01",
+        at: now,
+        canary
+      })
+    ).toEqual({ kind: "enabled", profileId: profile.profileId });
+    expect(registry.getSummary(profile.profileId)).toMatchObject({
+      profileId: profile.profileId,
+      modelFamily: "gpt-synthetic",
+      modelVersion: "2026-07-01",
+      status: "enabled"
+    });
+  });
+
+  it("disables imaging for expired profiles, failed canaries and unknown models", () => {
+    const registry = createModelProfileRegistry([
+      profile,
+      { ...profile, profileId: "expired-profile", modelVersion: "2026-06-01", expiresAt: past }
+    ]);
+    const failedCanary = evaluateSyntheticCanaries({
+      profile,
+      observedFragmentsByKind: {
+        ...observedAllFragments(),
+        hashes: []
+      },
+      evaluatedAt: now
+    });
+
+    expect(failedCanary.passed).toBe(false);
+    expect(failedCanary.failedWorkloads).toEqual(["hashes"]);
+    expect(
+      registry.resolveStatus({
+        provider: "openai",
+        modelFamily: "gpt-synthetic",
+        modelVersion: "2026-06-01",
+        at: now
+      })
+    ).toEqual({ kind: "expired", profileId: "expired-profile" });
+    expect(
+      registry.resolveStatus({
+        provider: "openai",
+        modelFamily: "gpt-synthetic",
+        modelVersion: "2026-07-01",
+        at: now,
+        canary: failedCanary
+      })
+    ).toEqual({ kind: "disabled", profileId: profile.profileId });
+    expect(
+      registry.resolveStatus({
+        provider: "anthropic",
+        modelFamily: "unknown-model",
+        modelVersion: "2099-01-01",
+        at: now
+      })
+    ).toEqual({
+      kind: "disabled",
+      profileId: "unknown:anthropic:unknown-model:2099-01-01"
+    });
+  });
+
+  it("does not let Safe mode auto-enable a guessed profile", () => {
+    const registry = createModelProfileRegistry([]);
+    const status = registry.resolveStatus({
+      provider: "openai",
+      modelFamily: "gpt-synthetic",
+      modelVersion: "guessed-latest",
+      at: now
+    });
+    const result = evaluatePolicyDecision({
+      block: createTextBlock({
+        id: blockId("safe-guessed-profile"),
+        order: orderIndex(0),
+        text: "Older prose that would otherwise be gist-safe.",
+        sourceCategory: "conversation_history",
+        exactnessRisk: "gist_safe",
+        recoverability: recoverable("project-1", "session-1", blockId("safe-guessed-profile")),
+        providerMetadata: metadata,
+        decision: keepNativeDecision(["safe_mode"])
+      }),
+      scannerResult: {
+        riskClass: "gist_safe",
+        reasonCodes: ["eligible_gist_safe"],
+        renderEligible: true,
+        protectedSpans: [],
+        secretSensitiveSpans: []
+      },
+      contextAgeMs: 86_400_000,
+      sourceCategory: "conversation_history",
+      taskExactnessRequirement: "gist_ok",
+      recoverability: recoverable("project-1", "session-1", blockId("safe-guessed-profile")),
+      modelProfileStatus: status,
+      estimatedCost: { textCost: 1_000, imageCost: 10, sidecarCost: 10 },
+      mode: "safe",
+      timestamp: now
+    });
+
+    expect(status.kind).toBe("disabled");
+    expect(result.decision).toBe("KEEP_NATIVE");
+    expect(result.reasons).toContain("profile_disabled");
   });
 });
 

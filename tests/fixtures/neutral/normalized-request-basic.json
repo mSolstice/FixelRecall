@@ -1,0 +1,49 @@
+{
+  "id": "request-neutral-basic",
+  "provider": "unknown",
+  "mode": "safe",
+  "providerMetadata": {
+    "provider": "unknown",
+    "endpoint": "/v1/unknown",
+    "model": "fake-model",
+    "streaming": false,
+    "cacheSensitive": false,
+    "preservedHeaders": [],
+    "rawShape": "unknown"
+  },
+  "messages": [
+    {
+      "id": "message-0",
+      "order": 0,
+      "role": "user",
+      "providerMetadata": {
+        "provider": "unknown",
+        "preservedHeaders": [],
+        "rawShape": "unknown"
+      },
+      "blocks": [
+        {
+          "id": "block-0",
+          "order": 0,
+          "kind": "text",
+          "sourceCategory": "current_instruction",
+          "exactnessRisk": "verbatim_critical",
+          "recoverability": {
+            "kind": "not_recoverable",
+            "reason": "current_context"
+          },
+          "providerMetadata": {
+            "provider": "unknown",
+            "preservedHeaders": [],
+            "rawShape": "unknown"
+          },
+          "text": "Keep this current instruction native.",
+          "decision": {
+            "action": "KEEP_NATIVE",
+            "reasonCodes": ["current_context"]
+          }
+        }
+      ]
+    }
+  ]
+}

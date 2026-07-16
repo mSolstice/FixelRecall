@@ -1,0 +1,6 @@
+data: {"type":"response.output_text.delta","delta":"Fake OpenAI stream chunk 1"}
+
+data: {"type":"response.output_text.done","text":"Fake OpenAI stream done"}
+
+data: [DONE]
+
