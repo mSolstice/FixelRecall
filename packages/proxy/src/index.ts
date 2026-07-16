@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 
 export type ProviderFamily = "openai" | "anthropic";
+export type GatewayMode = "safe" | "bypass";
 
 export interface ProxyRoute {
   readonly method: "GET" | "POST";
@@ -18,6 +19,50 @@ export interface StructuredLogEvent {
   readonly authRedacted: true;
   readonly bodyLogged: false;
   readonly event: "request_completed";
+  readonly mode: GatewayMode;
+  readonly killSwitchActive: boolean;
+  readonly requestBytes: number;
+  readonly responseStreamed: boolean;
+}
+
+export interface GatewayMetrics {
+  readonly startedAtMs: number;
+  readonly totalRequests: number;
+  readonly providerRequests: Readonly<Record<ProviderFamily, number>>;
+  readonly rejectedRequests: number;
+  readonly streamedResponses: number;
+  readonly authValuesRetained: false;
+  readonly rawBodiesPersisted: false;
+}
+
+export interface LocalGatewayOptions {
+  readonly requestTimeoutMs?: number;
+  readonly maxRequestBytes?: number;
+  readonly bindHost?: "127.0.0.1" | "::1";
+  readonly mode?: GatewayMode;
+  readonly killSwitchActive?: boolean;
+  readonly upstreams?: Partial<Record<ProviderFamily, string>>;
+  readonly upstreamAllowlist?: readonly string[];
+  readonly log?: (event: StructuredLogEvent) => void;
+}
+
+export interface LocalGateway {
+  readonly server: Server;
+  readonly bindHost: "127.0.0.1" | "::1";
+  readonly close: () => Promise<void>;
+  readonly setBypass: (enabled: boolean) => void;
+  readonly setKillSwitch: (enabled: boolean) => void;
+  readonly status: () => GatewayStatus;
+}
+
+export interface GatewayStatus {
+  readonly gateway: "context-diet-local";
+  readonly mode: GatewayMode;
+  readonly killSwitchActive: boolean;
+  readonly bindHost: "127.0.0.1" | "::1";
+  readonly routes: readonly string[];
+  readonly upstreamAllowlist: readonly string[];
+  readonly metrics: GatewayMetrics;
 }
 
 export interface FakeGatewayOptions {
@@ -25,14 +70,16 @@ export interface FakeGatewayOptions {
   readonly log?: (event: StructuredLogEvent) => void;
 }
 
-export interface FakeGateway {
-  readonly server: Server;
-  readonly close: () => Promise<void>;
-}
+export type FakeGateway = LocalGateway;
 
 export const healthRoute: ProxyRoute = {
   method: "GET",
   path: "/health"
+};
+
+export const statusRoute: ProxyRoute = {
+  method: "GET",
+  path: "/status"
 };
 
 export const openAIResponsesRoute: ProxyRoute = {
@@ -46,74 +93,138 @@ export const anthropicMessagesRoute: ProxyRoute = {
 };
 
 const defaultRequestTimeoutMs = 5_000;
+const defaultMaxRequestBytes = 1_000_000;
+const providerRoutes = ["/v1/responses", "/v1/messages"] as const;
 
-export function createFakeGateway(options: FakeGatewayOptions = {}): FakeGateway {
+export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGateway {
   const requestTimeoutMs = options.requestTimeoutMs ?? defaultRequestTimeoutMs;
+  const maxRequestBytes = options.maxRequestBytes ?? defaultMaxRequestBytes;
+  const bindHost = options.bindHost ?? "127.0.0.1";
+  let mode = options.mode ?? "safe";
+  let killSwitchActive = options.killSwitchActive ?? false;
+  const upstreams = options.upstreams ?? {};
+  const upstreamAllowlist = options.upstreamAllowlist ?? [];
+  const metrics = createMetrics();
 
   const server = createServer(async (request, response) => {
     const startedAt = Date.now();
     const requestId = readRequestId(request);
+    const route = normaliseRoute(request.url ?? "/");
+    const method = request.method ?? "GET";
     let statusCode = 500;
     let provider: ProviderFamily | undefined;
+    let requestBytes = 0;
+    let responseStreamed = false;
 
-    request.setTimeout(requestTimeoutMs, () => {
-      statusCode = 408;
-      response.writeHead(statusCode, {
-        "content-type": "application/json",
-        "x-request-id": requestId
-      });
-      response.end(JSON.stringify({ error: { type: "timeout", message: "request timed out" } }));
-      request.destroy();
-    });
+    const abortController = new AbortController();
+    const timeout = setTimeout(() => abortController.abort(), requestTimeoutMs);
+    request.on("aborted", () => abortController.abort());
 
     try {
-      const routeKey = `${request.method ?? "GET"} ${request.url ?? "/"}`;
+      const controlResult = await maybeHandleControlRoute({
+        method,
+        route,
+        requestId,
+        response,
+        status: () => gateway.status(),
+        setBypass: (enabled) => {
+          mode = enabled ? "bypass" : "safe";
+        },
+        setKillSwitch: (enabled) => {
+          killSwitchActive = enabled;
+        }
+      });
+      if (controlResult !== null) {
+        statusCode = controlResult;
+        return;
+      }
 
-      if (routeKey === "GET /health") {
-        statusCode = 200;
+      if (method !== "POST" || !isProviderRoute(route)) {
+        statusCode = 404;
         writeJson(response, statusCode, requestId, {
-          status: "ok",
-          gateway: "context-diet-fake",
-          mode: "transport-feasibility"
+          error: { type: "not_found", message: "route is not available on the local gateway" }
         });
         return;
       }
 
-      if (routeKey === "POST /v1/responses") {
-        provider = "openai";
-        const body = await readJsonBody(request);
-        statusCode = await handleOpenAIResponses(body, response, requestId);
-        return;
-      }
+      provider = route === openAIResponsesRoute.path ? "openai" : "anthropic";
+      metrics.providerRequests[provider] += 1;
 
-      if (routeKey === "POST /v1/messages") {
-        provider = "anthropic";
-        const body = await readJsonBody(request);
-        statusCode = await handleAnthropicMessages(body, response, requestId);
-        return;
-      }
-
-      statusCode = 404;
-      writeJson(response, statusCode, requestId, {
-        error: { type: "not_found", message: "route is not part of this feasibility spike" }
-      });
-    } catch {
-      if (!response.headersSent) {
-        statusCode = 400;
+      if (killSwitchActive) {
+        statusCode = 503;
+        metrics.rejectedRequests += 1;
         writeJson(response, statusCode, requestId, {
-          error: { type: "bad_request", message: "request could not be parsed" }
+          error: { type: "kill_switch_active", message: "Context Diet gateway is disabled" }
+        });
+        return;
+      }
+
+      const upstreamUrl = upstreams[provider];
+      if (upstreamUrl === undefined || !isAllowedUpstream(upstreamUrl, upstreamAllowlist)) {
+        statusCode = 502;
+        metrics.rejectedRequests += 1;
+        writeJson(response, statusCode, requestId, {
+          error: {
+            type: "upstream_not_allowed",
+            provider,
+            message: "No allowlisted upstream is configured for this provider"
+          }
+        });
+        return;
+      }
+
+      const body = await readLimitedBody(request, maxRequestBytes);
+      requestBytes = body.length;
+      const upstreamResponse = await fetch(upstreamUrl, {
+        method: "POST",
+        headers: forwardHeaders(request, provider),
+        body,
+        signal: abortController.signal
+      });
+
+      statusCode = upstreamResponse.status;
+      if (!upstreamResponse.ok) {
+        metrics.rejectedRequests += 1;
+        writeJson(response, 502, requestId, {
+          error: {
+            type: "provider_error",
+            provider,
+            upstreamStatus: upstreamResponse.status,
+            message: "Provider upstream returned an error"
+          }
+        });
+        statusCode = 502;
+        return;
+      }
+
+      responseStreamed = true;
+      metrics.streamedResponses += 1;
+      await streamUpstreamResponse(upstreamResponse, response, requestId);
+    } catch (error) {
+      if (!response.headersSent) {
+        const gatewayError = classifyGatewayError(error);
+        statusCode = gatewayError.statusCode;
+        metrics.rejectedRequests += 1;
+        writeJson(response, statusCode, requestId, {
+          error: { type: gatewayError.type, message: gatewayError.message }
         });
       }
     } finally {
+      clearTimeout(timeout);
+      metrics.totalRequests += 1;
       options.log?.({
         authRedacted: true,
         bodyLogged: false,
         durationMs: Date.now() - startedAt,
         event: "request_completed",
-        method: request.method ?? "GET",
+        killSwitchActive,
+        method,
+        mode,
         provider,
+        requestBytes,
         requestId,
-        route: request.url ?? "/",
+        responseStreamed,
+        route,
         statusCode
       });
     }
@@ -122,8 +233,9 @@ export function createFakeGateway(options: FakeGatewayOptions = {}): FakeGateway
   server.requestTimeout = requestTimeoutMs;
   server.headersTimeout = requestTimeoutMs + 1_000;
 
-  return {
+  const gateway: LocalGateway = {
     server,
+    bindHost,
     close: () =>
       new Promise((resolve, reject) => {
         server.close((error) => {
@@ -133,8 +245,228 @@ export function createFakeGateway(options: FakeGatewayOptions = {}): FakeGateway
             resolve();
           }
         });
-      })
+      }),
+    setBypass: (enabled) => {
+      mode = enabled ? "bypass" : "safe";
+    },
+    setKillSwitch: (enabled) => {
+      killSwitchActive = enabled;
+    },
+    status: () => ({
+      bindHost,
+      gateway: "context-diet-local",
+      killSwitchActive,
+      metrics: {
+        ...metrics,
+        providerRequests: { ...metrics.providerRequests }
+      },
+      mode,
+      routes: [
+        healthRoute.path,
+        statusRoute.path,
+        openAIResponsesRoute.path,
+        anthropicMessagesRoute.path
+      ],
+      upstreamAllowlist
+    })
   };
+
+  return gateway;
+}
+
+export function createFakeGateway(options: FakeGatewayOptions = {}): FakeGateway {
+  const requestTimeoutMs = options.requestTimeoutMs ?? defaultRequestTimeoutMs;
+  const bindHost = "127.0.0.1" as const;
+  let mode: GatewayMode = "safe";
+  let killSwitchActive = false;
+  const metrics = createMetrics();
+  const server = createServer(async (request, response) => {
+    const startedAt = Date.now();
+    const requestId = readRequestId(request);
+    const route = normaliseRoute(request.url ?? "/");
+    const method = request.method ?? "GET";
+    let statusCode = 500;
+    let provider: ProviderFamily | undefined;
+    let requestBytes = 0;
+    let responseStreamed = false;
+
+    try {
+      const controlResult = await maybeHandleControlRoute({
+        method,
+        requestId,
+        response,
+        route,
+        setBypass: (enabled) => {
+          mode = enabled ? "bypass" : "safe";
+        },
+        setKillSwitch: (enabled) => {
+          killSwitchActive = enabled;
+        },
+        status: () => gateway.status()
+      });
+      if (controlResult !== null) {
+        statusCode = controlResult;
+        return;
+      }
+      if (method !== "POST" || !isProviderRoute(route)) {
+        statusCode = 404;
+        writeJson(response, statusCode, requestId, {
+          error: { type: "not_found", message: "fake gateway route not found" }
+        });
+        return;
+      }
+      if (killSwitchActive) {
+        statusCode = 503;
+        metrics.rejectedRequests += 1;
+        writeJson(response, statusCode, requestId, {
+          error: { type: "kill_switch_active", message: "Context Diet gateway is disabled" }
+        });
+        return;
+      }
+      provider = route === openAIResponsesRoute.path ? "openai" : "anthropic";
+      metrics.providerRequests[provider] += 1;
+      const bodyBuffer = await readLimitedBody(request, defaultMaxRequestBytes);
+      requestBytes = bodyBuffer.length;
+      const parsed = parseJsonObject(bodyBuffer);
+      statusCode =
+        provider === "openai"
+          ? await handleOpenAIResponses(parsed, response, requestId)
+          : await handleAnthropicMessages(parsed, response, requestId);
+      responseStreamed = parsed["stream"] === true;
+      if (responseStreamed) {
+        metrics.streamedResponses += 1;
+      }
+    } catch (error) {
+      if (!response.headersSent) {
+        const gatewayError = classifyGatewayError(error);
+        statusCode = gatewayError.statusCode;
+        metrics.rejectedRequests += 1;
+        writeJson(response, statusCode, requestId, {
+          error: { type: gatewayError.type, message: gatewayError.message }
+        });
+      }
+    } finally {
+      metrics.totalRequests += 1;
+      options.log?.({
+        authRedacted: true,
+        bodyLogged: false,
+        durationMs: Date.now() - startedAt,
+        event: "request_completed",
+        killSwitchActive,
+        method,
+        mode,
+        provider,
+        requestBytes,
+        requestId,
+        responseStreamed,
+        route,
+        statusCode
+      });
+    }
+  });
+
+  server.requestTimeout = requestTimeoutMs;
+  server.headersTimeout = requestTimeoutMs + 1_000;
+
+  const gateway: LocalGateway = {
+    bindHost,
+    close: () =>
+      new Promise((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      }),
+    server,
+    setBypass: (enabled) => {
+      mode = enabled ? "bypass" : "safe";
+    },
+    setKillSwitch: (enabled) => {
+      killSwitchActive = enabled;
+    },
+    status: () => ({
+      bindHost,
+      gateway: "context-diet-local",
+      killSwitchActive,
+      metrics: { ...metrics, providerRequests: { ...metrics.providerRequests } },
+      mode,
+      routes: [
+        healthRoute.path,
+        statusRoute.path,
+        openAIResponsesRoute.path,
+        anthropicMessagesRoute.path
+      ],
+      upstreamAllowlist: ["fake-provider"]
+    })
+  };
+
+  return gateway;
+}
+
+function createMetrics(): {
+  startedAtMs: number;
+  totalRequests: number;
+  providerRequests: Record<ProviderFamily, number>;
+  rejectedRequests: number;
+  streamedResponses: number;
+  authValuesRetained: false;
+  rawBodiesPersisted: false;
+} {
+  return {
+    authValuesRetained: false,
+    providerRequests: { anthropic: 0, openai: 0 },
+    rawBodiesPersisted: false,
+    rejectedRequests: 0,
+    startedAtMs: Date.now(),
+    streamedResponses: 0,
+    totalRequests: 0
+  };
+}
+
+async function maybeHandleControlRoute(input: {
+  readonly method: string;
+  readonly route: string;
+  readonly requestId: string;
+  readonly response: ServerResponse;
+  readonly status: () => GatewayStatus;
+  readonly setBypass: (enabled: boolean) => void;
+  readonly setKillSwitch: (enabled: boolean) => void;
+}): Promise<number | null> {
+  if (input.method === "GET" && input.route === healthRoute.path) {
+    writeJson(input.response, 200, input.requestId, {
+      status: "ok",
+      gateway: "context-diet-local",
+      mode: input.status().mode
+    });
+    return 200;
+  }
+  if (input.method === "GET" && input.route === statusRoute.path) {
+    writeJson(
+      input.response,
+      200,
+      input.requestId,
+      input.status() as unknown as Record<string, unknown>
+    );
+    return 200;
+  }
+  if (input.method === "POST" && input.route === "/runtime/bypass") {
+    input.setBypass(true);
+    writeJson(input.response, 200, input.requestId, { mode: "bypass" });
+    return 200;
+  }
+  if (input.method === "POST" && input.route === "/runtime/safe") {
+    input.setBypass(false);
+    writeJson(input.response, 200, input.requestId, { mode: "safe" });
+    return 200;
+  }
+  if (input.method === "POST" && input.route === "/runtime/kill-switch") {
+    input.setKillSwitch(true);
+    writeJson(input.response, 200, input.requestId, { killSwitchActive: true });
+    return 200;
+  }
+  if (input.method === "POST" && input.route === "/runtime/resume") {
+    input.setKillSwitch(false);
+    writeJson(input.response, 200, input.requestId, { killSwitchActive: false });
+    return 200;
+  }
+  return null;
 }
 
 async function handleOpenAIResponses(
@@ -151,17 +483,15 @@ async function handleOpenAIResponses(
   }
 
   if (body["stream"] === true) {
-    const statusCode = 200;
     writeStream(response, requestId, [
       'data: {"type":"response.output_text.delta","delta":"Fake OpenAI stream chunk 1"}\n\n',
       'data: {"type":"response.output_text.done","text":"Fake OpenAI stream done"}\n\n',
       "data: [DONE]\n\n"
     ]);
-    return statusCode;
+    return 200;
   }
 
-  const statusCode = 200;
-  writeJson(response, statusCode, requestId, {
+  writeJson(response, 200, requestId, {
     id: `resp_${requestId}`,
     object: "response",
     output: [
@@ -172,7 +502,7 @@ async function handleOpenAIResponses(
       }
     ]
   });
-  return statusCode;
+  return 200;
 }
 
 async function handleAnthropicMessages(
@@ -189,17 +519,15 @@ async function handleAnthropicMessages(
   }
 
   if (body["stream"] === true) {
-    const statusCode = 200;
     writeStream(response, requestId, [
       'event: message_start\ndata: {"type":"message_start","message":{"id":"msg_fake","type":"message","role":"assistant","content":[],"model":"fake-claude","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":1,"output_tokens":1}}}\n\n',
       'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Fake Anthropic stream chunk 1"}}\n\n',
       'event: message_stop\ndata: {"type":"message_stop"}\n\n'
     ]);
-    return statusCode;
+    return 200;
   }
 
-  const statusCode = 200;
-  writeJson(response, statusCode, requestId, {
+  writeJson(response, 200, requestId, {
     id: `msg_${requestId}`,
     type: "message",
     role: "assistant",
@@ -208,7 +536,7 @@ async function handleAnthropicMessages(
     stop_reason: "end_turn",
     usage: { input_tokens: 1, output_tokens: 1 }
   });
-  return statusCode;
+  return 200;
 }
 
 function readRequestId(request: IncomingMessage): string {
@@ -219,21 +547,75 @@ function readRequestId(request: IncomingMessage): string {
   return randomUUID();
 }
 
-async function readJsonBody(request: IncomingMessage): Promise<Record<string, unknown>> {
+async function readLimitedBody(request: IncomingMessage, maxBytes: number): Promise<Buffer> {
   const chunks: Buffer[] = [];
+  let total = 0;
   for await (const chunk of request) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    total += buffer.length;
+    if (total > maxBytes) {
+      throw new GatewayRequestError(
+        413,
+        "request_too_large",
+        "request exceeds configured size limit"
+      );
+    }
+    chunks.push(buffer);
   }
+  return Buffer.concat(chunks);
+}
 
-  if (chunks.length === 0) {
+function parseJsonObject(body: Buffer): Record<string, unknown> {
+  if (body.length === 0) {
     return {};
   }
-
-  const parsed: unknown = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  const parsed: unknown = JSON.parse(body.toString("utf8"));
   if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
     return parsed as Record<string, unknown>;
   }
   throw new Error("Expected JSON object body");
+}
+
+async function streamUpstreamResponse(
+  upstreamResponse: Response,
+  response: ServerResponse,
+  requestId: string
+): Promise<void> {
+  response.writeHead(upstreamResponse.status, {
+    "cache-control": upstreamResponse.headers.get("cache-control") ?? "no-cache",
+    "content-type": upstreamResponse.headers.get("content-type") ?? "application/json",
+    "x-request-id": requestId
+  });
+  if (upstreamResponse.body === null) {
+    response.end();
+    return;
+  }
+  for await (const chunk of upstreamResponse.body) {
+    response.write(chunk);
+  }
+  response.end();
+}
+
+function forwardHeaders(request: IncomingMessage, provider: ProviderFamily): Headers {
+  const headers = new Headers();
+  headers.set("content-type", "application/json");
+  copyHeader(request, headers, "x-request-id");
+  if (provider === "openai") {
+    copyHeader(request, headers, "authorization");
+    copyHeader(request, headers, "openai-beta");
+  } else {
+    copyHeader(request, headers, "x-api-key");
+    copyHeader(request, headers, "anthropic-version");
+    copyHeader(request, headers, "anthropic-beta");
+  }
+  return headers;
+}
+
+function copyHeader(request: IncomingMessage, headers: Headers, name: string): void {
+  const value = request.headers[name];
+  if (typeof value === "string") {
+    headers.set(name, value);
+  }
 }
 
 function writeJson(
@@ -260,4 +642,44 @@ function writeStream(response: ServerResponse, requestId: string, chunks: readon
     response.write(chunk);
   }
   response.end();
+}
+
+function isProviderRoute(route: string): route is (typeof providerRoutes)[number] {
+  return providerRoutes.includes(route as (typeof providerRoutes)[number]);
+}
+
+function normaliseRoute(url: string): string {
+  return url.split("?")[0] ?? "/";
+}
+
+function isAllowedUpstream(upstreamUrl: string, allowlist: readonly string[]): boolean {
+  return allowlist.some((allowed) => upstreamUrl.startsWith(allowed));
+}
+
+function classifyGatewayError(error: unknown): {
+  readonly statusCode: number;
+  readonly type: string;
+  readonly message: string;
+} {
+  if (error instanceof GatewayRequestError) {
+    return { statusCode: error.statusCode, type: error.type, message: error.message };
+  }
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return {
+      statusCode: 408,
+      type: "timeout_or_cancelled",
+      message: "request timed out or was cancelled"
+    };
+  }
+  return { statusCode: 400, type: "bad_request", message: "request could not be handled" };
+}
+
+class GatewayRequestError extends Error {
+  constructor(
+    readonly statusCode: number,
+    readonly type: string,
+    message: string
+  ) {
+    super(message);
+  }
 }
