@@ -1,3 +1,9 @@
+import {
+  createSyntheticUsageHistory,
+  type SyntheticUsageDay,
+  type SyntheticUsageHistory
+} from "@context-diet/test-data";
+
 export interface SafeMetric {
   readonly name: string;
   readonly value: number;
@@ -137,8 +143,94 @@ export interface ProviderCostReport {
   readonly reasons: readonly string[];
 }
 
+export type ProjectionScenarioName = "conservative" | "expected" | "high-usage";
+export type ProjectionEvidenceOrigin = "synthetic" | "measured";
+
+export interface SavingsProjectionCostAssumptions {
+  readonly inputPerMillion: number;
+  readonly imagePerMillion: number;
+  readonly cachedInputPerMillion: number;
+  readonly retrievalPerCall: number;
+  readonly localProcessingPerRequest: number;
+}
+
+export interface SavingsProjectionInput {
+  readonly seed: number;
+  readonly days: 30 | 90;
+  readonly costAssumptions: SavingsProjectionCostAssumptions;
+  readonly baselineAvailable?: boolean;
+  readonly evidenceOrigin?: ProjectionEvidenceOrigin;
+  readonly benchmarkDate?: string;
+}
+
+export interface SavingsProjectionPeriod {
+  readonly originalInputCost: number;
+  readonly imageCost: number;
+  readonly cacheEffect: number;
+  readonly localProcessingCost: number;
+  readonly retrievalOverhead: number;
+  readonly netSaving: number;
+  readonly addedLatencyMs: number;
+  readonly breakEvenRequests: number | null;
+  readonly savingsPercentage: number | null;
+}
+
+export interface SavingsProjectionScenario {
+  readonly scenario: ProjectionScenarioName;
+  readonly weekly: SavingsProjectionPeriod;
+  readonly monthly: SavingsProjectionPeriod;
+  readonly annual: SavingsProjectionPeriod;
+}
+
+export interface SavingsProjectionReport {
+  readonly dataNotice: "SYNTHETIC DATA";
+  readonly evidenceOrigin: "synthetic";
+  readonly seed: number;
+  readonly historyDays: 30 | 90;
+  readonly benchmarkDate: string;
+  readonly baselineAvailable: boolean;
+  readonly comparisonValid: boolean;
+  readonly confidence: CostConfidence;
+  readonly scenarios: readonly SavingsProjectionScenario[];
+  readonly reasons: readonly string[];
+}
+
 export function createSafeMetric(name: string, value: number): SafeMetric {
   return { name, value };
+}
+
+export function createSavingsProjectionReport(
+  input: SavingsProjectionInput
+): SavingsProjectionReport {
+  const history = createSyntheticUsageHistory(input.seed, input.days);
+  const evidenceOrigin = input.evidenceOrigin ?? "synthetic";
+  const baselineAvailable = input.baselineAvailable ?? true;
+  const mixedEvidence = evidenceOrigin !== history.dataOrigin;
+  const comparisonValid = baselineAvailable && !mixedEvidence;
+  const reasons: string[] = ["SYNTHETIC DATA: projections use seeded synthetic usage history."];
+  if (!baselineAvailable) {
+    reasons.push("Missing baseline means no savings percentage is reported.");
+  }
+  if (mixedEvidence) {
+    reasons.push("Measured and simulated data cannot be mixed silently; comparison is invalid.");
+  }
+
+  return {
+    baselineAvailable,
+    benchmarkDate: input.benchmarkDate ?? "2026-07-17",
+    comparisonValid,
+    confidence: mixedEvidence ? "unavailable" : input.days === 90 ? "medium" : "low",
+    dataNotice: "SYNTHETIC DATA",
+    evidenceOrigin: "synthetic",
+    historyDays: input.days,
+    reasons,
+    scenarios: [
+      projectionScenario("conservative", history, input.costAssumptions, 0.75, comparisonValid),
+      projectionScenario("expected", history, input.costAssumptions, 1, comparisonValid),
+      projectionScenario("high-usage", history, input.costAssumptions, 1.4, comparisonValid)
+    ],
+    seed: input.seed
+  };
 }
 
 export function createProviderCostReport(input: ProviderCostReportInput): ProviderCostReport {
@@ -360,6 +452,109 @@ function retestCondition(input: RecommendationInput, verdict: RecommendationVerd
     return "Re-test only after a supported local model profile is approved.";
   }
   return "Re-test when usage, pricing, cache intensity, model profile or exactness mix changes.";
+}
+
+function projectionScenario(
+  scenario: ProjectionScenarioName,
+  history: SyntheticUsageHistory,
+  costs: SavingsProjectionCostAssumptions,
+  multiplier: number,
+  comparisonValid: boolean
+): SavingsProjectionScenario {
+  const base = periodFromDays(history.days, costs, multiplier, comparisonValid);
+  return {
+    annual: scaleProjection(base, 365 / history.days.length, comparisonValid),
+    monthly: scaleProjection(base, 30 / history.days.length, comparisonValid),
+    scenario,
+    weekly: scaleProjection(base, 7 / history.days.length, comparisonValid)
+  };
+}
+
+function periodFromDays(
+  days: readonly SyntheticUsageDay[],
+  costs: SavingsProjectionCostAssumptions,
+  multiplier: number,
+  comparisonValid: boolean
+): SavingsProjectionPeriod {
+  const totals = days.reduce(
+    (acc, day) => {
+      const requests = day.sessions * day.requestsPerSession * multiplier;
+      const originalTokens = day.originalTokenEstimate * requests;
+      const eligibleTokens = day.eligibleTokenEstimate * requests;
+      const cachedTokens = Math.min(day.cachedTokens * requests, originalTokens);
+      const imageTokens = day.imageTokens * requests;
+      const retrievalCalls = day.retrievalCalls * requests;
+      return {
+        addedLatencyMs: acc.addedLatencyMs + day.addedLatencyMs * requests,
+        cachedTokens: acc.cachedTokens + cachedTokens,
+        eligibleTokens: acc.eligibleTokens + eligibleTokens,
+        imageTokens: acc.imageTokens + imageTokens,
+        originalTokens: acc.originalTokens + originalTokens,
+        requests: acc.requests + requests,
+        retrievalCalls: acc.retrievalCalls + retrievalCalls
+      };
+    },
+    {
+      addedLatencyMs: 0,
+      cachedTokens: 0,
+      eligibleTokens: 0,
+      imageTokens: 0,
+      originalTokens: 0,
+      requests: 0,
+      retrievalCalls: 0
+    }
+  );
+  const originalInputCost = (totals.originalTokens / 1_000_000) * costs.inputPerMillion;
+  const transformedInputCost =
+    (Math.max(0, totals.originalTokens - totals.eligibleTokens - totals.cachedTokens) / 1_000_000) *
+    costs.inputPerMillion;
+  const cacheEffect =
+    (totals.cachedTokens / 1_000_000) * (costs.inputPerMillion - costs.cachedInputPerMillion);
+  const imageCost = (totals.imageTokens / 1_000_000) * costs.imagePerMillion;
+  const localProcessingCost = totals.requests * costs.localProcessingPerRequest;
+  const retrievalOverhead = totals.retrievalCalls * costs.retrievalPerCall;
+  const grossSaving = originalInputCost - transformedInputCost;
+  const netSaving = grossSaving + cacheEffect - imageCost - localProcessingCost - retrievalOverhead;
+  const perRequestNet = totals.requests === 0 ? 0 : netSaving / totals.requests;
+
+  return {
+    addedLatencyMs: Math.round(totals.requests === 0 ? 0 : totals.addedLatencyMs / totals.requests),
+    breakEvenRequests:
+      perRequestNet <= 0
+        ? null
+        : Math.ceil((imageCost + localProcessingCost + retrievalOverhead) / perRequestNet),
+    cacheEffect: roundMoney(cacheEffect),
+    imageCost: roundMoney(imageCost),
+    localProcessingCost: roundMoney(localProcessingCost),
+    netSaving: roundMoney(netSaving),
+    originalInputCost: roundMoney(originalInputCost),
+    retrievalOverhead: roundMoney(retrievalOverhead),
+    savingsPercentage:
+      comparisonValid && originalInputCost > 0
+        ? roundMoney((netSaving / originalInputCost) * 100)
+        : null
+  };
+}
+
+function scaleProjection(
+  period: SavingsProjectionPeriod,
+  factor: number,
+  comparisonValid: boolean
+): SavingsProjectionPeriod {
+  return {
+    addedLatencyMs: period.addedLatencyMs,
+    breakEvenRequests: period.breakEvenRequests,
+    cacheEffect: roundMoney(period.cacheEffect * factor),
+    imageCost: roundMoney(period.imageCost * factor),
+    localProcessingCost: roundMoney(period.localProcessingCost * factor),
+    netSaving: roundMoney(period.netSaving * factor),
+    originalInputCost: roundMoney(period.originalInputCost * factor),
+    retrievalOverhead: roundMoney(period.retrievalOverhead * factor),
+    savingsPercentage:
+      comparisonValid && period.originalInputCost > 0
+        ? roundMoney((period.netSaving / period.originalInputCost) * 100)
+        : null
+  };
 }
 
 function costTotal(run: ProviderCostRun): ProviderCostTotal | null {

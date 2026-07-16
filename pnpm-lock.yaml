@@ -31,6 +31,12 @@ importers:
 
   apps/dashboard:
     dependencies:
+      "@context-diet/core":
+        specifier: workspace:*
+        version: link:../../packages/core
+      "@context-diet/leaderboard":
+        specifier: workspace:*
+        version: link:../../packages/leaderboard
       "@context-diet/metrics":
         specifier: workspace:*
         version: link:../../packages/metrics
@@ -64,7 +70,13 @@ importers:
         specifier: workspace:*
         version: link:../core
 
-  packages/metrics: {}
+  packages/leaderboard: {}
+
+  packages/metrics:
+    dependencies:
+      "@context-diet/test-data":
+        specifier: workspace:*
+        version: link:../test-data
 
   packages/providers-anthropic:
     dependencies:

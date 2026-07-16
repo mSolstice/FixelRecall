@@ -94,6 +94,19 @@ export interface ShareCardAllowedFields {
   readonly protectedValuesImagedCount: number;
   readonly modelFamily: string;
   readonly benchmarkDate: string;
+  readonly verificationId: string;
+  readonly evidenceOriginLabel: "SYNTHETIC" | "MEASURED" | "MIXED";
+  readonly compatibilityVerdict:
+    | "RECOMMENDED"
+    | "RECOMMENDED_WITH_RESTRICTIONS"
+    | "AUDIT_ONLY"
+    | "NOT_WORTH_USING"
+    | "UNSUPPORTED"
+    | "RETEST_REQUIRED";
+  readonly monthlyProjectionRange: string;
+  readonly benchmarkProfile: string;
+  readonly testStatus: "PASSING" | "FAILING" | "INCOMPLETE";
+  readonly syntheticWatermark: "SYNTHETIC RESULTS";
 }
 
 export interface ShareCardPreview {
@@ -113,10 +126,55 @@ export interface ShareCardExportResult {
   readonly exported: boolean;
   readonly preview: ShareCardPreview;
   readonly pngPath: string | null;
+  readonly svgPath: string | null;
   readonly proofJsonPath: string | null;
 }
 
+export interface ShareCardProofObject {
+  readonly artifactKind: "context_diet_share_card_proof";
+  readonly exported: boolean;
+  readonly allowlist: readonly ShareCardAllowedFieldName[];
+  readonly blockedFieldCount: number;
+  readonly fields: ShareCardAllowedFields;
+  readonly generatedFiles: readonly ("png" | "svg" | "json_proof")[];
+  readonly noUploadOrShareAction: true;
+  readonly shareNothingAutomatically: true;
+}
+
 export type ShareCardAllowedFieldName = keyof ShareCardAllowedFields;
+
+export type SyntheticBenchmarkBadgeVariant =
+  | "benchmark_passing"
+  | "synthetic_input_reduction"
+  | "protected_values_imaged"
+  | "compatibility_status";
+
+export interface SyntheticBenchmarkEvidence {
+  readonly artifactKind: "context_diet_synthetic_benchmark_evidence";
+  readonly dataOrigin: "synthetic";
+  readonly syntheticNotice: "SYNTHETIC TEST DATA";
+  readonly seed: number;
+  readonly generatedAt: string;
+  readonly benchmarkPassing: boolean;
+  readonly inputReductionPercent: number | null;
+  readonly protectedValuesImagedCount: number;
+  readonly compatibilityStatus: "PASSING" | "BLOCKED";
+  readonly testsPassed: number;
+  readonly testsTotal: number;
+  readonly modelFamily: string;
+  readonly benchmarkDate: string;
+  readonly stableResultKey: string;
+  readonly privacyFilter: "forbidden_private_fields_excluded";
+  readonly forbiddenPrivateFieldCount: number;
+}
+
+export interface SyntheticBenchmarkArtifacts {
+  readonly evidence: SyntheticBenchmarkEvidence;
+  readonly markdownSummary: string;
+  readonly pullRequestCommentText: string;
+  readonly readmeEmbedInstructions: string;
+  readonly badges: Readonly<Record<SyntheticBenchmarkBadgeVariant, string>>;
+}
 
 export const shareCardAllowedFields = [
   "percentageInputReduction",
@@ -124,7 +182,14 @@ export const shareCardAllowedFields = [
   "testsPassed",
   "protectedValuesImagedCount",
   "modelFamily",
-  "benchmarkDate"
+  "benchmarkDate",
+  "verificationId",
+  "evidenceOriginLabel",
+  "compatibilityVerdict",
+  "monthlyProjectionRange",
+  "benchmarkProfile",
+  "testStatus",
+  "syntheticWatermark"
 ] as const satisfies readonly ShareCardAllowedFieldName[];
 
 export const shareCardForbiddenFields = [
@@ -134,17 +199,64 @@ export const shareCardForbiddenFields = [
   "branch",
   "paths",
   "path",
+  "filePath",
+  "filePaths",
   "prompts",
   "prompt",
+  "rawPrompt",
+  "promptText",
   "code",
+  "diff",
   "userIdentity",
   "user",
   "sessionIds",
   "sessionId",
   "providerCredentials",
+  "credentials",
   "credential",
   "authorization",
-  "apiKey"
+  "apiKey",
+  "rawAuditEvents",
+  "rawAuditEvent",
+  "auditEvents"
+] as const;
+
+export const syntheticBenchmarkEvidenceAllowedFields = [
+  "artifactKind",
+  "dataOrigin",
+  "syntheticNotice",
+  "seed",
+  "generatedAt",
+  "benchmarkPassing",
+  "inputReductionPercent",
+  "protectedValuesImagedCount",
+  "compatibilityStatus",
+  "testsPassed",
+  "testsTotal",
+  "modelFamily",
+  "benchmarkDate",
+  "stableResultKey",
+  "privacyFilter",
+  "forbiddenPrivateFieldCount"
+] as const satisfies readonly (keyof SyntheticBenchmarkEvidence)[];
+
+export const syntheticBenchmarkForbiddenFields = [
+  ...shareCardForbiddenFields,
+  "repositoryId",
+  "repositoryOrigin",
+  "repositoryName",
+  "taskId",
+  "taskName",
+  "filesChanged",
+  "filePath",
+  "diff",
+  "rawPrompt",
+  "promptText",
+  "requestBody",
+  "responseBody",
+  "authentication",
+  "secret",
+  "token"
 ] as const;
 
 export function benchmarkReadiness(): BenchmarkReadiness {
@@ -254,6 +366,8 @@ export function renderBenchmarkMarkdown(report: BenchmarkReport): string {
   const lines = [
     "# Context Diet Personal Benchmark",
     "",
+    "SYNTHETIC DATA",
+    "",
     "SYNTHETIC TEST DATA",
     "",
     `Generated: ${report.generatedAt}`,
@@ -319,6 +433,152 @@ export async function writeBenchmarkReport(
   return { jsonPath, markdownPath };
 }
 
+export function createSyntheticBenchmarkArtifacts(seed = 1): SyntheticBenchmarkArtifacts {
+  const report = createSyntheticBenchmarkReport(seed);
+  const evidence = createSyntheticBenchmarkEvidence(report, seed);
+  const badges = createSyntheticBenchmarkBadges(evidence);
+  return {
+    badges,
+    evidence,
+    markdownSummary: renderSyntheticBenchmarkJobSummary(evidence),
+    pullRequestCommentText: renderSyntheticBenchmarkPullRequestComment(evidence),
+    readmeEmbedInstructions: renderSyntheticBenchmarkReadmeInstructions()
+  };
+}
+
+export function createSyntheticBenchmarkEvidence(
+  report: BenchmarkReport,
+  seed: number
+): SyntheticBenchmarkEvidence {
+  const control = runByVariant(report, "uncompressed_control");
+  const compressed = runByVariant(report, "safe_compressed_exact_retrieval");
+  const controlInput = control?.usage.inputTokens ?? null;
+  const compressedInput = compressed?.usage.inputTokens ?? null;
+  const inputReductionPercent =
+    controlInput === null || compressedInput === null || controlInput <= 0
+      ? null
+      : Math.round(((controlInput - compressedInput) / controlInput) * 100);
+  const protectedValuesImagedCount = report.runs.reduce(
+    (total, run) => total + run.protectedValuesImagedCount,
+    0
+  );
+  const testsTotal = report.runs.reduce((total, run) => total + run.testResults.length, 0);
+  const testsPassed = report.runs.reduce(
+    (total, run) => total + run.testResults.filter((result) => result.passed).length,
+    0
+  );
+  const benchmarkPassing =
+    report.comparison.comparable &&
+    report.runs.every((run) => run.status === "success") &&
+    testsTotal > 0 &&
+    testsPassed === testsTotal &&
+    protectedValuesImagedCount === 0;
+  return assertSyntheticEvidenceAllowlist({
+    artifactKind: "context_diet_synthetic_benchmark_evidence",
+    benchmarkDate: report.generatedAt.slice(0, 10),
+    benchmarkPassing,
+    compatibilityStatus: benchmarkPassing ? "PASSING" : "BLOCKED",
+    dataOrigin: "synthetic",
+    forbiddenPrivateFieldCount: syntheticBenchmarkForbiddenFields.length,
+    generatedAt: report.generatedAt,
+    inputReductionPercent,
+    modelFamily: report.scenario.modelProfile,
+    privacyFilter: "forbidden_private_fields_excluded",
+    protectedValuesImagedCount,
+    seed,
+    stableResultKey: `synthetic-seed-${seed}-${benchmarkPassing ? "passing" : "blocked"}-${inputReductionPercent ?? "na"}-${protectedValuesImagedCount}`,
+    syntheticNotice: "SYNTHETIC TEST DATA",
+    testsPassed,
+    testsTotal
+  });
+}
+
+export function createSyntheticBenchmarkBadges(
+  evidence: SyntheticBenchmarkEvidence
+): Readonly<Record<SyntheticBenchmarkBadgeVariant, string>> {
+  return {
+    benchmark_passing: renderBadge({
+      color: evidence.benchmarkPassing ? "#2f7d4f" : "#9c2f2f",
+      label: "Context Diet",
+      message: evidence.benchmarkPassing ? "benchmark passing" : "benchmark blocked"
+    }),
+    compatibility_status: renderBadge({
+      color: evidence.compatibilityStatus === "PASSING" ? "#2f7d4f" : "#9c2f2f",
+      label: "compatibility",
+      message: `SYNTHETIC ${evidence.compatibilityStatus}`
+    }),
+    protected_values_imaged: renderBadge({
+      color: evidence.protectedValuesImagedCount === 0 ? "#2f7d4f" : "#9c2f2f",
+      label: "protected imaged",
+      message: `SYNTHETIC ${evidence.protectedValuesImagedCount}`
+    }),
+    synthetic_input_reduction: renderBadge({
+      color: evidence.inputReductionPercent === null ? "#606a78" : "#1d6fdc",
+      label: "input reduction",
+      message:
+        evidence.inputReductionPercent === null
+          ? "not comparable"
+          : `SYNTHETIC ${evidence.inputReductionPercent}%`
+    })
+  };
+}
+
+export function renderSyntheticBenchmarkJobSummary(evidence: SyntheticBenchmarkEvidence): string {
+  return [
+    "# Context Diet Synthetic Benchmark",
+    "",
+    "**SYNTHETIC TEST DATA**",
+    "",
+    "| Field | Value |",
+    "| --- | --- |",
+    `| Benchmark | ${evidence.benchmarkPassing ? "passing" : "blocked"} |`,
+    `| Input reduction | ${evidence.inputReductionPercent === null ? "not comparable" : `SYNTHETIC ${evidence.inputReductionPercent}%`} |`,
+    `| Protected values imaged | SYNTHETIC ${evidence.protectedValuesImagedCount} |`,
+    `| Compatibility | ${evidence.compatibilityStatus} |`,
+    `| Tests | ${evidence.testsPassed}/${evidence.testsTotal} passed |`,
+    `| Model family | ${evidence.modelFamily} |`,
+    `| Seed | ${evidence.seed} |`,
+    "",
+    "Artifacts are generated from allowlisted synthetic fields only. Sensitive source details and credentials are excluded."
+  ].join("\n");
+}
+
+export function renderSyntheticBenchmarkPullRequestComment(
+  evidence: SyntheticBenchmarkEvidence
+): string {
+  return [
+    "## Context Diet synthetic benchmark",
+    "",
+    "**SYNTHETIC TEST DATA**",
+    "",
+    `Benchmark: ${evidence.benchmarkPassing ? "passing" : "blocked"}`,
+    `Input reduction: ${evidence.inputReductionPercent === null ? "not comparable" : `SYNTHETIC ${evidence.inputReductionPercent}%`}`,
+    `Protected values imaged: SYNTHETIC ${evidence.protectedValuesImagedCount}`,
+    `Compatibility: ${evidence.compatibilityStatus}`,
+    "",
+    "This text is saved as an artifact only; the workflow does not publish comments automatically."
+  ].join("\n");
+}
+
+export function renderSyntheticBenchmarkReadmeInstructions(): string {
+  return [
+    "# Context Diet Synthetic Benchmark Badge Embeds",
+    "",
+    "These badges are generated locally by GitHub Actions and uploaded as workflow artifacts. They are not published to an external badge service.",
+    "",
+    "After downloading the `context-diet-synthetic-benchmark` artifact, copy the SVG files into a committed docs or assets folder if you choose to display them.",
+    "",
+    "```md",
+    "![Context Diet benchmark](docs/badges/context-diet-benchmark.svg)",
+    "![Synthetic input reduction](docs/badges/context-diet-input-reduction.svg)",
+    "![Protected values imaged](docs/badges/context-diet-protected-imaged.svg)",
+    "![Compatibility status](docs/badges/context-diet-compatibility.svg)",
+    "```",
+    "",
+    "Every numeric badge based on test data includes `SYNTHETIC`. Do not replace these with production claims unless measured evidence is available."
+  ].join("\n");
+}
+
 export function createShareCardPreview(input: Record<string, unknown>): ShareCardPreview {
   const blockedFields = detectForbiddenFields(input);
   const allowedFields = pickAllowedShareFields(input);
@@ -337,39 +597,51 @@ export async function exportShareCard(
 ): Promise<ShareCardExportResult> {
   const preview = createShareCardPreview(input);
   if (!options.confirm) {
-    return { exported: false, pngPath: null, preview, proofJsonPath: null };
+    return { exported: false, pngPath: null, preview, proofJsonPath: null, svgPath: null };
   }
   await mkdir(options.outputDirectory, { recursive: true });
   const pngPath = join(options.outputDirectory, "context-diet-share-card.png");
+  const svgPath = join(options.outputDirectory, "context-diet-share-card.svg");
   const proofJsonPath = join(options.outputDirectory, "context-diet-share-card.proof.json");
   await writeFile(pngPath, createShareCardPng(preview.allowedFields));
-  await writeFile(
-    proofJsonPath,
-    `${JSON.stringify(
-      {
-        allowlist: preview.allowlist,
-        blockedFields: preview.blockedFields,
-        exported: true,
-        fields: preview.allowedFields,
-        shareNothingAutomatically: true
-      },
-      null,
-      2
-    )}\n`,
-    "utf8"
-  );
-  return { exported: true, pngPath, preview, proofJsonPath };
+  await writeFile(svgPath, createShareCardSvg(preview.allowedFields), "utf8");
+  const proof = createShareCardProofObject(preview, true);
+  await writeFile(proofJsonPath, `${JSON.stringify(proof, null, 2)}\n`, "utf8");
+  return { exported: true, pngPath, preview, proofJsonPath, svgPath };
 }
 
 function pickAllowedShareFields(input: Record<string, unknown>): ShareCardAllowedFields {
   return {
     benchmarkDate: stringField(input.benchmarkDate),
+    benchmarkProfile: stringField(input.benchmarkProfile),
+    compatibilityVerdict: compatibilityVerdictField(input.compatibilityVerdict),
     estimatedTotalSaving: numberField(input.estimatedTotalSaving),
+    evidenceOriginLabel: evidenceOriginField(input.evidenceOriginLabel),
     modelFamily: stringField(input.modelFamily),
+    monthlyProjectionRange: stringField(input.monthlyProjectionRange),
     percentageInputReduction:
       input.percentageInputReduction === null ? null : numberField(input.percentageInputReduction),
     protectedValuesImagedCount: integerField(input.protectedValuesImagedCount),
-    testsPassed: integerField(input.testsPassed)
+    syntheticWatermark: "SYNTHETIC RESULTS",
+    testStatus: testStatusField(input.testStatus),
+    testsPassed: integerField(input.testsPassed),
+    verificationId: stringField(input.verificationId)
+  };
+}
+
+function createShareCardProofObject(
+  preview: ShareCardPreview,
+  exported: boolean
+): ShareCardProofObject {
+  return {
+    allowlist: preview.allowlist,
+    artifactKind: "context_diet_share_card_proof",
+    blockedFieldCount: preview.blockedFields.length,
+    exported,
+    fields: preview.allowedFields,
+    generatedFiles: exported ? ["png", "svg", "json_proof"] : [],
+    noUploadOrShareAction: true,
+    shareNothingAutomatically: true
   };
 }
 
@@ -392,6 +664,67 @@ function detectForbiddenFields(input: Record<string, unknown>): readonly string[
   return [...blocked].sort();
 }
 
+function assertSyntheticEvidenceAllowlist(
+  evidence: SyntheticBenchmarkEvidence
+): SyntheticBenchmarkEvidence {
+  const allowed = new Set<string>(syntheticBenchmarkEvidenceAllowedFields);
+  for (const key of Object.keys(evidence)) {
+    if (!allowed.has(key)) {
+      throw new Error(`Synthetic benchmark evidence field is not allowlisted: ${key}`);
+    }
+  }
+  return evidence;
+}
+
+function runByVariant(
+  report: BenchmarkReport,
+  variant: BenchmarkVariant
+): BenchmarkRun | undefined {
+  return report.runs.find((run) => run.variant === variant);
+}
+
+function renderBadge(input: {
+  readonly label: string;
+  readonly message: string;
+  readonly color: string;
+}): string {
+  const label = escapeSvg(input.label);
+  const message = escapeSvg(input.message);
+  const labelWidth = badgeTextWidth(input.label);
+  const messageWidth = badgeTextWidth(input.message);
+  const totalWidth = labelWidth + messageWidth;
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="20" role="img" aria-label="${label}: ${message}">`,
+    `<title>${label}: ${message}</title>`,
+    `<linearGradient id="s" x2="0" y2="100%"><stop offset="0" stop-color="#fff" stop-opacity=".7"/><stop offset=".1" stop-opacity=".1"/><stop offset=".9" stop-opacity=".3"/><stop offset="1" stop-opacity=".5"/></linearGradient>`,
+    `<clipPath id="r"><rect width="${totalWidth}" height="20" rx="3" fill="#fff"/></clipPath>`,
+    `<g clip-path="url(#r)">`,
+    `<rect width="${labelWidth}" height="20" fill="#555"/>`,
+    `<rect x="${labelWidth}" width="${messageWidth}" height="20" fill="${input.color}"/>`,
+    `<rect width="${totalWidth}" height="20" fill="url(#s)"/>`,
+    `</g>`,
+    `<g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="11">`,
+    `<text x="${Math.round(labelWidth / 2)}" y="15" fill="#010101" fill-opacity=".3">${label}</text>`,
+    `<text x="${Math.round(labelWidth / 2)}" y="14">${label}</text>`,
+    `<text x="${labelWidth + Math.round(messageWidth / 2)}" y="15" fill="#010101" fill-opacity=".3">${message}</text>`,
+    `<text x="${labelWidth + Math.round(messageWidth / 2)}" y="14">${message}</text>`,
+    `</g>`,
+    `</svg>`
+  ].join("");
+}
+
+function badgeTextWidth(value: string): number {
+  return Math.max(44, value.length * 7 + 10);
+}
+
+function escapeSvg(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
 function renderShareCardPreviewText(
   fields: ShareCardAllowedFields,
   blockedFields: readonly string[]
@@ -403,9 +736,39 @@ function renderShareCardPreviewText(
     `Tests passed: ${fields.testsPassed}`,
     `Protected values imaged: ${fields.protectedValuesImagedCount}`,
     `Model family: ${fields.modelFamily}`,
+    `Verification ID: ${fields.verificationId}`,
+    `Evidence origin: ${fields.evidenceOriginLabel}`,
+    `Compatibility verdict: ${fields.compatibilityVerdict}`,
+    `Monthly projection: ${fields.monthlyProjectionRange}`,
+    `Benchmark profile: ${fields.benchmarkProfile}`,
+    `Test status: ${fields.testStatus}`,
+    `Watermark: ${fields.syntheticWatermark}`,
     `Benchmark date: ${fields.benchmarkDate}`,
     `Blocked forbidden fields: ${blockedFields.length}`
   ].join("\n");
+}
+
+function createShareCardSvg(fields: ShareCardAllowedFields): string {
+  const lines = [
+    "Context Diet",
+    fields.syntheticWatermark,
+    `Input reduction: ${fields.percentageInputReduction === null ? "not comparable" : `${fields.percentageInputReduction}%`}`,
+    `Monthly projection: ${fields.monthlyProjectionRange}`,
+    `Verdict: ${fields.compatibilityVerdict}`,
+    `Tests: ${fields.testStatus} (${fields.testsPassed} passed)`,
+    `Profile: ${fields.benchmarkProfile}`,
+    `Verification: ${fields.verificationId}`
+  ];
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" role="img" aria-label="Context Diet share card ${escapeSvg(fields.syntheticWatermark)}">`,
+    `<rect width="640" height="360" fill="#f7f8fa"/>`,
+    `<rect x="24" y="24" width="592" height="312" rx="8" fill="#ffffff" stroke="#d8dde5"/>`,
+    ...lines.map(
+      (line, index) =>
+        `<text x="48" y="${64 + index * 34}" fill="${index === 1 ? "#9c2f2f" : "#16181d"}" font-family="Inter,Arial,sans-serif" font-size="${index === 0 ? 24 : 18}" font-weight="${index <= 1 ? 700 : 400}">${escapeSvg(line)}</text>`
+    ),
+    `</svg>`
+  ].join("");
 }
 
 function createShareCardPng(fields: ShareCardAllowedFields): Buffer {
@@ -465,6 +828,27 @@ function integerField(value: unknown): number {
 
 function stringField(value: unknown): string {
   return typeof value === "string" && value.trim().length > 0 ? value : "unknown";
+}
+
+function evidenceOriginField(value: unknown): ShareCardAllowedFields["evidenceOriginLabel"] {
+  return value === "MEASURED" || value === "MIXED" ? value : "SYNTHETIC";
+}
+
+function compatibilityVerdictField(value: unknown): ShareCardAllowedFields["compatibilityVerdict"] {
+  return value === "RECOMMENDED" ||
+    value === "RECOMMENDED_WITH_RESTRICTIONS" ||
+    value === "AUDIT_ONLY" ||
+    value === "NOT_WORTH_USING" ||
+    value === "UNSUPPORTED" ||
+    value === "RETEST_REQUIRED"
+    ? value
+    : "AUDIT_ONLY";
+}
+
+function testStatusField(value: unknown): ShareCardAllowedFields["testStatus"] {
+  return value === "PASSING" || value === "FAILING" || value === "INCOMPLETE"
+    ? value
+    : "INCOMPLETE";
 }
 
 function syntheticRun(

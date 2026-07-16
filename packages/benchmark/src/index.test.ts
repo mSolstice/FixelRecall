@@ -6,17 +6,32 @@ import { describe, expect, it } from "vitest";
 
 import {
   benchmarkReadiness,
+  createSyntheticBenchmarkArtifacts,
+  createSyntheticBenchmarkBadges,
+  createSyntheticBenchmarkEvidence,
   createShareCardPreview,
   createPersonalBenchmarkReport,
   createSyntheticBenchmarkReport,
   exportShareCard,
   renderBenchmarkMarkdown,
+  renderSyntheticBenchmarkReadmeInstructions,
   shareCardForbiddenFields,
+  syntheticBenchmarkEvidenceAllowedFields,
+  syntheticBenchmarkForbiddenFields,
   validateComparableRuns,
   writeBenchmarkReport,
   type BenchmarkRun,
   type BenchmarkScenario
 } from "./index.js";
+
+const scenario: BenchmarkScenario = {
+  modelProfile: "synthetic-safe-profile-v1",
+  provider: "synthetic",
+  repositoryId: "synthetic-repo-fixture",
+  repositoryOrigin: "synthetic",
+  taskId: "safe-task-fixture",
+  taskName: "Synthetic safe helper edit"
+};
 
 describe("benchmarkReadiness", () => {
   it("requires a comparable baseline", () => {
@@ -25,14 +40,6 @@ describe("benchmarkReadiness", () => {
 });
 
 describe("personal benchmark harness", () => {
-  const scenario: BenchmarkScenario = {
-    modelProfile: "synthetic-safe-profile-v1",
-    provider: "synthetic",
-    repositoryId: "synthetic-repo-fixture",
-    repositoryOrigin: "synthetic",
-    taskId: "safe-task-fixture",
-    taskName: "Synthetic safe helper edit"
-  };
   const runs: readonly BenchmarkRun[] = [
     run("uncompressed_control"),
     run("safe_compressed"),
@@ -139,14 +146,26 @@ describe("personal benchmark harness", () => {
 describe("optional share-card generator", () => {
   const shareInput = {
     benchmarkDate: "2026-07-17",
+    benchmarkProfile: "synthetic-profile-safe-v1",
     branch: "main",
+    code: "const secret = 'do-not-export';",
+    compatibilityVerdict: "RECOMMENDED_WITH_RESTRICTIONS",
+    credentials: "credential-do-not-export",
     estimatedTotalSaving: 12.5,
+    evidenceOriginLabel: "SYNTHETIC",
+    filePath: "/Users/example/private-repo/src/secret.ts",
     modelFamily: "synthetic-safe",
+    monthlyProjectionRange: "$8.00-$12.00 SYNTHETIC",
     percentageInputReduction: 42,
+    prompt: "private prompt should not appear",
     protectedValuesImagedCount: 0,
+    rawAuditEvents: [{ body: "raw audit event should not appear" }],
     repositoryName: "private-repo",
     sessionId: "session_secret",
-    testsPassed: 24
+    testStatus: "PASSING",
+    testsPassed: 24,
+    userIdentity: "Ada Private",
+    verificationId: "verify_synthetic_001"
   };
 
   it("shows a preview using only allowlisted fields", () => {
@@ -154,16 +173,32 @@ describe("optional share-card generator", () => {
 
     expect(preview.allowedFields).toEqual({
       benchmarkDate: "2026-07-17",
+      benchmarkProfile: "synthetic-profile-safe-v1",
+      compatibilityVerdict: "RECOMMENDED_WITH_RESTRICTIONS",
       estimatedTotalSaving: 12.5,
+      evidenceOriginLabel: "SYNTHETIC",
       modelFamily: "synthetic-safe",
+      monthlyProjectionRange: "$8.00-$12.00 SYNTHETIC",
       percentageInputReduction: 42,
       protectedValuesImagedCount: 0,
-      testsPassed: 24
+      syntheticWatermark: "SYNTHETIC RESULTS",
+      testStatus: "PASSING",
+      testsPassed: 24,
+      verificationId: "verify_synthetic_001"
     });
     expect(preview.previewText).toContain("Context Diet share-card preview");
     expect(preview.previewText).toContain("Input reduction: 42%");
+    expect(preview.previewText).toContain("Verification ID: verify_synthetic_001");
+    expect(preview.previewText).toContain("Evidence origin: SYNTHETIC");
+    expect(preview.previewText).toContain("Compatibility verdict: RECOMMENDED_WITH_RESTRICTIONS");
+    expect(preview.previewText).toContain("Monthly projection: $8.00-$12.00 SYNTHETIC");
+    expect(preview.previewText).toContain("Benchmark profile: synthetic-profile-safe-v1");
+    expect(preview.previewText).toContain("Test status: PASSING");
+    expect(preview.previewText).toContain("Watermark: SYNTHETIC RESULTS");
     expect(preview.previewText).not.toContain("private-repo");
     expect(preview.previewText).not.toContain("session_secret");
+    expect(preview.previewText).not.toContain("private prompt");
+    expect(preview.previewText).not.toContain("do-not-export");
     expect(preview.shareNothingAutomatically).toBe(true);
   });
 
@@ -173,28 +208,52 @@ describe("optional share-card generator", () => {
 
     expect(result.exported).toBe(false);
     expect(result.pngPath).toBeNull();
+    expect(result.svgPath).toBeNull();
     expect(result.proofJsonPath).toBeNull();
   });
 
-  it("exports PNG and JSON proof metadata after confirmation", async () => {
+  it("exports PNG, SVG and JSON proof metadata after confirmation", async () => {
     const outputDirectory = await mkdtemp(join(tmpdir(), "context-diet-share-card-"));
     const result = await exportShareCard(shareInput, { confirm: true, outputDirectory });
 
     expect(result.exported).toBe(true);
     expect(result.pngPath).toContain("context-diet-share-card.png");
+    expect(result.svgPath).toContain("context-diet-share-card.svg");
     expect(result.proofJsonPath).toContain("context-diet-share-card.proof.json");
     const png = await readFile(result.pngPath as string);
+    const svg = await readFile(result.svgPath as string, "utf8");
     const proof = JSON.parse(await readFile(result.proofJsonPath as string, "utf8")) as {
+      readonly artifactKind: string;
       readonly fields: Record<string, unknown>;
       readonly allowlist: readonly string[];
-      readonly blockedFields: readonly string[];
+      readonly blockedFieldCount: number;
+      readonly generatedFiles: readonly string[];
+      readonly noUploadOrShareAction: boolean;
     };
 
     expect([...png.subarray(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+    expect(svg).toContain("<svg");
+    expect(svg).toContain("SYNTHETIC RESULTS");
+    expect(svg).toContain("verify_synthetic_001");
+    expect(proof.artifactKind).toBe("context_diet_share_card_proof");
     expect(proof.fields).toEqual(result.preview.allowedFields);
     expect(proof.allowlist).toEqual(result.preview.allowlist);
-    expect(JSON.stringify(proof)).not.toContain("private-repo");
-    expect(JSON.stringify(proof)).not.toContain("session_secret");
+    expect(proof.blockedFieldCount).toBe(result.preview.blockedFields.length);
+    expect(proof.generatedFiles).toEqual(["png", "svg", "json_proof"]);
+    expect(proof.noUploadOrShareAction).toBe(true);
+    for (const artifact of [svg, JSON.stringify(proof)]) {
+      expect(artifact).not.toContain("private-repo");
+      expect(artifact).not.toContain("session_secret");
+      expect(artifact).not.toContain("private prompt");
+      expect(artifact).not.toContain("do-not-export");
+      expect(artifact).not.toContain("Ada Private");
+      expect(artifact).not.toContain("credential-do-not-export");
+      expect(artifact).not.toContain("raw audit event");
+      expect(artifact).not.toContain("/Users/example");
+      expect(artifact).not.toContain("main");
+      expect(artifact).not.toContain("rawAuditEvents");
+      expect(artifact).not.toContain("branch");
+    }
   });
 
   it.each(shareCardForbiddenFields)("blocks forbidden field %s", (field) => {
@@ -207,6 +266,101 @@ describe("optional share-card generator", () => {
     expect(preview.blockedFields).toEqual(expect.arrayContaining([field, `nested.${field}`]));
     expect(preview.previewText).not.toContain(`forbidden-${field}`);
     expect(JSON.stringify(preview.allowedFields)).not.toContain(`forbidden-${field}`);
+  });
+});
+
+describe("GitHub Actions synthetic benchmark artifacts", () => {
+  it("creates stable allowlisted evidence for a fixed seed", () => {
+    const first = createSyntheticBenchmarkArtifacts(7);
+    const second = createSyntheticBenchmarkArtifacts(7);
+
+    expect(first.evidence).toEqual(second.evidence);
+    expect(Object.keys(first.evidence).sort()).toEqual(
+      [...syntheticBenchmarkEvidenceAllowedFields].sort()
+    );
+    expect(first.evidence).toMatchObject({
+      artifactKind: "context_diet_synthetic_benchmark_evidence",
+      dataOrigin: "synthetic",
+      seed: 7,
+      syntheticNotice: "SYNTHETIC TEST DATA"
+    });
+  });
+
+  it("labels numeric synthetic badge results as SYNTHETIC", () => {
+    const artifacts = createSyntheticBenchmarkArtifacts(1);
+
+    expect(artifacts.badges.synthetic_input_reduction).toContain("SYNTHETIC");
+    expect(artifacts.badges.protected_values_imaged).toContain("SYNTHETIC");
+    expect(artifacts.markdownSummary).toContain("SYNTHETIC TEST DATA");
+    expect(artifacts.markdownSummary).toContain("SYNTHETIC 50%");
+    expect(artifacts.pullRequestCommentText).toContain("saved as an artifact only");
+  });
+
+  it("generates all static SVG badge variants without external badge services", () => {
+    const badges = createSyntheticBenchmarkBadges(createSyntheticBenchmarkArtifacts(1).evidence);
+
+    expect(Object.keys(badges).sort()).toEqual([
+      "benchmark_passing",
+      "compatibility_status",
+      "protected_values_imaged",
+      "synthetic_input_reduction"
+    ]);
+    for (const svg of Object.values(badges)) {
+      expect(svg).toContain("<svg");
+      expect(svg).not.toContain("shields.io");
+      expect(svg).not.toContain("badge");
+      expect(svg).not.toContain("https://");
+      expect(svg).not.toContain("<script");
+    }
+  });
+
+  it("excludes forbidden private fields from evidence, summaries and badges", () => {
+    const artifacts = createSyntheticBenchmarkArtifacts(3);
+    const serialised = JSON.stringify(artifacts);
+
+    for (const forbidden of [
+      "private-repo",
+      "session_secret",
+      "SECRET_VALUE",
+      "api_key=",
+      "Authorization",
+      "Bearer "
+    ]) {
+      expect(serialised).not.toContain(forbidden);
+    }
+    for (const forbiddenField of syntheticBenchmarkForbiddenFields) {
+      expect(Object.keys(artifacts.evidence)).not.toContain(forbiddenField);
+    }
+    expect(artifacts.evidence.privacyFilter).toBe("forbidden_private_fields_excluded");
+    expect(artifacts.evidence.forbiddenPrivateFieldCount).toBe(
+      syntheticBenchmarkForbiddenFields.length
+    );
+    for (const forbiddenField of syntheticBenchmarkForbiddenFields) {
+      expect(serialised).not.toContain(`"${forbiddenField}"`);
+    }
+  });
+
+  it("keeps incompatible reports blocked instead of claiming passing evidence", () => {
+    const report = createPersonalBenchmarkReport({
+      generatedAt: "2026-07-17T00:00:00.000Z",
+      runs: [run("uncompressed_control"), run("safe_compressed")],
+      scenario
+    });
+    const evidence = createSyntheticBenchmarkEvidence(report, 11);
+
+    expect(evidence.benchmarkPassing).toBe(false);
+    expect(evidence.compatibilityStatus).toBe("BLOCKED");
+    expect(createSyntheticBenchmarkBadges(evidence).benchmark_passing).toContain(
+      "benchmark blocked"
+    );
+  });
+
+  it("renders README embed instructions for local artifact badges", () => {
+    const instructions = renderSyntheticBenchmarkReadmeInstructions();
+
+    expect(instructions).toContain("not published to an external badge service");
+    expect(instructions).toContain("context-diet-benchmark.svg");
+    expect(instructions).toContain("SYNTHETIC");
   });
 });
 

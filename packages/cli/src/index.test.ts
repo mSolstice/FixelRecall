@@ -111,6 +111,7 @@ describe("context-diet CLI commands", () => {
     "stop",
     "status",
     "explain",
+    "preset",
     "benchmark",
     "retrieve",
     "delete-session",
@@ -147,6 +148,39 @@ describe("context-diet CLI commands", () => {
 
     expect(dryRun.stdout).toContain("Dry run");
     expect(confirmed.stdout).toContain("Confirmed");
+  });
+
+  it("selects product-facing presets without duplicating policy modes", async () => {
+    const saveMore = await runCliCommand(["preset", "--preset", "save-more"]);
+
+    expect(saveMore.stdout).toContain("Requested preset: Save More");
+    expect(saveMore.stdout).toContain("Maps to internal mode: balanced");
+    expect(saveMore.stdout).toContain("Preset selection maps to an existing internal mode");
+  });
+
+  it("blocks forbidden preset transitions", async () => {
+    const blockedLab = await runCliCommand(["preset", "--preset", "lab-mode"]);
+    const allowedLab = await runCliCommand(["preset", "--preset", "lab-mode"], {
+      env: { experimentalSession: true }
+    });
+    const orgBlocked = await runCliCommand(["preset", "--preset", "save-more"], {
+      env: { organisationForbiddenPresets: ["Save More"] }
+    });
+
+    expect(blockedLab.stdout).toContain("Allowed: no");
+    expect(blockedLab.stdout).toContain("Lab Mode requires");
+    expect(allowedLab.stdout).toContain("Allowed: yes");
+    expect(orgBlocked.stdout).toContain("Organisation policy forbids this preset");
+  });
+
+  it("includes product presets in audit recommendations and explanations", async () => {
+    const report = runCompatibilityAudit();
+    const explain = await runCliCommand(["explain"]);
+
+    expect(report.recommendedProductPreset).toBe("Save More");
+    expect(report.dashboard.productPreset).toBe("Save More");
+    expect(explain.stdout).toContain("Product presets map to existing internal modes");
+    expect(explain.stdout).toContain("Preset maps to safe");
   });
 
   it("supports JSON benchmark output", async () => {

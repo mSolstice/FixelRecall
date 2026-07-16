@@ -5,7 +5,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { createSyntheticBenchmarkReport, renderBenchmarkMarkdown } from "@context-diet/benchmark";
-import { isoTimestamp, type ModelProfileSummary } from "@context-diet/core";
+import {
+  defaultProductPolicyPreset,
+  isoTimestamp,
+  productPolicyPresets,
+  selectProductPolicyPreset,
+  type ModelProfileSummary,
+  type ProductPolicyPreset
+} from "@context-diet/core";
 import {
   createPxpipeCompatibleRenderer,
   type ContextRenderer,
@@ -37,6 +44,10 @@ export interface CliEnvironment {
   readonly gatewayRunning: boolean;
   readonly activeHosts: readonly CompatibilityHost[];
   readonly sessionId?: string;
+  readonly policyPreset: ProductPolicyPreset;
+  readonly syntheticSession: boolean;
+  readonly experimentalSession: boolean;
+  readonly organisationForbiddenPresets: readonly ProductPolicyPreset[];
 }
 
 export interface CliCommandResult {
@@ -104,6 +115,7 @@ export interface CompatibilityAuditReport {
   readonly accuracyRiskBand: CompatibilityBand;
   readonly latencyBand: CompatibilityBand;
   readonly recommendedPreset: CompatibilityPreset;
+  readonly recommendedProductPreset: ProductPolicyPreset;
   readonly unsupportedCapabilities: readonly string[];
   readonly requiredCanaries: readonly string[];
   readonly verdict: CompatibilityAuditVerdict;
@@ -123,6 +135,7 @@ export interface CompatibilityDashboardOutput {
     readonly latency: CompatibilityBand;
   };
   readonly preset: CompatibilityPreset;
+  readonly productPreset: ProductPolicyPreset;
   readonly blockers: readonly string[];
   readonly warnings: readonly string[];
   readonly requiredCanaries: readonly string[];
@@ -188,6 +201,9 @@ export async function runCliCommand(
   if (command === "explain") {
     return textResult(0, renderExplain(env));
   }
+  if (command === "preset") {
+    return textResult(0, renderPresetSelector(env, argv));
+  }
   if (command === "benchmark") {
     const report = createSyntheticBenchmarkReport(1);
     return textResult(
@@ -224,6 +240,7 @@ export function runCompatibilityAudit(
   const thresholdFailure = exactnessOrSafetyThresholdFailure(input, unsupportedCapabilities);
   const verdict = compatibilityVerdict(input, score, thresholdFailure, unsupportedCapabilities);
   const recommendedPreset = recommendedPresetFor(input, verdict, accuracyRiskBand);
+  const recommendedProductPreset = recommendedProductPresetFor(verdict, recommendedPreset);
   const reasons = compatibilityReasons(input, verdict, {
     accuracyRiskBand,
     expectedBenefitBand,
@@ -247,6 +264,7 @@ export function runCompatibilityAudit(
       host: input.host,
       kind: "compatibility_audit",
       preset: recommendedPreset,
+      productPreset: recommendedProductPreset,
       requiredCanaries,
       score,
       verdict,
@@ -258,6 +276,7 @@ export function runCompatibilityAudit(
     latencyBand,
     reasons,
     recommendedPreset,
+    recommendedProductPreset,
     requiredCanaries,
     title: "Context Diet Compatibility Audit",
     unsupportedCapabilities,
@@ -278,6 +297,7 @@ export function renderCompatibilityAuditMarkdown(report: CompatibilityAuditRepor
     `Verdict: **${report.verdict}**`,
     `Compatibility score: **${report.compatibilityScore}**`,
     `Recommended preset: **${report.recommendedPreset}**`,
+    `Recommended product preset: **${report.recommendedProductPreset}**`,
     "",
     `Expected benefit: ${report.expectedBenefitBand}`,
     `Accuracy risk: ${report.accuracyRiskBand}`,
@@ -301,8 +321,12 @@ function cliEnvironment(override: Partial<CliEnvironment> = {}): CliEnvironment 
     activeHosts: ["both"],
     fakeProviderDevelopmentMode: override.fakeProviderDevelopmentMode ?? false,
     gatewayRunning: override.gatewayRunning ?? false,
+    experimentalSession: override.experimentalSession ?? false,
+    organisationForbiddenPresets: override.organisationForbiddenPresets ?? [],
+    policyPreset: override.policyPreset ?? defaultProductPolicyPreset,
     safetyMode: override.safetyMode ?? "Safe",
     sessionId: override.sessionId,
+    syntheticSession: override.syntheticSession ?? false,
     upstreamBaseUrl: sanitiseUrl(override.upstreamBaseUrl ?? "https://api.openai.example.invalid")
   };
 }
@@ -337,6 +361,7 @@ function renderDoctorSummary(env: CliEnvironment): string {
     "",
     "Status: ready for local synthetic checks.",
     `Current upstream: ${env.upstreamBaseUrl}`,
+    `Policy preset: ${env.policyPreset}`,
     `Safety mode: ${env.safetyMode}`,
     `Gateway: ${env.gatewayRunning ? "running" : "stopped"}`,
     `Fake-provider development mode: ${env.fakeProviderDevelopmentMode ? "on" : "off"}`,
@@ -354,6 +379,7 @@ function renderStart(env: CliEnvironment): string {
     "Context Diet gateway start",
     "",
     `Current upstream: ${upstream}`,
+    `Policy preset: ${env.policyPreset}`,
     `Safety mode: ${env.safetyMode}`,
     `Fake-provider development mode: ${env.fakeProviderDevelopmentMode ? "on" : "off"}`,
     "Host configuration was not changed.",
@@ -370,6 +396,7 @@ function renderStop(
     "Context Diet gateway stop",
     "",
     `Current upstream: ${env.upstreamBaseUrl}`,
+    `Policy preset: ${env.policyPreset}`,
     `Safety mode: ${env.safetyMode}`,
     options.confirm && !options.dryRun
       ? "Confirmed: local gateway stop would be applied."
@@ -385,6 +412,7 @@ function renderStatus(env: CliEnvironment): string {
     "",
     `Gateway: ${env.gatewayRunning ? "running" : "stopped"}`,
     `Current upstream: ${env.upstreamBaseUrl}`,
+    `Policy preset: ${env.policyPreset}`,
     `Safety mode: ${env.safetyMode}`,
     `Hosts: ${env.activeHosts.join(", ")}`,
     `Fake-provider development mode: ${env.fakeProviderDevelopmentMode ? "on" : "off"}`,
@@ -400,10 +428,40 @@ function renderExplain(env: CliEnvironment): string {
     "Context Diet keeps Safe mode as the default. Current instructions, secrets, exact values, code, commands and active tool state stay native.",
     "When a block is eligible, the policy can render a compact image and keep an exact local sidecar for retrieval.",
     "If parsing, scanning, rendering, storage or rebuilding fails, the original provider request is sent unchanged.",
+    "Product presets map to existing internal modes and never weaken the built-in safety floor.",
     "",
     `Current upstream: ${env.upstreamBaseUrl}`,
+    `Policy preset: ${env.policyPreset}`,
     `Safety mode: ${env.safetyMode}`,
+    renderPresetDetails(env),
     restoreDirectRouting()
+  ].join("\n");
+}
+
+function renderPresetSelector(env: CliEnvironment, argv: readonly string[]): string {
+  const requested = parseProductPreset(valueAfter(argv, "--preset")) ?? env.policyPreset;
+  const selection = selectProductPolicyPreset({
+    experimentalSession: env.experimentalSession,
+    organisationForbiddenPresets: env.organisationForbiddenPresets,
+    requestedPreset: requested,
+    syntheticSession: env.syntheticSession
+  });
+  return [
+    "Context Diet policy preset",
+    "",
+    `Requested preset: ${selection.preset}`,
+    `Allowed: ${selection.allowed ? "yes" : "no"}`,
+    `Maps to internal mode: ${selection.definition.internalMode}`,
+    `Eligible sources: ${selection.definition.eligibleSources.join(", ")}`,
+    `Block-age threshold: ${selection.definition.blockAgeThresholdMs} ms`,
+    `Minimum saving: ${selection.definition.minimumSaving}`,
+    `Recovery required: ${selection.definition.recoveryRequired ? "yes" : "no"}`,
+    `Allowed profile status: ${selection.definition.allowedProfileStatus.join(", ")}`,
+    `Language support: ${selection.definition.languageSupport.join(", ")}`,
+    `Maximum added latency: ${selection.definition.maximumAddedLatencyMs} ms`,
+    `Adaptation permission: ${selection.definition.adaptationPermission}`,
+    "Reasons:",
+    ...selection.reasons.map((reason) => `- ${reason}`)
   ].join("\n");
 }
 
@@ -444,12 +502,33 @@ function renderUninstall(
     "Context Diet uninstall",
     "",
     `Current upstream: ${env.upstreamBaseUrl}`,
+    `Policy preset: ${env.policyPreset}`,
     `Safety mode: ${env.safetyMode}`,
     options.confirm && !options.dryRun
       ? "Confirmed: host configuration changes would be applied."
       : "Dry run: no files, sessions or host configuration were changed.",
     restoreDirectRouting()
   ].join("\n");
+}
+
+function renderPresetDetails(env: CliEnvironment): string {
+  const selection = selectProductPolicyPreset({
+    experimentalSession: env.experimentalSession,
+    organisationForbiddenPresets: env.organisationForbiddenPresets,
+    requestedPreset: env.policyPreset,
+    syntheticSession: env.syntheticSession
+  });
+  return `Preset maps to ${selection.definition.internalMode}; eligible sources: ${selection.definition.eligibleSources.join(", ")}.`;
+}
+
+function parseProductPreset(value: string | undefined): ProductPolicyPreset | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const normalisedValue = value.toLowerCase().replaceAll(" ", "-");
+  return (Object.keys(productPolicyPresets) as ProductPolicyPreset[]).find(
+    (preset) => preset.toLowerCase().replaceAll(" ", "-") === normalisedValue
+  );
 }
 
 function restoreDirectRouting(): string {
@@ -704,6 +783,22 @@ function recommendedPresetFor(
     return "MAX";
   }
   return "BALANCED";
+}
+
+function recommendedProductPresetFor(
+  verdict: CompatibilityAuditVerdict,
+  preset: CompatibilityPreset
+): ProductPolicyPreset {
+  if (verdict === "UNSUPPORTED" || verdict === "NOT_WORTH_USING") {
+    return "Observe Only";
+  }
+  if (verdict === "AUDIT_ONLY" || verdict === "RETEST_REQUIRED" || preset === "SAFE") {
+    return "Protect First";
+  }
+  if (preset === "MAX") {
+    return "Lab Mode";
+  }
+  return "Save More";
 }
 
 function unsupportedCapabilitiesFor(input: CompatibilityAuditInput): readonly string[] {

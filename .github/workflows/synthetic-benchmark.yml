@@ -1,0 +1,52 @@
+name: Synthetic Benchmark Evidence
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-benchmark:
+    runs-on: ubuntu-latest
+    env:
+      CONTEXT_DIET_SYNTHETIC_BENCHMARK_SEED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.13.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm vitest run packages/benchmark/src/index.test.ts
+      - name: Generate deterministic synthetic benchmark artifacts
+        run: pnpm benchmark:synthetic:ci
+      - name: Verify artifacts contain no forbidden private fields
+        run: |
+          node -e '
+          const fs = require("node:fs");
+          const root = "artifacts/context-diet-synthetic-benchmark";
+          const text = fs.readdirSync(root, { recursive: true })
+            .filter((name) => fs.statSync(`${root}/${name}`).isFile())
+            .map((name) => fs.readFileSync(`${root}/${name}`, "utf8"))
+            .join("\n");
+          const forbiddenValues = ["private-repo", "session_secret", "SECRET_VALUE", "api_key=", "Authorization", "Bearer "];
+          for (const value of forbiddenValues) {
+            if (text.includes(value)) {
+              throw new Error(`Forbidden artifact value found: ${value}`);
+            }
+          }
+          '
+      - uses: actions/upload-artifact@v4
+        with:
+          name: context-diet-synthetic-benchmark
+          path: artifacts/context-diet-synthetic-benchmark
+          if-no-files-found: error

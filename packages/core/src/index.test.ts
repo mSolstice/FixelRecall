@@ -23,6 +23,10 @@ import {
   reasonCatalogue,
   recoverable,
   requestId,
+  defaultProductPolicyPreset,
+  productPolicyPresets,
+  productPresetToPolicyMode,
+  selectProductPolicyPreset,
   sortByOrder,
   type AuditEventSink,
   type BenchmarkEvidenceStore,
@@ -149,6 +153,55 @@ describe("provider-neutral construction", () => {
     expect(() => requestId(" ")).toThrow("request id must be non-empty");
     expect(() => orderIndex(-1)).toThrow("order index must be a non-negative integer");
     expect(() => orderIndex(1.5)).toThrow("order index must be a non-negative integer");
+  });
+});
+
+describe("product policy presets", () => {
+  it("defaults to Protect First", () => {
+    const selection = selectProductPolicyPreset();
+
+    expect(defaultProductPolicyPreset).toBe("Protect First");
+    expect(selection).toMatchObject({
+      allowed: true,
+      preset: "Protect First",
+      definition: { internalMode: "safe", recoveryRequired: true }
+    });
+  });
+
+  it("maps product presets to existing internal modes", () => {
+    expect(productPresetToPolicyMode("Observe Only")).toBe("bypass");
+    expect(productPresetToPolicyMode("Protect First")).toBe("safe");
+    expect(productPresetToPolicyMode("Save More")).toBe("balanced");
+    expect(productPresetToPolicyMode("Lab Mode")).toBe("max");
+    expect(productPolicyPresets["Save More"].minimumSaving).toBeGreaterThan(
+      productPolicyPresets["Protect First"].minimumSaving
+    );
+  });
+
+  it("forbids Lab Mode outside synthetic or explicitly experimental sessions", () => {
+    expect(selectProductPolicyPreset({ requestedPreset: "Lab Mode" }).allowed).toBe(false);
+    expect(
+      selectProductPolicyPreset({ requestedPreset: "Lab Mode", syntheticSession: true }).allowed
+    ).toBe(true);
+    expect(
+      selectProductPolicyPreset({ experimentalSession: true, requestedPreset: "Lab Mode" }).allowed
+    ).toBe(true);
+  });
+
+  it("supports future organisation-forbidden transitions", () => {
+    const selection = selectProductPolicyPreset({
+      organisationForbiddenPresets: ["Save More"],
+      requestedPreset: "Save More"
+    });
+
+    expect(selection.allowed).toBe(false);
+    expect(selection.reasons.join("\n")).toContain("Organisation policy forbids");
+  });
+
+  it("states that presets do not weaken the built-in safety floor", () => {
+    expect(
+      selectProductPolicyPreset({ requestedPreset: "Save More" }).reasons.join("\n")
+    ).toContain("never weakens the safety floor");
   });
 });
 

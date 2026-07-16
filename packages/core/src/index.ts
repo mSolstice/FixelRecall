@@ -4,6 +4,35 @@ export type ContextDietMode = "safe" | "balanced" | "max" | "bypass";
 
 export type PolicyMode = ContextDietMode;
 
+export type ProductPolicyPreset = "Observe Only" | "Protect First" | "Save More" | "Lab Mode";
+
+export interface ProductPolicyPresetDefinition {
+  readonly preset: ProductPolicyPreset;
+  readonly internalMode: PolicyMode;
+  readonly eligibleSources: readonly SourceCategory[];
+  readonly blockAgeThresholdMs: number;
+  readonly minimumSaving: number;
+  readonly recoveryRequired: boolean;
+  readonly allowedProfileStatus: readonly ModelProfileStatus["kind"][];
+  readonly languageSupport: readonly string[];
+  readonly maximumAddedLatencyMs: number;
+  readonly adaptationPermission: "none" | "conservative" | "adaptive" | "experimental";
+}
+
+export interface ProductPolicyPresetSelectionInput {
+  readonly requestedPreset?: ProductPolicyPreset;
+  readonly syntheticSession?: boolean;
+  readonly experimentalSession?: boolean;
+  readonly organisationForbiddenPresets?: readonly ProductPolicyPreset[];
+}
+
+export interface ProductPolicyPresetSelection {
+  readonly preset: ProductPolicyPreset;
+  readonly definition: ProductPolicyPresetDefinition;
+  readonly allowed: boolean;
+  readonly reasons: readonly string[];
+}
+
 export type SourceCategory =
   | "current_instruction"
   | "conversation_history"
@@ -208,6 +237,97 @@ export interface ModelProfileThresholds {
   readonly minimumGist: number;
   readonly minimumStructure: number;
   readonly minimumExactString: number;
+}
+
+export const defaultProductPolicyPreset: ProductPolicyPreset = "Protect First";
+
+export const productPolicyPresets = {
+  "Observe Only": {
+    adaptationPermission: "none",
+    allowedProfileStatus: ["enabled", "disabled", "expired"],
+    blockAgeThresholdMs: 0,
+    eligibleSources: [
+      "conversation_history",
+      "tool_result",
+      "documentation",
+      "terminal_output",
+      "external_content"
+    ],
+    internalMode: "bypass",
+    languageSupport: ["all"],
+    maximumAddedLatencyMs: 0,
+    minimumSaving: 0,
+    preset: "Observe Only",
+    recoveryRequired: false
+  },
+  "Protect First": {
+    adaptationPermission: "conservative",
+    allowedProfileStatus: ["enabled"],
+    blockAgeThresholdMs: 5 * 60 * 1000,
+    eligibleSources: ["conversation_history", "tool_result", "documentation"],
+    internalMode: "safe",
+    languageSupport: ["latin", "devanagari", "cjk", "mixed"],
+    maximumAddedLatencyMs: 500,
+    minimumSaving: 0.01,
+    preset: "Protect First",
+    recoveryRequired: true
+  },
+  "Save More": {
+    adaptationPermission: "adaptive",
+    allowedProfileStatus: ["enabled"],
+    blockAgeThresholdMs: 30 * 60 * 1000,
+    eligibleSources: ["conversation_history", "tool_result", "documentation", "external_content"],
+    internalMode: "balanced",
+    languageSupport: ["latin", "devanagari", "cjk", "mixed"],
+    maximumAddedLatencyMs: 1_500,
+    minimumSaving: 0.05,
+    preset: "Save More",
+    recoveryRequired: true
+  },
+  "Lab Mode": {
+    adaptationPermission: "experimental",
+    allowedProfileStatus: ["enabled"],
+    blockAgeThresholdMs: 60 * 60 * 1000,
+    eligibleSources: [
+      "conversation_history",
+      "tool_result",
+      "documentation",
+      "external_content",
+      "terminal_output"
+    ],
+    internalMode: "max",
+    languageSupport: ["latin", "devanagari", "cjk", "mixed"],
+    maximumAddedLatencyMs: 3_000,
+    minimumSaving: 0.1,
+    preset: "Lab Mode",
+    recoveryRequired: true
+  }
+} as const satisfies Record<ProductPolicyPreset, ProductPolicyPresetDefinition>;
+
+export function selectProductPolicyPreset(
+  input: ProductPolicyPresetSelectionInput = {}
+): ProductPolicyPresetSelection {
+  const preset = input.requestedPreset ?? defaultProductPolicyPreset;
+  const definition = productPolicyPresets[preset];
+  const reasons: string[] = [];
+  if (input.organisationForbiddenPresets?.includes(preset) === true) {
+    reasons.push("Organisation policy forbids this preset.");
+  }
+  if (
+    preset === "Lab Mode" &&
+    input.syntheticSession !== true &&
+    input.experimentalSession !== true
+  ) {
+    reasons.push("Lab Mode requires a synthetic or explicitly experimental session.");
+  }
+  reasons.push(
+    "Preset selection maps to an existing internal mode and never weakens the safety floor."
+  );
+  return { allowed: reasons.length === 1, definition, preset, reasons };
+}
+
+export function productPresetToPolicyMode(preset: ProductPolicyPreset): PolicyMode {
+  return productPolicyPresets[preset].internalMode;
 }
 
 export interface VersionedModelProfile {

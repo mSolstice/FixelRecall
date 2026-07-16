@@ -15,6 +15,7 @@ exports[`context-diet CLI commands > prints safe output for audit 1`] = `
     "host": "both",
     "kind": "compatibility_audit",
     "preset": "BALANCED",
+    "productPreset": "Save More",
     "requiredCanaries": [
       "prose gist canary",
       "exact-string canary",
@@ -58,6 +59,7 @@ exports[`context-diet CLI commands > prints safe output for audit 1`] = `
     "The synthetic fixture passed benefit and safety checks for the recommended preset."
   ],
   "recommendedPreset": "BALANCED",
+  "recommendedProductPreset": "Save More",
   "requiredCanaries": [
     "prose gist canary",
     "exact-string canary",
@@ -75,6 +77,8 @@ exports[`context-diet CLI commands > prints safe output for audit 1`] = `
 
 exports[`context-diet CLI commands > prints safe output for benchmark 1`] = `
 "# Context Diet Personal Benchmark
+
+SYNTHETIC DATA
 
 SYNTHETIC TEST DATA
 
@@ -168,6 +172,7 @@ exports[`context-diet CLI commands > prints safe output for doctor 1`] = `
 
 Status: ready for local synthetic checks.
 Current upstream: https://provider.example.test/v1
+Policy preset: Protect First
 Safety mode: Safe
 Gateway: running
 Fake-provider development mode: on
@@ -183,10 +188,32 @@ exports[`context-diet CLI commands > prints safe output for explain 1`] = `
 Context Diet keeps Safe mode as the default. Current instructions, secrets, exact values, code, commands and active tool state stay native.
 When a block is eligible, the policy can render a compact image and keep an exact local sidecar for retrieval.
 If parsing, scanning, rendering, storage or rebuilding fails, the original provider request is sent unchanged.
+Product presets map to existing internal modes and never weaken the built-in safety floor.
 
 Current upstream: https://provider.example.test/v1
+Policy preset: Protect First
 Safety mode: Safe
+Preset maps to safe; eligible sources: conversation_history, tool_result, documentation.
 Restore direct routing by removing the local Context Diet base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.
+"
+`;
+
+exports[`context-diet CLI commands > prints safe output for preset 1`] = `
+"Context Diet policy preset
+
+Requested preset: Protect First
+Allowed: yes
+Maps to internal mode: safe
+Eligible sources: conversation_history, tool_result, documentation
+Block-age threshold: 300000 ms
+Minimum saving: 0.01
+Recovery required: yes
+Allowed profile status: enabled
+Language support: latin, devanagari, cjk, mixed
+Maximum added latency: 500 ms
+Adaptation permission: conservative
+Reasons:
+- Preset selection maps to an existing internal mode and never weakens the safety floor.
 "
 `;
 
@@ -205,6 +232,7 @@ exports[`context-diet CLI commands > prints safe output for start 1`] = `
 "Context Diet gateway start
 
 Current upstream: http://127.0.0.1:8787/fake-provider
+Policy preset: Protect First
 Safety mode: Safe
 Fake-provider development mode: on
 Host configuration was not changed.
@@ -218,6 +246,7 @@ exports[`context-diet CLI commands > prints safe output for status 1`] = `
 
 Gateway: running
 Current upstream: https://provider.example.test/v1
+Policy preset: Protect First
 Safety mode: Safe
 Hosts: both
 Fake-provider development mode: on
@@ -230,6 +259,7 @@ exports[`context-diet CLI commands > prints safe output for stop 1`] = `
 "Context Diet gateway stop
 
 Current upstream: https://provider.example.test/v1
+Policy preset: Protect First
 Safety mode: Safe
 Dry run: no running process or host configuration was changed.
 Use --confirm to stop managed local routing after reviewing the current status.
@@ -241,6 +271,7 @@ exports[`context-diet CLI commands > prints safe output for uninstall 1`] = `
 "Context Diet uninstall
 
 Current upstream: https://provider.example.test/v1
+Policy preset: Protect First
 Safety mode: Safe
 Dry run: no files, sessions or host configuration were changed.
 Restore direct routing by removing the local Context Diet base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc -b tsconfig.build.json",
+    "benchmark:synthetic:ci": "node scripts/generate-synthetic-benchmark-artifacts.mjs --seed 1 --output artifacts/context-diet-synthetic-benchmark",
     "check:environment": "node scripts/check-environment.mjs",
     "check:skills": "node scripts/check-skills.mjs",
     "format": "prettier --write .",

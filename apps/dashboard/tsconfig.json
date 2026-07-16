@@ -6,7 +6,11 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
   },
-  "references": [{ "path": "../../packages/metrics" }],
+  "references": [
+    { "path": "../../packages/core" },
+    { "path": "../../packages/leaderboard" },
+    { "path": "../../packages/metrics" }
+  ],
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/*.test.ts"]
 }

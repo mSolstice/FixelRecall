@@ -12,6 +12,7 @@
     { "path": "packages/test-data" },
     { "path": "packages/metrics" },
     { "path": "packages/benchmark" },
+    { "path": "packages/leaderboard" },
     { "path": "packages/cli" },
     { "path": "apps/dashboard" }
   ]

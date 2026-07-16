@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createProviderCostReport,
   createSafeMetric,
+  createSavingsProjectionReport,
   recommendContextDiet,
   type ProviderCostRun,
   type RecommendationInput
@@ -244,6 +245,100 @@ describe("createProviderCostReport", () => {
     expect(report.totalEstimatedCost).toBeNull();
     expect(report.availability).toBe("unavailable");
     expect(report.reasons.join("\n")).toContain("Token counts are unavailable");
+  });
+});
+
+describe("createSavingsProjectionReport", () => {
+  const assumptions = {
+    cachedInputPerMillion: 0.2,
+    imagePerMillion: 5,
+    inputPerMillion: 2,
+    localProcessingPerRequest: 0.001,
+    retrievalPerCall: 0.0005
+  };
+
+  it("creates 30-day synthetic weekly, monthly and annual projections", () => {
+    const report = createSavingsProjectionReport({
+      benchmarkDate: "2026-07-17",
+      costAssumptions: assumptions,
+      days: 30,
+      seed: 314
+    });
+
+    expect(report.dataNotice).toBe("SYNTHETIC DATA");
+    expect(report.evidenceOrigin).toBe("synthetic");
+    expect(report.historyDays).toBe(30);
+    expect(report.confidence).toBe("low");
+    expect(report.scenarios.map((item) => item.scenario)).toEqual([
+      "conservative",
+      "expected",
+      "high-usage"
+    ]);
+    for (const scenario of report.scenarios) {
+      expect(scenario.weekly.originalInputCost).toBeGreaterThan(0);
+      expect(scenario.monthly.imageCost).toBeGreaterThanOrEqual(0);
+      expect(scenario.annual.cacheEffect).toBeGreaterThanOrEqual(0);
+      expect(scenario.weekly.savingsPercentage).not.toBeNull();
+    }
+  });
+
+  it("creates 90-day synthetic projections with stronger confidence", () => {
+    const report = createSavingsProjectionReport({
+      costAssumptions: assumptions,
+      days: 90,
+      seed: 314
+    });
+
+    expect(report.historyDays).toBe(90);
+    expect(report.confidence).toBe("medium");
+    expect(report.scenarios[2]?.annual.netSaving).toBeGreaterThan(
+      report.scenarios[0]?.annual.netSaving ?? Number.NEGATIVE_INFINITY
+    );
+  });
+
+  it("does not claim a percentage when baseline is missing", () => {
+    const report = createSavingsProjectionReport({
+      baselineAvailable: false,
+      costAssumptions: assumptions,
+      days: 30,
+      seed: 314
+    });
+
+    expect(report.baselineAvailable).toBe(false);
+    expect(report.comparisonValid).toBe(false);
+    expect(report.reasons.join("\n")).toContain("Missing baseline");
+    expect(report.scenarios[1]?.weekly.savingsPercentage).toBeNull();
+  });
+
+  it("does not mix measured and simulated data silently", () => {
+    const report = createSavingsProjectionReport({
+      costAssumptions: assumptions,
+      days: 90,
+      evidenceOrigin: "measured",
+      seed: 314
+    });
+
+    expect(report.comparisonValid).toBe(false);
+    expect(report.confidence).toBe("unavailable");
+    expect(report.reasons.join("\n")).toContain("Measured and simulated data cannot be mixed");
+    expect(report.scenarios[1]?.monthly.savingsPercentage).toBeNull();
+  });
+
+  it("keeps negative savings visible", () => {
+    const report = createSavingsProjectionReport({
+      costAssumptions: {
+        cachedInputPerMillion: 0.2,
+        imagePerMillion: 200,
+        inputPerMillion: 0.1,
+        localProcessingPerRequest: 0.5,
+        retrievalPerCall: 0.1
+      },
+      days: 30,
+      seed: 314
+    });
+
+    expect(report.scenarios[1]?.weekly.netSaving).toBeLessThan(0);
+    expect(report.scenarios[1]?.weekly.savingsPercentage).toBeLessThan(0);
   });
 });
 
