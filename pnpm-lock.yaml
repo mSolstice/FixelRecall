@@ -43,6 +43,9 @@ importers:
 
   packages/cli:
     dependencies:
+      "@context-diet/benchmark":
+        specifier: workspace:*
+        version: link:../benchmark
       "@context-diet/core":
         specifier: workspace:*
         version: link:../core

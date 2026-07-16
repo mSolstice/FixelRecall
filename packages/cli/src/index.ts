@@ -4,6 +4,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { createSyntheticBenchmarkReport, renderBenchmarkMarkdown } from "@context-diet/benchmark";
 import { isoTimestamp, type ModelProfileSummary } from "@context-diet/core";
 import {
   createPxpipeCompatibleRenderer,
@@ -26,6 +27,30 @@ export type CompatibilityAuditVerdict =
 export type CompatibilityBand = "LOW" | "MEDIUM" | "HIGH";
 export type CompatibilityPreset = "SAFE" | "BALANCED" | "MAX" | "BYPASS";
 export type CompatibilityHost = "codex" | "claude_code" | "both";
+export type CliSafetyMode = "Safe" | "Balanced" | "Max" | "Bypass";
+export type CliOutputFormat = "text" | "json" | "markdown";
+
+export interface CliEnvironment {
+  readonly upstreamBaseUrl: string;
+  readonly safetyMode: CliSafetyMode;
+  readonly fakeProviderDevelopmentMode: boolean;
+  readonly gatewayRunning: boolean;
+  readonly activeHosts: readonly CompatibilityHost[];
+  readonly sessionId?: string;
+}
+
+export interface CliCommandResult {
+  readonly exitCode: number;
+  readonly stdout: string;
+  readonly stderr: string;
+}
+
+export interface CliCommandOptions {
+  readonly env?: Partial<CliEnvironment>;
+  readonly confirm?: boolean;
+  readonly dryRun?: boolean;
+  readonly format?: CliOutputFormat;
+}
 
 export interface RendererDoctorCheck {
   readonly name: string;
@@ -114,23 +139,76 @@ export function describeCli(): string {
 }
 
 export async function runCli(argv: readonly string[] = process.argv.slice(2)): Promise<number> {
+  const result = await runCliCommand(argv);
+  if (result.stdout.length > 0) {
+    process.stdout.write(result.stdout);
+  }
+  if (result.stderr.length > 0) {
+    process.stderr.write(result.stderr);
+  }
+  return result.exitCode;
+}
+
+export async function runCliCommand(
+  argv: readonly string[],
+  options: CliCommandOptions = {}
+): Promise<CliCommandResult> {
   if (argv[0] === "renderer" && argv[1] === "doctor") {
     const report = await runRendererDoctor();
-    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-    return report.status === "UNSAFE" || report.status === "UNSUPPORTED" ? 2 : 0;
+    return {
+      exitCode: report.status === "UNSAFE" || report.status === "UNSUPPORTED" ? 2 : 0,
+      stderr: "",
+      stdout: `${JSON.stringify(report, null, 2)}\n`
+    };
   }
-  if (argv[0] === "compatibility-audit") {
-    const format = argv.includes("--markdown") ? "markdown" : "json";
+  const command = argv[0] ?? "help";
+  const env = cliEnvironment(options.env);
+  const format = options.format ?? formatFromArgs(argv);
+  if (command === "doctor") {
+    return textResult(0, renderDoctorSummary(env));
+  }
+  if (command === "audit" || command === "compatibility-audit") {
     const report = runCompatibilityAudit();
-    process.stdout.write(
+    return textResult(
+      report.verdict === "UNSUPPORTED" ? 2 : 0,
       format === "markdown"
-        ? `${renderCompatibilityAuditMarkdown(report)}\n`
-        : `${renderCompatibilityAuditJson(report)}\n`
+        ? renderCompatibilityAuditMarkdown(report)
+        : renderCompatibilityAuditJson(report)
     );
-    return report.verdict === "UNSUPPORTED" ? 2 : 0;
   }
-  process.stdout.write(`${describeCli()}\n`);
-  return 0;
+  if (command === "start") {
+    return textResult(0, renderStart(env));
+  }
+  if (command === "stop") {
+    return textResult(0, renderStop(env, destructiveOptions(argv, options)));
+  }
+  if (command === "status") {
+    return textResult(0, renderStatus(env));
+  }
+  if (command === "explain") {
+    return textResult(0, renderExplain(env));
+  }
+  if (command === "benchmark") {
+    const report = createSyntheticBenchmarkReport(1);
+    return textResult(
+      report.comparison.comparable ? 0 : 3,
+      format === "json" ? JSON.stringify(report, null, 2) : renderBenchmarkMarkdown(report)
+    );
+  }
+  if (command === "retrieve") {
+    return textResult(0, renderRetrieve(env, argv));
+  }
+  if (command === "delete-session") {
+    return textResult(0, renderDeleteSession(env, destructiveOptions(argv, options)));
+  }
+  if (command === "uninstall") {
+    return textResult(0, renderUninstall(env, destructiveOptions(argv, options)));
+  }
+  return {
+    exitCode: 64,
+    stderr: `Unknown command: ${command}\nRun context-diet help to see available commands.\n`,
+    stdout: ""
+  };
 }
 
 export function runCompatibilityAudit(
@@ -216,6 +294,187 @@ export function renderCompatibilityAuditMarkdown(report: CompatibilityAuditRepor
       ? ["- None"]
       : report.unsupportedCapabilities.map((capability) => `- ${capability}`))
   ].join("\n");
+}
+
+function cliEnvironment(override: Partial<CliEnvironment> = {}): CliEnvironment {
+  return {
+    activeHosts: ["both"],
+    fakeProviderDevelopmentMode: override.fakeProviderDevelopmentMode ?? false,
+    gatewayRunning: override.gatewayRunning ?? false,
+    safetyMode: override.safetyMode ?? "Safe",
+    sessionId: override.sessionId,
+    upstreamBaseUrl: sanitiseUrl(override.upstreamBaseUrl ?? "https://api.openai.example.invalid")
+  };
+}
+
+function formatFromArgs(argv: readonly string[]): CliOutputFormat {
+  if (argv.includes("--json")) {
+    return "json";
+  }
+  if (argv.includes("--markdown")) {
+    return "markdown";
+  }
+  return "text";
+}
+
+function destructiveOptions(
+  argv: readonly string[],
+  options: CliCommandOptions
+): { readonly confirm: boolean; readonly dryRun: boolean } {
+  return {
+    confirm: options.confirm === true || argv.includes("--confirm"),
+    dryRun: options.dryRun ?? (argv.includes("--dry-run") || !argv.includes("--confirm"))
+  };
+}
+
+function textResult(exitCode: number, output: string): CliCommandResult {
+  return { exitCode, stderr: "", stdout: `${output.trimEnd()}\n` };
+}
+
+function renderDoctorSummary(env: CliEnvironment): string {
+  return [
+    "Context Diet doctor",
+    "",
+    "Status: ready for local synthetic checks.",
+    `Current upstream: ${env.upstreamBaseUrl}`,
+    `Safety mode: ${env.safetyMode}`,
+    `Gateway: ${env.gatewayRunning ? "running" : "stopped"}`,
+    `Fake-provider development mode: ${env.fakeProviderDevelopmentMode ? "on" : "off"}`,
+    "",
+    "No credentials were read or printed.",
+    restoreDirectRouting()
+  ].join("\n");
+}
+
+function renderStart(env: CliEnvironment): string {
+  const upstream = env.fakeProviderDevelopmentMode
+    ? "http://127.0.0.1:8787/fake-provider"
+    : env.upstreamBaseUrl;
+  return [
+    "Context Diet gateway start",
+    "",
+    `Current upstream: ${upstream}`,
+    `Safety mode: ${env.safetyMode}`,
+    `Fake-provider development mode: ${env.fakeProviderDevelopmentMode ? "on" : "off"}`,
+    "Host configuration was not changed.",
+    "Use your host's custom provider/base URL setting to point at the local gateway.",
+    restoreDirectRouting()
+  ].join("\n");
+}
+
+function renderStop(
+  env: CliEnvironment,
+  options: { readonly confirm: boolean; readonly dryRun: boolean }
+): string {
+  return [
+    "Context Diet gateway stop",
+    "",
+    `Current upstream: ${env.upstreamBaseUrl}`,
+    `Safety mode: ${env.safetyMode}`,
+    options.confirm && !options.dryRun
+      ? "Confirmed: local gateway stop would be applied."
+      : "Dry run: no running process or host configuration was changed.",
+    "Use --confirm to stop managed local routing after reviewing the current status.",
+    restoreDirectRouting()
+  ].join("\n");
+}
+
+function renderStatus(env: CliEnvironment): string {
+  return [
+    "Context Diet status",
+    "",
+    `Gateway: ${env.gatewayRunning ? "running" : "stopped"}`,
+    `Current upstream: ${env.upstreamBaseUrl}`,
+    `Safety mode: ${env.safetyMode}`,
+    `Hosts: ${env.activeHosts.join(", ")}`,
+    `Fake-provider development mode: ${env.fakeProviderDevelopmentMode ? "on" : "off"}`,
+    "Credentials: not displayed",
+    restoreDirectRouting()
+  ].join("\n");
+}
+
+function renderExplain(env: CliEnvironment): string {
+  return [
+    "Context Diet explain",
+    "",
+    "Context Diet keeps Safe mode as the default. Current instructions, secrets, exact values, code, commands and active tool state stay native.",
+    "When a block is eligible, the policy can render a compact image and keep an exact local sidecar for retrieval.",
+    "If parsing, scanning, rendering, storage or rebuilding fails, the original provider request is sent unchanged.",
+    "",
+    `Current upstream: ${env.upstreamBaseUrl}`,
+    `Safety mode: ${env.safetyMode}`,
+    restoreDirectRouting()
+  ].join("\n");
+}
+
+function renderRetrieve(env: CliEnvironment, argv: readonly string[]): string {
+  const blockId = valueAfter(argv, "--block-id") ?? "not provided";
+  return [
+    "Context Diet retrieve",
+    "",
+    `Session: ${env.sessionId ?? "not provided"}`,
+    `Block ID: ${blockId}`,
+    "Result: synthetic retrieval preview only. No filesystem path was accepted.",
+    "Returned characters: 0",
+    "Credentials: not displayed"
+  ].join("\n");
+}
+
+function renderDeleteSession(
+  env: CliEnvironment,
+  options: { readonly confirm: boolean; readonly dryRun: boolean }
+): string {
+  return [
+    "Context Diet delete-session",
+    "",
+    `Session: ${env.sessionId ?? "not provided"}`,
+    options.confirm && !options.dryRun
+      ? "Confirmed: the selected local session would be deleted."
+      : "Dry run: no session data was deleted.",
+    "Use --confirm only after checking the session ID.",
+    "Credentials: not displayed"
+  ].join("\n");
+}
+
+function renderUninstall(
+  env: CliEnvironment,
+  options: { readonly confirm: boolean; readonly dryRun: boolean }
+): string {
+  return [
+    "Context Diet uninstall",
+    "",
+    `Current upstream: ${env.upstreamBaseUrl}`,
+    `Safety mode: ${env.safetyMode}`,
+    options.confirm && !options.dryRun
+      ? "Confirmed: host configuration changes would be applied."
+      : "Dry run: no files, sessions or host configuration were changed.",
+    restoreDirectRouting()
+  ].join("\n");
+}
+
+function restoreDirectRouting(): string {
+  return "Restore direct routing by removing the local Context Diet base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.";
+}
+
+function valueAfter(argv: readonly string[], key: string): string | undefined {
+  const index = argv.indexOf(key);
+  return index >= 0 ? argv[index + 1] : undefined;
+}
+
+function sanitiseUrl(value: string): string {
+  try {
+    const parsed = new URL(value);
+    parsed.username = "";
+    parsed.password = "";
+    for (const key of [...parsed.searchParams.keys()]) {
+      if (key.toLowerCase().includes("key") || key.toLowerCase().includes("token")) {
+        parsed.searchParams.delete(key);
+      }
+    }
+    return parsed.toString();
+  } catch {
+    return value.replace(/(api[_-]?key|token|password)=([^&\s]+)/gi, "$1=REDACTED");
+  }
 }
 
 export async function runRendererDoctor(

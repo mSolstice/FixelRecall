@@ -4,6 +4,7 @@ import {
   describeCli,
   renderCompatibilityAuditJson,
   renderCompatibilityAuditMarkdown,
+  runCliCommand,
   runCompatibilityAudit,
   runRendererDoctor,
   type CompatibilityAuditVerdict
@@ -99,5 +100,62 @@ describe("context-diet compatibility-audit", () => {
     expect(report.compatibilityScore).toBeGreaterThan(50);
     expect(report.verdict).toBe("AUDIT_ONLY");
     expect(report.reasons.join("\n")).toContain("not allowed to hide");
+  });
+});
+
+describe("context-diet CLI commands", () => {
+  it.each([
+    "doctor",
+    "audit",
+    "start",
+    "stop",
+    "status",
+    "explain",
+    "benchmark",
+    "retrieve",
+    "delete-session",
+    "uninstall"
+  ] as const)("prints safe output for %s", async (command) => {
+    const result = await runCliCommand([command], {
+      env: {
+        fakeProviderDevelopmentMode: true,
+        gatewayRunning: true,
+        sessionId: "session_test_123",
+        upstreamBaseUrl: "https://token:SECRET_VALUE@provider.example.test/v1?api_key=SECRET_VALUE"
+      }
+    });
+
+    expect(result.exitCode).toBeGreaterThanOrEqual(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toMatchSnapshot();
+    expect(result.stdout).not.toContain("SECRET_VALUE");
+    expect(result.stdout).not.toContain("token:SECRET");
+  });
+
+  it("uses helpful exit code for unknown commands", async () => {
+    const result = await runCliCommand(["nope"]);
+
+    expect(result.exitCode).toBe(64);
+    expect(result.stderr).toContain("Unknown command");
+  });
+
+  it("requires confirmation before destructive actions", async () => {
+    const dryRun = await runCliCommand(["delete-session"], { env: { sessionId: "session_safe" } });
+    const confirmed = await runCliCommand(["delete-session", "--confirm"], {
+      env: { sessionId: "session_safe" }
+    });
+
+    expect(dryRun.stdout).toContain("Dry run");
+    expect(confirmed.stdout).toContain("Confirmed");
+  });
+
+  it("supports JSON benchmark output", async () => {
+    const result = await runCliCommand(["benchmark", "--json"]);
+
+    expect(result.exitCode).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      comparison: { comparable: true },
+      dataOrigin: "synthetic"
+    });
   });
 });

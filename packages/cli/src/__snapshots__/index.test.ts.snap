@@ -1,0 +1,248 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`context-diet CLI commands > prints safe output for audit 1`] = `
+"{
+  "accuracyRiskBand": "LOW",
+  "compatibilityScore": 79,
+  "dashboard": {
+    "bands": {
+      "accuracyRisk": "LOW",
+      "expectedBenefit": "HIGH",
+      "latency": "MEDIUM"
+    },
+    "blockers": [],
+    "dataOrigin": "synthetic",
+    "host": "both",
+    "kind": "compatibility_audit",
+    "preset": "BALANCED",
+    "requiredCanaries": [
+      "prose gist canary",
+      "exact-string canary",
+      "table structure canary",
+      "tool and code exactness canary",
+      "Codex route canary",
+      "Claude Code route canary"
+    ],
+    "score": 79,
+    "verdict": "RECOMMENDED",
+    "warnings": [
+      "This report uses SYNTHETIC TEST DATA for both.",
+      "Expected benefit is high based on request size, session size and cache intensity.",
+      "Accuracy risk is low because exactness sensitivity is medium.",
+      "Latency impact is medium for the selected latency sensitivity.",
+      "The synthetic fixture passed benefit and safety checks for the recommended preset."
+    ]
+  },
+  "dataNotice": "SYNTHETIC TEST DATA",
+  "expectedBenefitBand": "HIGH",
+  "input": {
+    "averageRequestSize": 18000,
+    "averageSessionSize": 140000,
+    "cacheIntensity": "high",
+    "exactnessSensitivity": "medium",
+    "host": "both",
+    "language": "English",
+    "latencySensitivity": "medium",
+    "modelSimulatorProfile": "enabled",
+    "riskPreference": "balanced",
+    "script": "latin",
+    "toolUseFrequency": "medium",
+    "workloadType": "prose"
+  },
+  "latencyBand": "MEDIUM",
+  "reasons": [
+    "This report uses SYNTHETIC TEST DATA for both.",
+    "Expected benefit is high based on request size, session size and cache intensity.",
+    "Accuracy risk is low because exactness sensitivity is medium.",
+    "Latency impact is medium for the selected latency sensitivity.",
+    "The synthetic fixture passed benefit and safety checks for the recommended preset."
+  ],
+  "recommendedPreset": "BALANCED",
+  "requiredCanaries": [
+    "prose gist canary",
+    "exact-string canary",
+    "table structure canary",
+    "tool and code exactness canary",
+    "Codex route canary",
+    "Claude Code route canary"
+  ],
+  "title": "Context Diet Compatibility Audit",
+  "unsupportedCapabilities": [],
+  "verdict": "RECOMMENDED"
+}
+"
+`;
+
+exports[`context-diet CLI commands > prints safe output for benchmark 1`] = `
+"# Context Diet Personal Benchmark
+
+SYNTHETIC TEST DATA
+
+Generated: 2026-07-17T00:00:00.000Z
+Task: Update a synthetic formatting helper and run deterministic tests
+Provider: synthetic
+Model profile: synthetic-safe-profile-v1
+Repository: synthetic-repo-1
+
+## Comparison
+
+Comparable: yes
+The three synthetic benchmark runs are comparable. Agreement is based on task tests and deterministic checks, not text similarity alone.
+
+## Runs
+
+### uncompressed_control
+
+Status: success
+Input tokens: 24000
+Output tokens: 4000
+Cached input tokens: 0
+Image tokens: 0
+Latency: 1800 ms
+Cache treatment: none
+Tool actions: read_file, apply_patch, run_tests
+Files changed: src/synthetic-format-helper.ts, src/synthetic-format-helper.test.ts
+Retrieval calls: 0
+Protected values imaged: 0
+Output agreement: passed via task_tests
+Errors: none
+
+Test commands:
+
+- pnpm test -- synthetic-format-helper: passed (synthetic helper tests passed)
+
+### safe_compressed
+
+Status: success
+Input tokens: 11000
+Output tokens: 4000
+Cached input tokens: 2000
+Image tokens: 900
+Latency: 2050 ms
+Cache treatment: context_diet_cache
+Tool actions: read_file, apply_patch, run_tests
+Files changed: src/synthetic-format-helper.ts, src/synthetic-format-helper.test.ts
+Retrieval calls: 0
+Protected values imaged: 0
+Output agreement: passed via task_tests
+Errors: none
+
+Test commands:
+
+- pnpm test -- synthetic-format-helper: passed (synthetic helper tests passed)
+
+### safe_compressed_exact_retrieval
+
+Status: success
+Input tokens: 12000
+Output tokens: 4000
+Cached input tokens: 2500
+Image tokens: 900
+Latency: 2250 ms
+Cache treatment: context_diet_cache
+Tool actions: read_file, apply_patch, run_tests
+Files changed: src/synthetic-format-helper.ts, src/synthetic-format-helper.test.ts
+Retrieval calls: 2
+Protected values imaged: 0
+Output agreement: passed via task_tests
+Errors: none
+
+Test commands:
+
+- pnpm test -- synthetic-format-helper: passed (synthetic helper tests passed)
+"
+`;
+
+exports[`context-diet CLI commands > prints safe output for delete-session 1`] = `
+"Context Diet delete-session
+
+Session: session_test_123
+Dry run: no session data was deleted.
+Use --confirm only after checking the session ID.
+Credentials: not displayed
+"
+`;
+
+exports[`context-diet CLI commands > prints safe output for doctor 1`] = `
+"Context Diet doctor
+
+Status: ready for local synthetic checks.
+Current upstream: https://provider.example.test/v1
+Safety mode: Safe
+Gateway: running
+Fake-provider development mode: on
+
+No credentials were read or printed.
+Restore direct routing by removing the local Context Diet base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.
+"
+`;
+
+exports[`context-diet CLI commands > prints safe output for explain 1`] = `
+"Context Diet explain
+
+Context Diet keeps Safe mode as the default. Current instructions, secrets, exact values, code, commands and active tool state stay native.
+When a block is eligible, the policy can render a compact image and keep an exact local sidecar for retrieval.
+If parsing, scanning, rendering, storage or rebuilding fails, the original provider request is sent unchanged.
+
+Current upstream: https://provider.example.test/v1
+Safety mode: Safe
+Restore direct routing by removing the local Context Diet base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.
+"
+`;
+
+exports[`context-diet CLI commands > prints safe output for retrieve 1`] = `
+"Context Diet retrieve
+
+Session: session_test_123
+Block ID: not provided
+Result: synthetic retrieval preview only. No filesystem path was accepted.
+Returned characters: 0
+Credentials: not displayed
+"
+`;
+
+exports[`context-diet CLI commands > prints safe output for start 1`] = `
+"Context Diet gateway start
+
+Current upstream: http://127.0.0.1:8787/fake-provider
+Safety mode: Safe
+Fake-provider development mode: on
+Host configuration was not changed.
+Use your host's custom provider/base URL setting to point at the local gateway.
+Restore direct routing by removing the local Context Diet base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.
+"
+`;
+
+exports[`context-diet CLI commands > prints safe output for status 1`] = `
+"Context Diet status
+
+Gateway: running
+Current upstream: https://provider.example.test/v1
+Safety mode: Safe
+Hosts: both
+Fake-provider development mode: on
+Credentials: not displayed
+Restore direct routing by removing the local Context Diet base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.
+"
+`;
+
+exports[`context-diet CLI commands > prints safe output for stop 1`] = `
+"Context Diet gateway stop
+
+Current upstream: https://provider.example.test/v1
+Safety mode: Safe
+Dry run: no running process or host configuration was changed.
+Use --confirm to stop managed local routing after reviewing the current status.
+Restore direct routing by removing the local Context Diet base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.
+"
+`;
+
+exports[`context-diet CLI commands > prints safe output for uninstall 1`] = `
+"Context Diet uninstall
+
+Current upstream: https://provider.example.test/v1
+Safety mode: Safe
+Dry run: no files, sessions or host configuration were changed.
+Restore direct routing by removing the local Context Diet base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.
+"
+`;

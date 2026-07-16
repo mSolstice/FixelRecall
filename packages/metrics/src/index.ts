@@ -60,8 +60,145 @@ export interface ContextDietRecommendation {
   readonly retestCondition: string;
 }
 
+export type CostProvider = "openai" | "anthropic" | "unknown";
+export type TokenAvailability = "available" | "estimated" | "unavailable";
+export type CostConfidence = "high" | "medium" | "low" | "unavailable";
+
+export interface ProviderTokenBreakdown {
+  readonly measuredInputTokens?: number;
+  readonly estimatedInputTokens?: number;
+  readonly cachedInputTokens?: number;
+  readonly imageTokens?: number;
+  readonly outputTokens?: number;
+  readonly availability: TokenAvailability;
+}
+
+export interface ProviderPriceInfo {
+  readonly source: string;
+  readonly date: string;
+  readonly inputPerMillion: number;
+  readonly cachedInputPerMillion: number;
+  readonly imagePerMillion: number;
+  readonly outputPerMillion: number;
+  readonly staleAfterDays: number;
+}
+
+export interface ProviderCostRun {
+  readonly provider: CostProvider;
+  readonly modelVersion: string;
+  readonly cacheTreatment: "none" | "provider_cache" | "context_diet_cache";
+  readonly status: "success" | "failed";
+  readonly tokens: ProviderTokenBreakdown;
+  readonly price: ProviderPriceInfo;
+  readonly addedLatencyMs: number;
+  readonly normalisedModelComparison?: boolean;
+}
+
+export interface ProviderCostReportInput {
+  readonly baseline?: ProviderCostRun;
+  readonly candidate: ProviderCostRun;
+  readonly asOfDate: string;
+}
+
+export interface ProviderCostTotal {
+  readonly input: number;
+  readonly cachedInput: number;
+  readonly image: number;
+  readonly output: number;
+  readonly total: number;
+}
+
+export interface ProviderCostReport {
+  readonly dataOrigin: "synthetic";
+  readonly provider: CostProvider;
+  readonly modelVersion: string;
+  readonly measuredInputTokens: number | null;
+  readonly estimatedInputTokens: number | null;
+  readonly cachedInputTokens: number | null;
+  readonly imageTokens: number | null;
+  readonly outputTokens: number | null;
+  readonly priceSource: string;
+  readonly priceDate: string;
+  readonly priceStale: boolean;
+  readonly addedLatencyMs: number;
+  readonly totalEstimatedCost: number | null;
+  readonly confidence: CostConfidence;
+  readonly availability: TokenAvailability;
+  readonly baselineTotalEstimatedCost: number | null;
+  readonly savingsAmount: number | null;
+  readonly savingsPercentage: number | null;
+  readonly negativeResult: boolean;
+  readonly comparisonValid: boolean;
+  readonly cacheTreatment: {
+    readonly baseline: string | null;
+    readonly candidate: string;
+    readonly changed: boolean;
+  };
+  readonly reasons: readonly string[];
+}
+
 export function createSafeMetric(name: string, value: number): SafeMetric {
   return { name, value };
+}
+
+export function createProviderCostReport(input: ProviderCostReportInput): ProviderCostReport {
+  const candidate = input.candidate;
+  const candidateTotal = costTotal(candidate);
+  const baselineTotal =
+    input.baseline === undefined || input.baseline.status === "failed"
+      ? null
+      : costTotal(input.baseline);
+  const comparability = comparable(input);
+  const savingsAmount =
+    baselineTotal === null || candidateTotal === null || !comparability.valid
+      ? null
+      : roundMoney(baselineTotal.total - candidateTotal.total);
+  const savingsPercentage =
+    baselineTotal === null ||
+    candidateTotal === null ||
+    !comparability.valid ||
+    baselineTotal.total === 0
+      ? null
+      : roundMoney(((baselineTotal.total - candidateTotal.total) / baselineTotal.total) * 100);
+  const priceStale = isPriceStale(candidate.price, input.asOfDate);
+  const reasons = costReportReasons({
+    baselineTotal,
+    candidate,
+    candidateTotal,
+    comparability,
+    priceStale,
+    savingsAmount
+  });
+
+  return {
+    addedLatencyMs: candidate.addedLatencyMs,
+    availability: candidate.tokens.availability,
+    baselineTotalEstimatedCost: baselineTotal?.total ?? null,
+    cachedInputTokens: candidate.tokens.cachedInputTokens ?? null,
+    cacheTreatment: {
+      baseline: input.baseline?.cacheTreatment ?? null,
+      candidate: candidate.cacheTreatment,
+      changed:
+        input.baseline !== undefined && input.baseline.cacheTreatment !== candidate.cacheTreatment
+    },
+    comparisonValid: comparability.valid,
+    confidence: confidenceFor(candidate, input.baseline, comparability.valid),
+    dataOrigin: "synthetic",
+    estimatedInputTokens: candidate.tokens.estimatedInputTokens ?? null,
+    imageTokens: candidate.tokens.imageTokens ?? null,
+    measuredInputTokens: candidate.tokens.measuredInputTokens ?? null,
+    modelVersion: candidate.modelVersion,
+    negativeResult: savingsAmount !== null && savingsAmount < 0,
+    outputTokens: candidate.tokens.outputTokens ?? null,
+    priceDate: candidate.price.date,
+    priceSource: candidate.price.source,
+    priceStale,
+    provider: candidate.provider,
+    reasons,
+    savingsAmount,
+    savingsPercentage,
+    totalEstimatedCost: candidateTotal?.total ?? null
+  };
 }
 
 export function recommendContextDiet(input: RecommendationInput): ContextDietRecommendation {
@@ -223,6 +360,116 @@ function retestCondition(input: RecommendationInput, verdict: RecommendationVerd
     return "Re-test only after a supported local model profile is approved.";
   }
   return "Re-test when usage, pricing, cache intensity, model profile or exactness mix changes.";
+}
+
+function costTotal(run: ProviderCostRun): ProviderCostTotal | null {
+  if (run.status === "failed" || run.tokens.availability === "unavailable") {
+    return null;
+  }
+  const measuredOrEstimatedInput =
+    run.tokens.measuredInputTokens ?? run.tokens.estimatedInputTokens ?? null;
+  if (measuredOrEstimatedInput === null) {
+    return null;
+  }
+  const cachedInput = run.tokens.cachedInputTokens ?? 0;
+  const billableInput = Math.max(0, measuredOrEstimatedInput - cachedInput);
+  const imageTokens = run.tokens.imageTokens ?? 0;
+  const outputTokens = run.tokens.outputTokens ?? 0;
+  const total = {
+    cachedInput: (cachedInput / 1_000_000) * run.price.cachedInputPerMillion,
+    image: (imageTokens / 1_000_000) * run.price.imagePerMillion,
+    input: (billableInput / 1_000_000) * run.price.inputPerMillion,
+    output: (outputTokens / 1_000_000) * run.price.outputPerMillion
+  };
+  return {
+    cachedInput: roundMoney(total.cachedInput),
+    image: roundMoney(total.image),
+    input: roundMoney(total.input),
+    output: roundMoney(total.output),
+    total: roundMoney(total.input + total.cachedInput + total.image + total.output)
+  };
+}
+
+function comparable(input: ProviderCostReportInput): {
+  readonly valid: boolean;
+  readonly reasons: readonly string[];
+} {
+  const baseline = input.baseline;
+  const reasons: string[] = [];
+  if (baseline === undefined) {
+    reasons.push("No comparable baseline was provided, so savings percentage is not reported.");
+  } else {
+    if (baseline.status === "failed" || input.candidate.status === "failed") {
+      reasons.push("Failed runs cannot be used as successful cost comparisons.");
+    }
+    if (
+      baseline.modelVersion !== input.candidate.modelVersion &&
+      input.candidate.normalisedModelComparison !== true
+    ) {
+      reasons.push("Different model versions invalidate comparison unless explicitly normalised.");
+    }
+  }
+  return { reasons, valid: reasons.length === 0 };
+}
+
+function isPriceStale(price: ProviderPriceInfo, asOfDate: string): boolean {
+  const priceDate = Date.parse(price.date);
+  const reportDate = Date.parse(asOfDate);
+  if (Number.isNaN(priceDate) || Number.isNaN(reportDate)) {
+    return true;
+  }
+  const ageDays = (reportDate - priceDate) / 86_400_000;
+  return ageDays > price.staleAfterDays;
+}
+
+function confidenceFor(
+  candidate: ProviderCostRun,
+  baseline: ProviderCostRun | undefined,
+  comparisonValid: boolean
+): CostConfidence {
+  if (candidate.tokens.availability === "unavailable" || candidate.status === "failed") {
+    return "unavailable";
+  }
+  if (!comparisonValid || baseline === undefined) {
+    return "low";
+  }
+  return candidate.tokens.availability === "estimated" ? "medium" : "high";
+}
+
+function costReportReasons(input: {
+  readonly candidate: ProviderCostRun;
+  readonly candidateTotal: ProviderCostTotal | null;
+  readonly baselineTotal: ProviderCostTotal | null;
+  readonly comparability: { readonly valid: boolean; readonly reasons: readonly string[] };
+  readonly priceStale: boolean;
+  readonly savingsAmount: number | null;
+}): readonly string[] {
+  const reasons = [...input.comparability.reasons];
+  if (input.candidate.tokens.availability === "unavailable") {
+    reasons.push("Token counts are unavailable, so total estimated cost is unavailable.");
+  }
+  if (input.candidate.status === "failed") {
+    reasons.push("The candidate run failed and is not counted as a successful comparison.");
+  }
+  if (input.priceStale) {
+    reasons.push("Price data is stale and must be labelled before using the estimate.");
+  }
+  if (input.baselineTotal !== null && input.candidateTotal !== null) {
+    const baselineCacheTreatment =
+      input.comparability.valid && input.candidate.cacheTreatment !== "none"
+        ? "a comparable setup"
+        : "a native setup";
+    reasons.push(
+      `Cache treatment: baseline uses ${baselineCacheTreatment}; candidate uses ${input.candidate.cacheTreatment}.`
+    );
+  }
+  if (input.savingsAmount !== null && input.savingsAmount < 0) {
+    reasons.push("The comparison is negative; the candidate costs more than the baseline.");
+  }
+  if (reasons.length === 0) {
+    reasons.push("Comparable provider-aware cost report is available.");
+  }
+  return reasons;
 }
 
 function roundMoney(value: number): number {
