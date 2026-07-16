@@ -43,9 +43,15 @@ importers:
 
   packages/cli:
     dependencies:
+      "@context-diet/core":
+        specifier: workspace:*
+        version: link:../core
       "@context-diet/proxy":
         specifier: workspace:*
         version: link:../proxy
+      "@context-diet/renderer":
+        specifier: workspace:*
+        version: link:../renderer
 
   packages/core: {}
 

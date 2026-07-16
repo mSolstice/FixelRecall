@@ -150,6 +150,27 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
       provider = route === openAIResponsesRoute.path ? "openai" : "anthropic";
       metrics.providerRequests[provider] += 1;
 
+      if (!hasProviderAuth(request, provider)) {
+        statusCode = 401;
+        metrics.rejectedRequests += 1;
+        writeJson(response, statusCode, requestId, {
+          error: { type: "authentication_required", message: "provider authentication is required" }
+        });
+        return;
+      }
+
+      if (!hasJsonContentType(request)) {
+        statusCode = 415;
+        metrics.rejectedRequests += 1;
+        writeJson(response, statusCode, requestId, {
+          error: {
+            type: "unsupported_media_type",
+            message: "content-type must be application/json"
+          }
+        });
+        return;
+      }
+
       if (killSwitchActive) {
         statusCode = 503;
         metrics.rejectedRequests += 1;
@@ -175,6 +196,7 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
 
       const body = await readLimitedBody(request, maxRequestBytes);
       requestBytes = body.length;
+      validateJsonBody(body);
       const upstreamResponse = await fetch(upstreamUrl, {
         method: "POST",
         headers: forwardHeaders(request, provider),
@@ -185,7 +207,7 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
       statusCode = upstreamResponse.status;
       if (!upstreamResponse.ok) {
         metrics.rejectedRequests += 1;
-        writeJson(response, 502, requestId, {
+        writeJson(response, statusCode, requestId, {
           error: {
             type: "provider_error",
             provider,
@@ -193,7 +215,6 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
             message: "Provider upstream returned an error"
           }
         });
-        statusCode = 502;
         return;
       }
 
@@ -325,6 +346,25 @@ export function createFakeGateway(options: FakeGatewayOptions = {}): FakeGateway
       }
       provider = route === openAIResponsesRoute.path ? "openai" : "anthropic";
       metrics.providerRequests[provider] += 1;
+      if (!hasProviderAuth(request, provider)) {
+        statusCode = 401;
+        metrics.rejectedRequests += 1;
+        writeJson(response, statusCode, requestId, {
+          error: { type: "authentication_required", message: "provider authentication is required" }
+        });
+        return;
+      }
+      if (!hasJsonContentType(request)) {
+        statusCode = 415;
+        metrics.rejectedRequests += 1;
+        writeJson(response, statusCode, requestId, {
+          error: {
+            type: "unsupported_media_type",
+            message: "content-type must be application/json"
+          }
+        });
+        return;
+      }
       const bodyBuffer = await readLimitedBody(request, defaultMaxRequestBytes);
       requestBytes = bodyBuffer.length;
       const parsed = parseJsonObject(bodyBuffer);
@@ -615,6 +655,25 @@ function copyHeader(request: IncomingMessage, headers: Headers, name: string): v
   const value = request.headers[name];
   if (typeof value === "string") {
     headers.set(name, value);
+  }
+}
+
+function hasProviderAuth(request: IncomingMessage, provider: ProviderFamily): boolean {
+  const header =
+    provider === "openai" ? request.headers["authorization"] : request.headers["x-api-key"];
+  return typeof header === "string" && header.trim().length > 0;
+}
+
+function hasJsonContentType(request: IncomingMessage): boolean {
+  const header = request.headers["content-type"];
+  return typeof header === "string" && header.toLowerCase().startsWith("application/json");
+}
+
+function validateJsonBody(body: Buffer): void {
+  try {
+    parseJsonObject(body);
+  } catch {
+    throw new GatewayRequestError(400, "bad_request", "request body must be a JSON object");
   }
 }
 

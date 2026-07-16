@@ -1,3 +1,8 @@
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { createServer, type Server } from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -7,6 +12,12 @@ import {
   type ProviderFamily,
   type StructuredLogEvent
 } from "./index.js";
+
+const rawBodyPersistenceStatuses = [400, 401, 403, 404, 409, 413, 415, 422, 429] as const;
+const rawBodyPersistenceProviders = [
+  { provider: "openai", route: "/v1/responses" },
+  { provider: "anthropic", route: "/v1/messages" }
+] as const satisfies readonly { readonly provider: ProviderFamily; readonly route: string }[];
 
 describe("healthRoute", () => {
   it("declares the local health endpoint", () => {
@@ -179,7 +190,7 @@ describe("createLocalGateway", () => {
     try {
       const response = await fetch(`http://127.0.0.1:${address.port}/v1/responses`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { authorization: "Bearer fake-key", "content-type": "application/json" },
         body: JSON.stringify({ model: "fake", input: "unknown shape passes through" })
       });
       expect(response.status).toBe(502);
@@ -262,7 +273,7 @@ describe("createLocalGateway", () => {
       await fetch(`${baseUrl}/runtime/kill-switch`, { method: "POST" });
       const blocked = await fetch(`${baseUrl}/v1/responses`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { authorization: "Bearer fake-key", "content-type": "application/json" },
         body: JSON.stringify({ model: "fake", input: "blocked" })
       });
       expect(blocked.status).toBe(503);
@@ -287,14 +298,14 @@ describe("createLocalGateway", () => {
     try {
       const tooLarge = await fetch(`${baseUrl}/v1/responses`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { authorization: "Bearer fake-key", "content-type": "application/json" },
         body: JSON.stringify({ input: "x".repeat(100) })
       });
       expect(tooLarge.status).toBe(413);
 
       const providerError = await fetch(`${baseUrl}/v1/responses`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { authorization: "Bearer fake-key", "content-type": "application/json" },
         body: JSON.stringify({ trigger_provider_error: true })
       });
       expect(providerError.status).toBe(502);
@@ -305,6 +316,51 @@ describe("createLocalGateway", () => {
       await close();
       await openai.close();
     }
+  });
+});
+
+describe("raw 4xx request body persistence", () => {
+  it("does not persist raw request bodies for local gateway 4xx statuses", async () => {
+    const evidenceRoot = join(tmpdir(), `context-diet-raw-4xx-evidence-${Date.now()}`);
+    await mkdir(evidenceRoot, { recursive: true });
+    const allCanaries: string[] = [];
+
+    for (const status of rawBodyPersistenceStatuses) {
+      for (const providerCase of rawBodyPersistenceProviders) {
+        const canary = makeRawBodyCanary(status, providerCase.provider);
+        allCanaries.push(canary);
+        const logs: StructuredLogEvent[] = [];
+        const evidence = await exercise4xxCase({
+          canary,
+          evidenceRoot,
+          logs,
+          provider: providerCase.provider,
+          route: providerCase.route,
+          status
+        });
+
+        const serialisedEvidence = JSON.stringify(evidence.safeSnapshot);
+        expect(evidence.responseStatus).toBe(status);
+        expect(serialisedEvidence).not.toContain(canary);
+        expect(serialisedEvidence).not.toContain(evidence.rawBody);
+        expect(JSON.stringify(logs)).not.toContain(canary);
+        expect(JSON.stringify(logs)).not.toContain(evidence.rawBody);
+        expect(
+          logs.find((log) => log.route === providerCase.route && log.statusCode === status)
+        ).toMatchObject({
+          authRedacted: true,
+          bodyLogged: false,
+          route: providerCase.route,
+          statusCode: status
+        });
+      }
+    }
+
+    const leaks = await scanForCanaries({
+      canaries: allCanaries,
+      roots: [process.cwd(), evidenceRoot]
+    });
+    expect(leaks).toEqual([]);
   });
 });
 
@@ -363,16 +419,243 @@ async function startFakeUpstream(provider: ProviderFamily) {
   };
 }
 
-function listen(server: import("node:http").Server): Promise<void> {
+async function startStatusUpstream(statusCode: number) {
+  const server = createServer(async (request, response) => {
+    let byteCount = 0;
+    for await (const chunk of request) {
+      byteCount += Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(chunk);
+    }
+    response.writeHead(statusCode, {
+      "content-type": "application/json",
+      "x-upstream-byte-count": String(byteCount)
+    });
+    response.end(
+      JSON.stringify({
+        error: {
+          type: `synthetic_${statusCode}`,
+          message: "synthetic provider error without request body"
+        }
+      })
+    );
+  });
+  await listen(server);
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    throw new Error("Expected TCP server address");
+  }
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    close: () =>
+      new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      })
+  };
+}
+
+function listen(server: Server): Promise<void> {
   return new Promise((resolve) => {
     server.listen(0, "127.0.0.1", resolve);
   });
 }
 
+async function exercise4xxCase(input: {
+  readonly status: (typeof rawBodyPersistenceStatuses)[number];
+  readonly provider: ProviderFamily;
+  readonly route: string;
+  readonly canary: string;
+  readonly logs: StructuredLogEvent[];
+  readonly evidenceRoot: string;
+}): Promise<{
+  readonly rawBody: string;
+  readonly responseStatus: number;
+  readonly safeSnapshot: Record<string, unknown>;
+}> {
+  const rawBody = JSON.stringify({
+    synthetic: true,
+    canary_sentence: input.canary,
+    payload: `synthetic body for ${input.provider} ${input.status}`
+  });
+  const trigger = await create4xxTrigger(input.status, input.provider);
+  const gateway = createLocalGateway({
+    log: (event) => input.logs.push(event),
+    maxRequestBytes: input.status === 413 ? 24 : 1_000_000,
+    upstreamAllowlist: trigger.allowlist,
+    upstreams: trigger.upstreams
+  });
+  await listen(gateway.server);
+  const address = gateway.server.address();
+  if (address === null || typeof address === "string") {
+    throw new Error("Expected TCP server address");
+  }
+  const headers = headersFor4xx(input.status, input.provider);
+  try {
+    const response = await fetch(`http://127.0.0.1:${address.port}${input.route}`, {
+      method: "POST",
+      headers,
+      body: input.status === 400 ? `{"canary_sentence":"${input.canary}",` : rawBody
+    });
+    const responseBody = (await response.json()) as Record<string, unknown>;
+    const status = await (await fetch(`http://127.0.0.1:${address.port}/status`)).json();
+    const latestLog = input.logs.at(-1);
+    const safeSnapshot = {
+      auditEvents: [
+        {
+          bodyIncluded: false,
+          errorCode: readErrorType(responseBody),
+          provider: input.provider,
+          requestId: latestLog?.requestId,
+          status: response.status
+        }
+      ],
+      generatedArtifacts: [],
+      logs: input.logs,
+      metrics: status,
+      response: {
+        errorCode: readErrorType(responseBody),
+        requestId: response.headers.get("x-request-id"),
+        status: response.status
+      },
+      snapshots: [
+        {
+          byteCount: latestLog?.requestBytes ?? 0,
+          route: input.route,
+          status: response.status
+        }
+      ],
+      tempFiles: [],
+      traces: [
+        {
+          durationMs: latestLog?.durationMs ?? 0,
+          errorCode: readErrorType(responseBody),
+          route: input.route,
+          status: response.status
+        }
+      ],
+      vault: []
+    };
+    await writeFile(
+      join(input.evidenceRoot, `${input.provider}-${input.status}.json`),
+      JSON.stringify(safeSnapshot, null, 2)
+    );
+    return { rawBody, responseStatus: response.status, safeSnapshot };
+  } finally {
+    await gateway.close();
+    await trigger.close();
+  }
+}
+
+async function create4xxTrigger(
+  status: (typeof rawBodyPersistenceStatuses)[number],
+  provider: ProviderFamily
+): Promise<{
+  readonly upstreams: Partial<Record<ProviderFamily, string>>;
+  readonly allowlist: readonly string[];
+  readonly close: () => Promise<void>;
+}> {
+  if (status === 403 || status === 404 || status === 409 || status === 422 || status === 429) {
+    const upstream = await startStatusUpstream(status);
+    return {
+      allowlist: [upstream.baseUrl],
+      close: upstream.close,
+      upstreams: {
+        [provider]: `${upstream.baseUrl}${provider === "openai" ? "/v1/responses" : "/v1/messages"}`
+      }
+    };
+  }
+  return {
+    allowlist: ["http://127.0.0.1:1"],
+    close: async () => undefined,
+    upstreams: { [provider]: "http://127.0.0.1:1/synthetic" }
+  };
+}
+
+function headersFor4xx(status: number, provider: ProviderFamily): Record<string, string> {
+  const auth =
+    provider === "openai"
+      ? { authorization: `Bearer fake-${provider}-4xx-key` }
+      : { "x-api-key": `fake-${provider}-4xx-key`, "anthropic-version": "2023-06-01" };
+  if (status === 401) {
+    return { "content-type": "application/json", "x-request-id": `raw-4xx-${provider}-${status}` };
+  }
+  if (status === 415) {
+    return {
+      ...auth,
+      "content-type": "text/plain",
+      "x-request-id": `raw-4xx-${provider}-${status}`
+    };
+  }
+  return {
+    ...auth,
+    "content-type": "application/json",
+    "x-request-id": `raw-4xx-${provider}-${status}`
+  };
+}
+
+function makeRawBodyCanary(status: number, provider: ProviderFamily): string {
+  return [
+    "Synthetic raw 4xx body canary sentence for",
+    provider,
+    "status",
+    String(status),
+    randomSuffix()
+  ].join(" ");
+}
+
+function randomSuffix(): string {
+  return `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
+function readErrorType(responseBody: Record<string, unknown>): string {
+  const error = responseBody["error"];
+  if (error !== null && typeof error === "object" && !Array.isArray(error)) {
+    const type = (error as { readonly type?: unknown }).type;
+    return typeof type === "string" ? type : "unknown_error";
+  }
+  return "unknown_error";
+}
+
+async function scanForCanaries(input: {
+  readonly canaries: readonly string[];
+  readonly roots: readonly string[];
+}): Promise<readonly string[]> {
+  const leaks: string[] = [];
+  for (const root of input.roots) {
+    await scanPath(root, input.canaries, leaks);
+  }
+  return leaks;
+}
+
+async function scanPath(path: string, canaries: readonly string[], leaks: string[]): Promise<void> {
+  const info = await stat(path);
+  if (info.isDirectory()) {
+    if (path.includes("/.git") || path.includes("/node_modules")) {
+      return;
+    }
+    const children = await readdir(path);
+    for (const child of children) {
+      await scanPath(join(path, child), canaries, leaks);
+    }
+    return;
+  }
+  if (!info.isFile() || info.size > 2_000_000) {
+    return;
+  }
+  const content = await readFile(path, "utf8").catch(() => "");
+  for (const canary of canaries) {
+    if (content.includes(canary)) {
+      leaks.push(`${path}:${canary}`);
+    }
+  }
+}
+
 async function postStream(url: string): Promise<string> {
+  const isOpenAI = url.endsWith("/v1/responses");
   const response = await fetch(url, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      ...(isOpenAI ? { authorization: "Bearer fake-key" } : { "x-api-key": "fake-key" }),
+      "content-type": "application/json"
+    },
     body: JSON.stringify({ stream: true })
   });
   expect(response.status).toBe(200);
@@ -380,9 +663,13 @@ async function postStream(url: string): Promise<string> {
 }
 
 function postProviderError(url: string): Promise<Response> {
+  const isOpenAI = url.endsWith("/v1/responses");
   return fetch(url, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      ...(isOpenAI ? { authorization: "Bearer fake-key" } : { "x-api-key": "fake-key" }),
+      "content-type": "application/json"
+    },
     body: JSON.stringify({ trigger_provider_error: true })
   });
 }

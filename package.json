@@ -10,6 +10,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
+    "scan:test-canaries": "node scripts/scan-test-output-canaries.mjs",
     "smoke:anthropic": "node scripts/smoke/anthropic-fake-gateway.mjs",
     "smoke:openai": "node scripts/smoke/openai-fake-gateway.mjs",
     "test": "vitest run",

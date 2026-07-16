@@ -166,7 +166,11 @@ describe("OpenAI Responses adapter", () => {
       }
       const response = await fetch(`http://127.0.0.1:${address.port}/v1/responses`, {
         method: "POST",
-        headers: { "content-type": "application/json", "x-request-id": "openai-adapter-stream" },
+        headers: {
+          authorization: "Bearer fake-openai-adapter-key",
+          "content-type": "application/json",
+          "x-request-id": "openai-adapter-stream"
+        },
         body: JSON.stringify(rebuilt)
       });
       expect(response.status).toBe(200);

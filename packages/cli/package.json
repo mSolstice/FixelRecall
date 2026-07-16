@@ -14,6 +14,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@context-diet/core": "workspace:*",
+    "@context-diet/renderer": "workspace:*",
     "@context-diet/proxy": "workspace:*"
   }
 }
