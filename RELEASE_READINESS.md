@@ -4,10 +4,11 @@ Review date: 2026-07-22
 
 Decision: **NO-GO**
 
-The release-candidate tree passes the local automated fake-provider checks, but it is not
-release-ready against the full acceptance criteria. The release gate still requires real Codex and
-Claude Code provider canaries with explicit consent, reviewed Linux CI evidence, OS support
-expansion beyond macOS, and a clean release-candidate commit.
+This review re-ran the current repository commands against `docs/ACCEPTANCE_CRITERIA.md`. The
+release-candidate commit passes local fake-provider checks, but it is not release-ready because real
+provider canaries have not been explicitly approved or run, Linux CI has not been reviewed for this
+commit, Windows native and WSL are unsupported, IDE surfaces are not release-tested, and real
+user-level install/uninstall has not been canaried outside temporary test directories.
 
 ## Version
 
@@ -16,66 +17,44 @@ expansion beyond macOS, and a clean release-candidate commit.
 - pnpm engine: `>=11 <12`
 - Package manager: `pnpm@11.13.0`
 
-## Commit
+## Commit And Tree
 
-- Release-candidate commit: generated after this report is staged.
-- Expected working tree after commit: clean.
-- Final commit hash: report from `git rev-parse HEAD` after commit.
+- Commit reviewed: `2cc1b1269cf06188e90e00204ba5f7fd6095c61b`
+- Short commit: `2cc1b12`
+- Tree before this report update: clean
+- Tree after this report update: dirty until `RELEASE_READINESS.md` is committed
 
-Do not cut a release if `git status --short` shows uncommitted changes after the release-candidate
-commit.
+## Supported OS
 
-## Supported Operating Systems
-
-Current evidence:
-
-- macOS: tested locally on Darwin 24.6.0 arm64 with Node.js 26 and pnpm 11.
-- Linux: CI workflow is configured for Ubuntu with Node.js 24 and 26, but this review did not verify
-  a current remote GitHub Actions run.
+- macOS: local fake-provider beta tested on Darwin 24.6.0 arm64 with Node.js 26 and pnpm 11.
+- Linux: GitHub Actions is configured for Ubuntu with Node.js 24 and 26, but a current remote CI run
+  was not reviewed in this pass.
 - Windows native: unsupported for this release.
 - WSL: unsupported for this release.
 
-See `docs/OS_SUPPORT.md` for the current OS support evidence and known path, permission, temp
-directory, symlink and loopback differences.
+See `docs/OS_SUPPORT.md` for path, permission, temp directory, symlink and loopback notes.
 
 ## Supported Codex Surfaces
 
-Current surface status:
-
-- Codex CLI: fake-provider tested. Environment doctor detected `codex-cli 0.136.0-alpha.2`;
-  `.agents/skills/context-diet/` exists; the fake OpenAI Responses-compatible route passes through
-  `/v1/responses`.
-- Codex IDE: not release-tested. This repository does not contain tests or official setup
-  instructions proving Codex IDE support.
-
-Not release-proven:
-
-- Real Codex custom-provider canary was not run.
-- Codex IDE surface was not tested and is not supported for this release.
-- Real user-level Codex configuration write/rollback has temp-directory tests only.
+- Codex CLI: fake-provider tested through the OpenAI Responses-compatible route `/v1/responses`.
+- Codex IDE: not release-tested and not supported for this release.
+- Real Codex provider canary: not run; explicit consent was not provided.
+- Real Codex user-level configuration migration: not canaried outside temporary test directories.
 
 ## Supported Claude Code Surfaces
 
-Current surface status:
-
-- Claude Code CLI: fake-provider tested. Environment doctor detected `2.1.217`;
-  `.claude/skills/context-diet/` exists; the fake Anthropic Messages-compatible route passes through
+- Claude Code CLI: fake-provider tested through the Anthropic Messages-compatible route
   `/v1/messages`.
-- Claude Code IDE: not release-tested. This repository does not contain tests or official setup
-  instructions proving Claude Code IDE support.
-
-Not release-proven:
-
-- Real Claude Code `ANTHROPIC_BASE_URL` canary was not run.
-- Claude Code IDE surface was not tested and is not supported for this release.
-- Real settings write/rollback has temp-directory tests only.
+- Claude Code IDE: not release-tested and not supported for this release.
+- Real Claude Code provider canary: not run; explicit consent was not provided.
+- Real Claude Code user-level settings migration: not canaried outside temporary test directories.
 
 ## Provider And Model Profiles
 
-Provider routes currently proven:
+Provider routes proven with fake providers:
 
-- OpenAI Responses-shaped fake provider route: `/v1/responses`
-- Anthropic Messages-shaped fake provider route: `/v1/messages`
+- OpenAI Responses-shaped route: `/v1/responses`
+- Anthropic Messages-shaped route: `/v1/messages`
 
 Model/profile evidence:
 
@@ -91,63 +70,65 @@ Release limitation:
 
 ## Commands Run
 
-| Command                                                        | Result                                                                                     |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `pnpm install`                                                 | PASS. Dependencies already up to date. Non-fatal pnpm update metadata warning appeared.    |
-| `pnpm check:environment`                                       | PASS. macOS, Git, Node 26, pnpm 11, Codex CLI, Claude Code CLI and required docs detected. |
-| `pnpm format:check`                                            | PASS                                                                                       |
-| `pnpm lint`                                                    | PASS                                                                                       |
-| `pnpm typecheck`                                               | PASS                                                                                       |
-| `pnpm build`                                                   | PASS                                                                                       |
-| `pnpm test`                                                    | PASS with loopback permission.                                                             |
-| `pnpm test:compatibility`                                      | PASS                                                                                       |
-| `pnpm check:skills`                                            | PASS                                                                                       |
-| `CONTEXT_DIET_TEST_CANARIES='[]' pnpm scan:test-canaries -- .` | PASS                                                                                       |
-| `pnpm canary:preflight`                                        | PASS with explicit safe placeholder environment; no provider traffic sent.                 |
-| `pnpm smoke:openai`                                            | PASS                                                                                       |
-| `pnpm smoke:anthropic`                                         | PASS                                                                                       |
-| `pnpm beta:fake`                                               | PASS                                                                                       |
-| `node packages/cli/dist/index.js status`                       | PASS                                                                                       |
-| `node packages/cli/dist/index.js benchmark --json`             | PASS                                                                                       |
-| `node packages/cli/dist/index.js renderer doctor`              | PASS; status `HEALTHY`.                                                                    |
+| Command                                                        | Result                                                                             |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `pnpm install`                                                 | PASS. Already up to date. Non-fatal pnpm metadata fetch warning for update check.  |
+| `pnpm check:environment`                                       | PASS. Darwin, Git, Node 26, pnpm 11, Codex CLI, Claude Code CLI and docs detected. |
+| `pnpm format:check`                                            | PASS                                                                               |
+| `pnpm lint`                                                    | PASS                                                                               |
+| `pnpm typecheck`                                               | PASS                                                                               |
+| `pnpm build`                                                   | PASS                                                                               |
+| `pnpm test`                                                    | PASS with local loopback permission: 17 files, 279 tests.                          |
+| `pnpm test:compatibility`                                      | PASS: 1 file, 3 tests.                                                             |
+| `pnpm check:skills`                                            | PASS                                                                               |
+| `CONTEXT_DIET_TEST_CANARIES='[]' pnpm scan:test-canaries -- .` | PASS                                                                               |
+| `pnpm smoke:openai`                                            | PASS with local loopback permission.                                               |
+| `pnpm smoke:anthropic`                                         | PASS with local loopback permission.                                               |
+| `pnpm beta:fake`                                               | PASS with local loopback permission.                                               |
+
+Sandbox note: the first sandboxed runs of `pnpm test`, `pnpm smoke:openai`, `pnpm smoke:anthropic`
+and `pnpm beta:fake` failed with `listen EPERM: operation not permitted 127.0.0.1`. Rerunning with
+local loopback permission passed. No real-provider traffic was sent.
 
 ## Test Totals
 
-Current local test totals:
-
 - Full Vitest suite: 17 files, 279 tests passed.
 - Compatibility suite: 1 file, 3 tests passed.
-- Fake beta: 13 recorded beta steps passed for gateway, clients, transform, MCP retrieval,
-  benchmark, dashboard smoke, kill switch, direct fake routing, delete-session and temp uninstall.
+- Fake beta: 13 beta steps passed for gateway, fake Codex client, fake Claude Code client,
+  transform, MCP retrieval, benchmark, dashboard smoke, kill switch, direct fake routing,
+  delete-session and temporary uninstall.
 - OpenAI fake smoke: PASS.
 - Anthropic fake smoke: PASS.
-- Skill sync check: PASS.
+- Skill sync: PASS.
 - Test-output canary scan: PASS.
+- Real Codex provider canary: not run.
+- Real Claude Code provider canary: not run.
 
-## Acceptance Criteria Summary
+## Acceptance Criteria Review
 
-Pass or mostly pass:
+Pass or mostly pass locally:
 
-- Repository foundation scripts exist and pass locally after formatting fix.
-- Node.js 24/26 and pnpm 11 are declared.
-- TypeScript strict mode is in use.
-- Dual fake-provider transport passes for Codex-shaped and Claude-shaped routes.
-- Provider-neutral types, firewall, vault, retrieval, renderer interface, provider adapters, proxy,
-  dashboard, benchmark and skills have passing tests.
-- Generated skill drift check passes.
-- Fake-provider beta passes.
+- Repository foundation: Node/pnpm engines, strict TypeScript, scripts, concise agent files and
+  local checks are present.
+- Dual fake-provider transport: Codex-shaped and Claude-shaped routes pass fake smoke and beta.
+- Normalised model: provider-neutral fixtures, ordering, metadata and pass-through tests exist.
+- Exactness Firewall: Safe-mode protection and reason-code tests exist.
+- Vault and retrieval: project/session isolation, expiry, deletion, integrity and MCP tests exist.
+- Renderer: interface, pxpipe adapter, doctor, golden/failure tests and fallback behavior exist.
+- OpenAI and Anthropic adapters: round-trip, transform, tool state, cache, image, unknown and
+  streaming tests exist.
+- Proxy: loopback default, allowlist, request limits, timeouts, kill switch, raw-body and credential
+  tests exist.
+- Metrics, dashboard, benchmark and skills have synthetic/local tests.
+- Windows/WSL are clearly marked unsupported.
 
-No-go gaps:
+No-go against acceptance criteria:
 
-- Working tree is dirty; HEAD is not a clean release candidate.
-- Real Codex provider canary has not been run.
-- Real Claude Code provider canary has not been run.
-- README status and known limitations have been updated, but the release commit remains dirty.
-- Transactional install, rollback and uninstall have temp-directory tests only; real user-level host
-  configuration migration is not release-proven.
-- Windows native and WSL are unsupported for this release.
-- Linux is CI-configured but no current remote CI result was verified in this review run.
-- Codex IDE and Claude Code IDE surfaces are not tested.
+- Linux checks were not reviewed from CI for this exact commit.
+- Codex real-provider canary has not passed with explicit consent.
+- Claude Code real-provider canary has not passed with explicit consent.
+- Real user-level uninstall/rollback is not canaried outside temporary test directories.
+- Codex IDE and Claude Code IDE are not release-tested.
 
 ## Security Findings
 
@@ -163,34 +144,30 @@ From `SECURITY_REVIEW.md`:
 
 Current review notes:
 
-- No critical or high security finding is known open in the current test scope.
-- No comprehensive external secret-scanning service was run; repository canary scanning and tests
-  passed.
+- No critical or high security finding is known open in the current local fake-provider scope.
+- Repository canary scan passed.
 - Real provider credentials were not used.
 
 ## Known Limitations
 
-- Current release candidate is fake-provider and synthetic-data only.
-- Real-provider canary plan exists, but real canaries were not executed.
+- Current evidence is fake-provider and synthetic-data only.
+- Real-provider canaries were not run.
 - No production database is present.
-- Installer/uninstaller write, rollback and uninstall only under explicit confirmation and have
-  temp-directory coverage; real user host configuration migration is not release-proven.
+- Install, uninstall and rollback have temp-directory evidence only.
 - Dashboard is static/local-rendered in this package; no release-grade dashboard server boundary is
-  implemented.
+  proven.
 - Model-profile approval is synthetic only.
 - Benchmarks are synthetic and must not be marketed as real savings.
 - Highly cached or code-heavy workloads may produce neutral or negative value.
-- Direct CLI invocation is covered for status, benchmark JSON and renderer doctor.
-- Codex CLI is fake-provider tested; Codex IDE is not release-tested.
-- Claude Code CLI is fake-provider tested; Claude Code IDE is not release-tested.
-- Windows native, WSL and IDE-host paths are untested and unsupported for this release.
+- Codex IDE and Claude Code IDE are not release-tested.
+- Windows native and WSL are unsupported for this release.
 
 ## Privacy Statement
 
 Context Diet is designed as a local engine. In Safe mode, current instructions, code, diffs,
 commands, exact values, paths, IDs, hashes, numbers and secret-sensitive values stay native.
 
-Current evidence shows:
+Current local fake-provider evidence shows:
 
 - Fake provider credentials are not logged in smoke or beta flows.
 - Raw 4xx request-body persistence tests pass for both provider-shaped routes.
@@ -201,56 +178,32 @@ Current evidence shows:
 Release caveat:
 
 - This privacy statement is supported by synthetic/fake tests only. It is not yet backed by real
-  provider canaries or third-party security review.
+  provider canaries, Linux CI review for this commit, or third-party security review.
 
-## Install Steps
+## Install, Uninstall And Rollback
 
-Current install path:
+Install:
 
-1. Install Node.js 24 LTS or Node.js 26.
-2. Install pnpm 11.
-3. Run `pnpm install`.
-4. Run `pnpm build`.
-5. Run `pnpm check:environment`.
-6. Run `pnpm beta:fake`.
-7. Preview Codex setup with `context-diet setup codex`.
-8. Preview Claude Code setup with `context-diet setup claude-code`.
-9. Apply only after explicit confirmation and after reviewing `docs/INSTALL_UNINSTALL_EVIDENCE.md`.
+- `context-diet setup codex` and `context-diet setup claude-code` dry-run by default.
+- Writes require explicit `--confirm`.
+- Tests use temporary configuration roots only.
+- Provider credentials are never written.
 
-Do not write real provider credentials into the repository. Do not run real provider tests without
-the consent process in `docs/REAL_PROVIDER_CANARY_PLAN.md`.
+Uninstall:
 
-## Uninstall Steps
+- `context-diet uninstall --confirm` removes only Context Diet-managed entries in tested temp roots.
+- Manual direct-route restoration remains documented for Codex and Claude Code.
 
-Current uninstall guidance:
+Rollback:
 
-1. Stop the local gateway.
-2. Restore Codex direct routing by switching back to the previous provider and removing the
-   `context_diet_local` custom provider entry.
-3. Restore Claude Code direct routing by unsetting `ANTHROPIC_BASE_URL`.
-4. Remove optional Claude Code SessionStart hooks if added.
-5. Remove `context-diet-retrieval` MCP entries if exact retrieval should be disabled.
-6. Use `context-diet uninstall --confirm` only after reviewing the manifest and target files.
-7. Delete temporary local sessions through `context-diet delete-session --confirm` after confirming
-   the target session.
+- `context-diet rollback --confirm` restores backups in tested temp roots.
+- Interrupted install resume and rollback are tested against synthetic manifests in temp roots.
 
-Transactional uninstall is proven only against temporary test directories.
+Release limitation:
 
-## Rollback Steps
+- Real user-level host config install/uninstall/rollback has not been canaried.
 
-If a canary, fake beta or local setup fails:
-
-1. Trigger the gateway kill switch.
-2. Stop the local gateway.
-3. Restore direct provider routing for Codex and Claude Code.
-4. Remove temporary MCP entries and optional hooks.
-5. Delete temporary Context Diet session and vault data.
-6. Keep only safe metadata evidence.
-7. Do not retry real-provider traffic until explicit approval is renewed.
-
-## Measured Benchmark Evidence
-
-Benchmark command source: exported CLI command runner with `benchmark --json`.
+## Benchmark Evidence
 
 Evidence origin: `synthetic`.
 
@@ -278,15 +231,16 @@ This is not real-provider cost evidence and must remain labelled synthetic.
 Reasons:
 
 1. Real Codex and Claude Code provider canaries have not passed with explicit consent.
-2. Linux CI has not been reviewed for this release-candidate commit.
-3. Windows native, WSL and IDE surfaces are unsupported for this release.
-4. Real user-level install/uninstall has not been canaried outside temporary test directories.
-5. Current benchmark evidence is synthetic only.
+2. Linux CI has not been reviewed for this exact commit.
+3. Windows native, WSL, Codex IDE and Claude Code IDE are unsupported for this release.
+4. Real user-level install/uninstall/rollback has not been canaried outside temporary test
+   directories.
+5. Benchmark evidence is synthetic only.
 
 Recommended next release blockers:
 
-1. Review a clean Linux CI run for this exact commit.
-2. Add Windows native and WSL validation before claiming support, or keep both explicitly
-   unsupported.
-3. Run real-provider canaries only after explicit user consent using
+1. Review a clean Linux CI run for commit `2cc1b1269cf06188e90e00204ba5f7fd6095c61b`.
+2. Run real-provider canaries only after explicit user consent using
    `docs/REAL_PROVIDER_CANARY_PLAN.md`.
+3. Canary real user-level install/uninstall/rollback with safe fake credentials and reversible
+   configuration.
