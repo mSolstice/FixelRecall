@@ -1,6 +1,10 @@
 # Context Diet Safety
 
-Keep as native text in Safe mode:
+Use this file when explaining policy decisions or checking whether content may be transformed.
+
+## Safe-mode floor
+
+Keep native:
 
 - Current instructions
 - Code, diffs, commands and SQL
@@ -9,10 +13,14 @@ Keep as native text in Safe mode:
 - Unknown formats
 - Secret-sensitive values
 
-Never render or persist a credential.
+Never render or persist credentials or secret-sensitive spans.
 
-When optimisation fails, preserve the original content.
+## Failure rule
 
-When retrieval authorisation fails, return nothing.
+If parsing, scanning, rendering, vault storage, profile validation or rebuilding fails, preserve the
+original provider content unchanged.
 
-Do not improve a savings figure by weakening a safety rule.
+## Explanations
+
+Explain decisions with reason codes and plain language. Do not improve a savings figure or
+recommendation by weakening a safety rule.

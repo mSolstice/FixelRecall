@@ -1,16 +1,16 @@
 # Context Diet Troubleshooting
 
+Use this file when Context Diet appears unavailable, unsafe, ineffective or misconfigured.
+
 ## First checks
 
-1. Confirm the local service is running.
-2. Run `context-diet doctor`.
-3. Confirm the host points at the expected local gateway.
+1. Confirm the local service status.
+2. Run the repository's doctor command.
+3. Confirm the host points at the expected loopback gateway.
 4. Confirm the gateway points at the expected allowlisted upstream.
-5. Confirm Safe or Bypass mode.
-6. Check privacy-safe error codes.
+5. Confirm Safe, Bypass or kill-switch state.
+6. Check privacy-safe error codes and structured metrics.
 7. Do not enable raw-body logging.
 
-## Skill limitation
-
-If a user expects the skill alone to shrink the current conversation, explain that the gateway must
-be configured for future provider requests.
+If a user expects this skill alone to shrink the current conversation, explain that the local engine
+must be configured before future provider requests can be transformed.

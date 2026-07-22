@@ -228,6 +228,65 @@ Credentials: not displayed
 "
 `;
 
+exports[`context-diet CLI commands > prints safe output for setup 1`] = `
+"Codex setup preview
+
+Dry run: no configuration files were written. Re-run with --confirm to apply.
+Provider credentials are not stored, printed or generated.
+Manifest: /var/folders/tx/8p1lxl213g9_5c6g504xln_40000gn/T/context-diet-config-preview/.context-diet/install-manifest.json
+Changed files: /var/folders/tx/8p1lxl213g9_5c6g504xln_40000gn/T/context-diet-config-preview/.codex/config.toml
+
+Configuration locations:
+- User configuration: ~/.codex/config.toml
+- Project instructions: AGENTS.md
+- Optional project-local metadata: .codex/ when present
+
+# Preview only: Codex custom provider
+
+No credentials are included. Keep OPENAI_API_KEY or provider keys in your normal secret store.
+
+\`\`\`toml
+model_provider = "context_diet_local"
+
+[model_providers.context_diet_local]
+name = "Context Diet local gateway"
+base_url = "http://127.0.0.1:4317"
+env_key = "OPENAI_API_KEY"
+\`\`\`
+
+Skill discovery: Codex should discover .agents/skills/context-diet and may invoke it for context audits, benchmarks, retrieval and setup troubleshooting.
+MCP retrieval preview:
+\`\`\`json
+{
+  "mcpServers": {
+    "context-diet-retrieval": {
+      "args": [
+        "mcp",
+        "retrieval"
+      ],
+      "command": "context-diet",
+      "env": {}
+    }
+  }
+}
+\`\`\`
+
+Current upstream: https://provider.example.test/v1
+Safety mode: Safe
+Policy preset: Protect First
+
+Restore direct routing:
+- Switch model_provider back to the direct provider you used before Context Diet.
+- Remove the context_diet_local provider block after confirming direct routing works.
+- Remove the context-diet-retrieval MCP entry if exact retrieval should be disabled.
+
+Uninstall:
+- Stop the local gateway.
+- Delete Context Diet custom-provider and MCP entries from Codex configuration.
+- Keep AGENTS.md unless you are removing all project agent instructions.
+"
+`;
+
 exports[`context-diet CLI commands > prints safe output for start 1`] = `
 "Context Diet gateway start
 
@@ -274,6 +333,8 @@ Current upstream: https://provider.example.test/v1
 Policy preset: Protect First
 Safety mode: Safe
 Dry run: no files, sessions or host configuration were changed.
+Manifest: /var/folders/tx/8p1lxl213g9_5c6g504xln_40000gn/T/context-diet-config-preview/.context-diet/install-manifest.json
+Changed files: none
 Restore direct routing by removing the local Context Diet base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.
 "
 `;

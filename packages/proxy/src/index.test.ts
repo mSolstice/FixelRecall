@@ -1,5 +1,5 @@
 import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
-import { createServer, type Server } from "node:http";
+import { createServer, type IncomingMessage, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -200,6 +200,71 @@ describe("createLocalGateway", () => {
     } finally {
       await gateway.close();
       await upstream.close();
+    }
+  });
+
+  it("requires exact upstream origin allowlist matches", async () => {
+    const capturedHeaders: Record<string, string> = {};
+    const upstream = await startHeaderCaptureUpstream(capturedHeaders);
+    const gateway = createLocalGateway({
+      upstreams: { openai: `${upstream.baseUrl}/v1/responses` },
+      upstreamAllowlist: ["http://127.0.0.1:1"]
+    });
+    await listen(gateway.server);
+    const address = gateway.server.address();
+    if (address === null || typeof address === "string") {
+      throw new Error("Expected TCP server address");
+    }
+    try {
+      const response = await fetch(`http://127.0.0.1:${address.port}/v1/responses`, {
+        method: "POST",
+        headers: {
+          authorization: "Bearer fake-prefix-allowlist-leak-key",
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({ model: "fake", input: "prefix allowlist test" })
+      });
+      expect(response.status).toBe(502);
+      await expect(response.json()).resolves.toMatchObject({
+        error: { type: "upstream_not_allowed", provider: "openai" }
+      });
+      expect(capturedHeaders.authorization).toBeUndefined();
+    } finally {
+      await gateway.close();
+      await upstream.close();
+    }
+  });
+
+  it("blocks upstream redirects without forwarding credentials to the redirected host", async () => {
+    const redirectedHeaders: Record<string, string> = {};
+    const redirected = await startHeaderCaptureUpstream(redirectedHeaders);
+    const redirecting = await startRedirectUpstream(`${redirected.baseUrl}/capture`);
+    const logs: StructuredLogEvent[] = [];
+    const { baseUrl, close } = await startProductionGateway(logs, {
+      openai: `${redirecting.baseUrl}/v1/responses`
+    });
+    try {
+      const response = await fetch(`${baseUrl}/v1/responses`, {
+        method: "POST",
+        headers: {
+          authorization: "Bearer fake-redirect-leak-key",
+          "content-type": "application/json",
+          "x-request-id": "redirect-block-test"
+        },
+        body: JSON.stringify({ model: "fake", input: "REDIRECT_BODY_CANARY_DO_NOT_LOG" })
+      });
+      expect(response.status).toBe(502);
+      await expect(response.json()).resolves.toMatchObject({
+        error: { type: "upstream_redirect_blocked", provider: "openai", upstreamStatus: 302 }
+      });
+      expect(redirectedHeaders.authorization).toBeUndefined();
+      const serialisedLogs = JSON.stringify(logs);
+      expect(serialisedLogs).not.toContain("fake-redirect-leak-key");
+      expect(serialisedLogs).not.toContain("REDIRECT_BODY_CANARY_DO_NOT_LOG");
+    } finally {
+      await close();
+      await redirecting.close();
+      await redirected.close();
     }
   });
 
@@ -452,10 +517,63 @@ async function startStatusUpstream(statusCode: number) {
   };
 }
 
+async function startHeaderCaptureUpstream(capturedHeaders: Record<string, string>) {
+  const server = createServer(async (request, response) => {
+    for (const [name, value] of Object.entries(request.headers)) {
+      if (typeof value === "string") {
+        capturedHeaders[name] = value;
+      }
+    }
+    await drainRequest(request);
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify({ ok: true }));
+  });
+  await listen(server);
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    throw new Error("Expected TCP server address");
+  }
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    close: () =>
+      new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      })
+  };
+}
+
+async function startRedirectUpstream(location: string) {
+  const server = createServer(async (request, response) => {
+    await drainRequest(request);
+    response.writeHead(302, {
+      location
+    });
+    response.end();
+  });
+  await listen(server);
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    throw new Error("Expected TCP server address");
+  }
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    close: () =>
+      new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      })
+  };
+}
+
 function listen(server: Server): Promise<void> {
   return new Promise((resolve) => {
     server.listen(0, "127.0.0.1", resolve);
   });
+}
+
+async function drainRequest(request: IncomingMessage): Promise<void> {
+  for await (const chunk of request) {
+    void chunk;
+  }
 }
 
 async function exercise4xxCase(input: {

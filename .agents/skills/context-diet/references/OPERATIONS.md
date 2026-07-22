@@ -1,28 +1,17 @@
 # Context Diet Operations
 
-## Common commands
+Use this file for local engine operation: doctor, start, stop, status, explain and retrieve.
 
-```bash
-context-diet doctor
-context-diet audit
-context-diet start
-context-diet status
-context-diet explain
-context-diet benchmark
-context-diet stop
-```
+## Procedure
 
-Use the actual installed command names from the repository if they differ.
+1. Run the repository's local CLI or package script for the requested action.
+2. Show current upstream, safety mode and product preset before changing routing.
+3. Default to Safe mode.
+4. Explain how to restore direct routing before start or stop changes.
+5. Require confirmation before changing host configuration or deleting sessions.
+6. Keep credentials out of commands, logs and summaries.
 
-## Operating rule
+## Retrieval
 
-Start in Safe mode.
-
-Before changing host routing:
-
-1. Show the current route.
-2. Show the proposed local route.
-3. Explain how to restore the old route.
-4. Ask for confirmation before writing user configuration.
-
-Never put a credential in the command history when a safer environment-variable or credential helper method exists.
+For exact retrieval, request only the narrow authorised block or line range. Never accept a
+filesystem path supplied by a model as retrieval authority.

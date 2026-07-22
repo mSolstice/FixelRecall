@@ -3,6 +3,7 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { createSyntheticBenchmarkReport, renderBenchmarkMarkdown } from "@context-diet/benchmark";
 import {
@@ -19,6 +20,12 @@ import {
   type ContextRendererInput,
   type ContextRendererResult
 } from "@context-diet/renderer";
+import {
+  installLocalConfig,
+  rollbackLocalConfig,
+  resumeInterruptedLocalConfig,
+  uninstallLocalConfig
+} from "./local-config.js";
 
 export const cliName = "context-diet";
 
@@ -36,6 +43,20 @@ export type CompatibilityPreset = "SAFE" | "BALANCED" | "MAX" | "BYPASS";
 export type CompatibilityHost = "codex" | "claude_code" | "both";
 export type CliSafetyMode = "Safe" | "Balanced" | "Max" | "Bypass";
 export type CliOutputFormat = "text" | "json" | "markdown";
+export type HostSetupTarget = "codex" | "claude-code";
+export type InstallerConfigTarget =
+  | "codex-user-config"
+  | "codex-project-config"
+  | "claude-user-settings"
+  | "claude-project-settings"
+  | "mcp-config"
+  | "claude-session-start-hook";
+export type InstallerManifestAction = "create" | "update" | "skip";
+export type RollbackAction =
+  | "restore-backup"
+  | "remove-created-file"
+  | "remove-managed-fragment"
+  | "skip";
 
 export interface CliEnvironment {
   readonly upstreamBaseUrl: string;
@@ -59,8 +80,59 @@ export interface CliCommandResult {
 export interface CliCommandOptions {
   readonly env?: Partial<CliEnvironment>;
   readonly confirm?: boolean;
+  readonly configRoot?: string;
   readonly dryRun?: boolean;
   readonly format?: CliOutputFormat;
+}
+
+export interface HostSetupPreview {
+  readonly target: HostSetupTarget;
+  readonly title: string;
+  readonly writesUserConfig: boolean;
+  readonly requiresConfirmation: true;
+  readonly configLocations: readonly string[];
+  readonly preview: string;
+  readonly restoreInstructions: readonly string[];
+  readonly uninstallInstructions: readonly string[];
+}
+
+export interface InstallerTargetPlan {
+  readonly id: InstallerConfigTarget;
+  readonly host: HostSetupTarget | "both";
+  readonly pathLabel: string;
+  readonly action: InstallerManifestAction;
+  readonly backupRequired: boolean;
+  readonly requiresConfirmation: boolean;
+  readonly credentialPolicy: "env-reference-only" | "no-credential-material";
+  readonly managedFragmentId: string;
+  readonly summary: string;
+}
+
+export interface InstallationManifestPlan {
+  readonly manifestVersion: 1;
+  readonly installationId: string;
+  readonly createdAt: string;
+  readonly dryRun: boolean;
+  readonly writesRealUserConfig: false;
+  readonly targets: readonly InstallerTargetPlan[];
+  readonly backupRootLabel: string;
+  readonly forbiddenWrites: readonly string[];
+}
+
+export interface RollbackStepPlan {
+  readonly targetId: InstallerConfigTarget;
+  readonly action: RollbackAction;
+  readonly order: number;
+  readonly reason: string;
+}
+
+export interface RollbackPlan {
+  readonly manifestVersion: 1;
+  readonly installationId: string;
+  readonly dryRun: boolean;
+  readonly requiresConfirmation: boolean;
+  readonly steps: readonly RollbackStepPlan[];
+  readonly recoveryMode: "normal" | "interrupted-install";
 }
 
 export interface RendererDoctorCheck {
@@ -192,6 +264,9 @@ export async function runCliCommand(
   if (command === "start") {
     return textResult(0, renderStart(env));
   }
+  if (command === "setup") {
+    return textResult(0, await renderSetup(env, argv, destructiveOptions(argv, options), options));
+  }
   if (command === "stop") {
     return textResult(0, renderStop(env, destructiveOptions(argv, options)));
   }
@@ -218,7 +293,10 @@ export async function runCliCommand(
     return textResult(0, renderDeleteSession(env, destructiveOptions(argv, options)));
   }
   if (command === "uninstall") {
-    return textResult(0, renderUninstall(env, destructiveOptions(argv, options)));
+    return textResult(0, await renderUninstall(env, destructiveOptions(argv, options), options));
+  }
+  if (command === "rollback") {
+    return textResult(0, await renderRollback(destructiveOptions(argv, options), options));
   }
   return {
     exitCode: 64,
@@ -316,6 +394,266 @@ export function renderCompatibilityAuditMarkdown(report: CompatibilityAuditRepor
   ].join("\n");
 }
 
+export function createCodexSetupPreview(env: CliEnvironment): HostSetupPreview {
+  const gatewayBaseUrl = "http://127.0.0.1:4317";
+  return {
+    configLocations: [
+      "User configuration: ~/.codex/config.toml",
+      "Project instructions: AGENTS.md",
+      "Optional project-local metadata: .codex/ when present"
+    ],
+    preview: [
+      "# Preview only: Codex custom provider",
+      "",
+      "No credentials are included. Keep OPENAI_API_KEY or provider keys in your normal secret store.",
+      "",
+      "```toml",
+      'model_provider = "context_diet_local"',
+      "",
+      "[model_providers.context_diet_local]",
+      'name = "Context Diet local gateway"',
+      `base_url = "${gatewayBaseUrl}"`,
+      'env_key = "OPENAI_API_KEY"',
+      "```",
+      "",
+      "Skill discovery: Codex should discover .agents/skills/context-diet and may invoke it for context audits, benchmarks, retrieval and setup troubleshooting.",
+      "MCP retrieval preview:",
+      "```json",
+      JSON.stringify(
+        {
+          mcpServers: {
+            "context-diet-retrieval": {
+              args: ["mcp", "retrieval"],
+              command: "context-diet",
+              env: {}
+            }
+          }
+        },
+        null,
+        2
+      ),
+      "```",
+      "",
+      `Current upstream: ${env.upstreamBaseUrl}`,
+      `Safety mode: ${env.safetyMode}`,
+      `Policy preset: ${env.policyPreset}`
+    ].join("\n"),
+    requiresConfirmation: true,
+    restoreInstructions: [
+      "Switch model_provider back to the direct provider you used before Context Diet.",
+      "Remove the context_diet_local provider block after confirming direct routing works.",
+      "Remove the context-diet-retrieval MCP entry if exact retrieval should be disabled."
+    ],
+    target: "codex",
+    title: "Codex setup preview",
+    uninstallInstructions: [
+      "Stop the local gateway.",
+      "Delete Context Diet custom-provider and MCP entries from Codex configuration.",
+      "Keep AGENTS.md unless you are removing all project agent instructions."
+    ],
+    writesUserConfig: false
+  };
+}
+
+export function createClaudeCodeSetupPreview(env: CliEnvironment): HostSetupPreview {
+  const gatewayBaseUrl = "http://127.0.0.1:4317";
+  return {
+    configLocations: [
+      "User settings: ~/.claude/settings.json",
+      "Project settings: .claude/settings.json when intentionally used",
+      "Project instructions: CLAUDE.md and imported AGENTS.md"
+    ],
+    preview: [
+      "# Preview only: Claude Code local gateway",
+      "",
+      "No credentials are included. Keep ANTHROPIC_API_KEY in your normal secret store.",
+      "",
+      "Shell preview:",
+      "```bash",
+      `export ANTHROPIC_BASE_URL="${gatewayBaseUrl}"`,
+      "```",
+      "",
+      "Optional non-destructive SessionStart doctor hook example:",
+      "```json",
+      JSON.stringify(
+        {
+          hooks: {
+            SessionStart: [
+              {
+                command: "context-diet status --no-credentials",
+                description: "Preview-only local Context Diet status check"
+              }
+            ]
+          }
+        },
+        null,
+        2
+      ),
+      "```",
+      "",
+      "Hooks are optional and must not be required for Context Diet to operate.",
+      "Skill discovery: Claude Code should discover .claude/skills/context-diet and may invoke it for context audits, benchmarks, retrieval and setup troubleshooting.",
+      "MCP retrieval preview:",
+      "```json",
+      JSON.stringify(
+        {
+          mcpServers: {
+            "context-diet-retrieval": {
+              args: ["mcp", "retrieval"],
+              command: "context-diet",
+              env: {}
+            }
+          }
+        },
+        null,
+        2
+      ),
+      "```",
+      "",
+      `Current upstream: ${env.upstreamBaseUrl}`,
+      `Safety mode: ${env.safetyMode}`,
+      `Policy preset: ${env.policyPreset}`
+    ].join("\n"),
+    requiresConfirmation: true,
+    restoreInstructions: [
+      "Unset ANTHROPIC_BASE_URL to restore direct Anthropic routing.",
+      "Remove the optional SessionStart hook if you added it.",
+      "Remove the context-diet-retrieval MCP entry if exact retrieval should be disabled."
+    ],
+    target: "claude-code",
+    title: "Claude Code setup preview",
+    uninstallInstructions: [
+      "Stop the local gateway.",
+      "Remove ANTHROPIC_BASE_URL from shell profiles or Claude Code settings.",
+      "Keep CLAUDE.md unless you are removing all project agent instructions."
+    ],
+    writesUserConfig: false
+  };
+}
+
+export function createInstallationManifestPlan(options: {
+  readonly hosts: readonly HostSetupTarget[];
+  readonly includeMcp: boolean;
+  readonly includeClaudeHook: boolean;
+  readonly dryRun?: boolean;
+  readonly installationId?: string;
+  readonly createdAt?: string;
+}): InstallationManifestPlan {
+  const hostSet = new Set(options.hosts);
+  const targets: InstallerTargetPlan[] = [];
+
+  if (hostSet.has("codex")) {
+    targets.push(
+      installerTarget(
+        "codex-user-config",
+        "codex",
+        "~/.codex/config.toml",
+        "update",
+        "Add a Context Diet local custom provider route for Codex CLI."
+      ),
+      installerTarget(
+        "codex-project-config",
+        "codex",
+        "project .codex/ when explicitly selected",
+        "skip",
+        "Project-local Codex metadata is planned only when the operator opts in."
+      )
+    );
+  }
+
+  if (hostSet.has("claude-code")) {
+    targets.push(
+      installerTarget(
+        "claude-user-settings",
+        "claude-code",
+        "~/.claude/settings.json",
+        "update",
+        "Set Claude Code to use the local ANTHROPIC_BASE_URL gateway route."
+      ),
+      installerTarget(
+        "claude-project-settings",
+        "claude-code",
+        "project .claude/settings.json when explicitly selected",
+        "skip",
+        "Project-local Claude Code settings are planned only when the operator opts in."
+      )
+    );
+
+    if (options.includeClaudeHook) {
+      targets.push(
+        installerTarget(
+          "claude-session-start-hook",
+          "claude-code",
+          "~/.claude/settings.json hooks.SessionStart",
+          "update",
+          "Optionally add a non-destructive Context Diet doctor hook."
+        )
+      );
+    }
+  }
+
+  if (options.includeMcp) {
+    targets.push(
+      installerTarget(
+        "mcp-config",
+        "both",
+        "host MCP configuration",
+        "update",
+        "Register the local context-diet-retrieval MCP server without credentials."
+      )
+    );
+  }
+
+  return {
+    backupRootLabel: "Context Diet local state backup directory recorded in the manifest",
+    createdAt: options.createdAt ?? "2026-07-22T00:00:00.000Z",
+    dryRun: options.dryRun ?? true,
+    forbiddenWrites: [
+      "provider API keys or bearer tokens",
+      "raw prompts, source code or request bodies",
+      "absolute repository paths in public identifiers",
+      "secret-sensitive scanner spans",
+      "unreviewed host configuration changes"
+    ],
+    installationId: options.installationId ?? "install_plan_synthetic_001",
+    manifestVersion: 1,
+    targets,
+    writesRealUserConfig: false
+  };
+}
+
+export function createRollbackPlan(
+  manifest: InstallationManifestPlan,
+  options: { readonly interruptedInstall?: boolean; readonly dryRun?: boolean } = {}
+): RollbackPlan {
+  const steps = [...manifest.targets].reverse().map((target, index): RollbackStepPlan => {
+    const action: RollbackAction =
+      target.action === "create"
+        ? "remove-created-file"
+        : target.action === "update"
+          ? "restore-backup"
+          : "skip";
+    return {
+      action,
+      order: index + 1,
+      reason:
+        action === "skip"
+          ? "No installed change is recorded for this target."
+          : "Rollback uses the manifest entry and its backup metadata only.",
+      targetId: target.id
+    };
+  });
+
+  return {
+    dryRun: options.dryRun ?? true,
+    installationId: manifest.installationId,
+    manifestVersion: manifest.manifestVersion,
+    recoveryMode: options.interruptedInstall ? "interrupted-install" : "normal",
+    requiresConfirmation: true,
+    steps
+  };
+}
+
 function cliEnvironment(override: Partial<CliEnvironment> = {}): CliEnvironment {
   return {
     activeHosts: ["both"],
@@ -385,6 +723,57 @@ function renderStart(env: CliEnvironment): string {
     "Host configuration was not changed.",
     "Use your host's custom provider/base URL setting to point at the local gateway.",
     restoreDirectRouting()
+  ].join("\n");
+}
+
+async function renderSetup(
+  env: CliEnvironment,
+  argv: readonly string[],
+  options: { readonly confirm: boolean; readonly dryRun: boolean },
+  commandOptions: CliCommandOptions
+): Promise<string> {
+  const target = parseSetupTarget(argv);
+  const preview =
+    target === "claude-code" ? createClaudeCodeSetupPreview(env) : createCodexSetupPreview(env);
+  const includeMcp = argv.includes("--mcp");
+  const includeClaudeHook = argv.includes("--claude-hook");
+  const configRoot = configRootFor(commandOptions);
+  const applyResult =
+    argv.includes("--resume") && options.confirm && !options.dryRun
+      ? await resumeInterruptedLocalConfig(configRoot)
+      : options.confirm && !options.dryRun
+        ? await installLocalConfig({
+            confirm: true,
+            hosts: [target],
+            includeClaudeHook: target === "claude-code" && includeClaudeHook,
+            includeMcp,
+            rootDir: configRoot
+          })
+        : await installLocalConfig({
+            confirm: false,
+            hosts: [target],
+            includeClaudeHook: target === "claude-code" && includeClaudeHook,
+            includeMcp,
+            rootDir: configRoot
+          });
+  return [
+    preview.title,
+    "",
+    applyResult.message,
+    "Provider credentials are not stored, printed or generated.",
+    `Manifest: ${applyResult.manifestPath}`,
+    `Changed files: ${applyResult.changedFiles.length === 0 ? "none" : applyResult.changedFiles.join(", ")}`,
+    "",
+    "Configuration locations:",
+    ...preview.configLocations.map((location) => `- ${location}`),
+    "",
+    preview.preview,
+    "",
+    "Restore direct routing:",
+    ...preview.restoreInstructions.map((instruction) => `- ${instruction}`),
+    "",
+    "Uninstall:",
+    ...preview.uninstallInstructions.map((instruction) => `- ${instruction}`)
   ].join("\n");
 }
 
@@ -494,20 +883,57 @@ function renderDeleteSession(
   ].join("\n");
 }
 
-function renderUninstall(
+async function renderUninstall(
   env: CliEnvironment,
-  options: { readonly confirm: boolean; readonly dryRun: boolean }
-): string {
+  options: { readonly confirm: boolean; readonly dryRun: boolean },
+  commandOptions: CliCommandOptions
+): Promise<string> {
+  const configRoot = configRootFor(commandOptions);
+  const result =
+    options.confirm && !options.dryRun
+      ? await uninstallLocalConfig(configRoot)
+      : {
+          applied: false,
+          changedFiles: [] as const,
+          dryRun: true,
+          manifestPath: localManifestPathForDisplay(configRoot),
+          message: "Dry run: no files, sessions or host configuration were changed."
+        };
   return [
     "Context Diet uninstall",
     "",
     `Current upstream: ${env.upstreamBaseUrl}`,
     `Policy preset: ${env.policyPreset}`,
     `Safety mode: ${env.safetyMode}`,
-    options.confirm && !options.dryRun
-      ? "Confirmed: host configuration changes would be applied."
-      : "Dry run: no files, sessions or host configuration were changed.",
+    result.message,
+    `Manifest: ${result.manifestPath}`,
+    `Changed files: ${result.changedFiles.length === 0 ? "none" : result.changedFiles.join(", ")}`,
     restoreDirectRouting()
+  ].join("\n");
+}
+
+async function renderRollback(
+  options: { readonly confirm: boolean; readonly dryRun: boolean },
+  commandOptions: CliCommandOptions
+): Promise<string> {
+  const configRoot = configRootFor(commandOptions);
+  const result =
+    options.confirm && !options.dryRun
+      ? await rollbackLocalConfig(configRoot)
+      : {
+          applied: false,
+          changedFiles: [] as const,
+          dryRun: true,
+          manifestPath: localManifestPathForDisplay(configRoot),
+          message: "Dry run: no files or host configuration were restored."
+        };
+  return [
+    "Context Diet rollback",
+    "",
+    result.message,
+    `Manifest: ${result.manifestPath}`,
+    `Changed files: ${result.changedFiles.length === 0 ? "none" : result.changedFiles.join(", ")}`,
+    "Credentials: not displayed"
   ].join("\n");
 }
 
@@ -529,6 +955,44 @@ function parseProductPreset(value: string | undefined): ProductPolicyPreset | un
   return (Object.keys(productPolicyPresets) as ProductPolicyPreset[]).find(
     (preset) => preset.toLowerCase().replaceAll(" ", "-") === normalisedValue
   );
+}
+
+function parseSetupTarget(argv: readonly string[]): HostSetupTarget {
+  const value = argv[1] ?? valueAfter(argv, "--host") ?? valueAfter(argv, "--target") ?? "codex";
+  const normalised = value.toLowerCase().replaceAll("_", "-");
+  return normalised === "claude" || normalised === "claude-code" ? "claude-code" : "codex";
+}
+
+function configRootFor(options: CliCommandOptions): string {
+  return (
+    options.configRoot ??
+    process.env["CONTEXT_DIET_CONFIG_ROOT"] ??
+    join(tmpdir(), "context-diet-config-preview")
+  );
+}
+
+function localManifestPathForDisplay(configRoot: string): string {
+  return join(configRoot, ".context-diet", "install-manifest.json");
+}
+
+function installerTarget(
+  id: InstallerConfigTarget,
+  host: HostSetupTarget | "both",
+  pathLabel: string,
+  action: InstallerManifestAction,
+  summary: string
+): InstallerTargetPlan {
+  return {
+    action,
+    backupRequired: action !== "skip",
+    credentialPolicy: id === "mcp-config" ? "no-credential-material" : "env-reference-only",
+    host,
+    id,
+    managedFragmentId: `context-diet:${id}`,
+    pathLabel,
+    requiresConfirmation: action !== "skip",
+    summary
+  };
 }
 
 function restoreDirectRouting(): string {
@@ -1214,7 +1678,7 @@ function createStaticRenderer(result: ContextRendererResult): ContextRenderer {
   return { render: async () => result };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1]) {
   runCli().then((code) => {
     process.exitCode = code;
   });

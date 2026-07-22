@@ -1,15 +1,73 @@
 # Codex Setup
 
-Codex should connect through a custom model provider whose `base_url` points at the local Context Diet gateway.
+Use this file only for Codex-specific setup troubleshooting.
 
-Use the repository's generated setup command or current official Codex configuration guidance.
+Codex should route future model calls through the local Context Diet gateway using the currently
+supported Codex custom-provider configuration.
 
-Never write a real API key into the repository.
+Do not write real API keys or provider credentials into the repository.
+
+## Configuration Locations
+
+- User configuration: `~/.codex/config.toml`
+- Project instructions: `AGENTS.md`
+- Optional project-local metadata: `.codex/` when present
+- Generated skill copy: `.agents/skills/context-diet/`
+
+## Custom Provider Preview
+
+Use the local setup generator for a safe preview:
+
+```bash
+context-diet setup codex
+```
+
+The generator prints a TOML preview and does not write user configuration without confirmation. It
+must not include provider credentials.
+
+Illustrative provider shape:
+
+```toml
+model_provider = "context_diet_local"
+
+[model_providers.context_diet_local]
+name = "Context Diet local gateway"
+base_url = "http://127.0.0.1:4317"
+env_key = "OPENAI_API_KEY"
+```
+
+## Skill Discovery and Invocation
+
+Codex discovers the generated skill copy under `.agents/skills/context-diet/`. Invoke it by asking
+for Context Diet audits, diagnostics, benchmarks, setup help or exact retrieval.
+
+## MCP Retrieval
+
+Register the local exact-retrieval MCP server without credentials:
+
+```json
+{
+  "mcpServers": {
+    "context-diet-retrieval": {
+      "command": "context-diet",
+      "args": ["mcp", "retrieval"],
+      "env": {}
+    }
+  }
+}
+```
 
 Verify:
 
 - Codex loaded `AGENTS.md`
 - The Context Diet skill appears
 - The custom provider points at loopback
-- `context-diet status` shows the expected upstream
+- Local status shows the expected upstream and Safe mode
 - A fake-provider test passes before a real canary
+
+## Restore and Uninstall
+
+- Restore direct routing by switching `model_provider` back to the previous direct provider.
+- Remove the `context_diet_local` provider block after direct routing works.
+- Remove `context-diet-retrieval` from MCP configuration to disable exact retrieval.
+- Stop the local Context Diet gateway.

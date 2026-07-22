@@ -201,10 +201,24 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
         method: "POST",
         headers: forwardHeaders(request, provider),
         body,
+        redirect: "manual",
         signal: abortController.signal
       });
 
       statusCode = upstreamResponse.status;
+      if (isRedirectStatus(upstreamResponse.status)) {
+        statusCode = 502;
+        metrics.rejectedRequests += 1;
+        writeJson(response, statusCode, requestId, {
+          error: {
+            type: "upstream_redirect_blocked",
+            provider,
+            upstreamStatus: upstreamResponse.status,
+            message: "Provider upstream redirect was blocked by allowlist policy"
+          }
+        });
+        return;
+      }
       if (!upstreamResponse.ok) {
         metrics.rejectedRequests += 1;
         writeJson(response, statusCode, requestId, {
@@ -712,7 +726,23 @@ function normaliseRoute(url: string): string {
 }
 
 function isAllowedUpstream(upstreamUrl: string, allowlist: readonly string[]): boolean {
-  return allowlist.some((allowed) => upstreamUrl.startsWith(allowed));
+  const upstreamOrigin = parseOrigin(upstreamUrl);
+  if (upstreamOrigin === null) {
+    return false;
+  }
+  return allowlist.some((allowed) => parseOrigin(allowed) === upstreamOrigin);
+}
+
+function parseOrigin(value: string): string | null {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
+function isRedirectStatus(statusCode: number): boolean {
+  return statusCode >= 300 && statusCode < 400;
 }
 
 function classifyGatewayError(error: unknown): {

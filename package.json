@@ -6,14 +6,17 @@
   "scripts": {
     "build": "tsc -b tsconfig.build.json",
     "benchmark:synthetic:ci": "node scripts/generate-synthetic-benchmark-artifacts.mjs --seed 1 --output artifacts/context-diet-synthetic-benchmark",
+    "beta:fake": "node scripts/fake-beta.mjs",
     "check:environment": "node scripts/check-environment.mjs",
-    "check:skills": "node scripts/check-skills.mjs",
+    "canary:preflight": "node scripts/real-provider-canary-preflight.mjs",
+    "check:skills": "node scripts/check-skill-sync.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "scan:test-canaries": "node scripts/scan-test-output-canaries.mjs",
     "smoke:anthropic": "node scripts/smoke/anthropic-fake-gateway.mjs",
     "smoke:openai": "node scripts/smoke/openai-fake-gateway.mjs",
+    "sync:skills": "node scripts/sync-skills.ts",
     "test": "vitest run",
     "test:compatibility": "vitest run tests/compatibility",
     "typecheck": "tsc -b tsconfig.build.json --pretty false"
