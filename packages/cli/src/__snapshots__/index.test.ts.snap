@@ -233,8 +233,8 @@ exports[`context-diet CLI commands > prints safe output for setup 1`] = `
 
 Dry run: no configuration files were written. Re-run with --confirm to apply.
 Provider credentials are not stored, printed or generated.
-Manifest: /var/folders/tx/8p1lxl213g9_5c6g504xln_40000gn/T/context-diet-config-preview/.context-diet/install-manifest.json
-Changed files: /var/folders/tx/8p1lxl213g9_5c6g504xln_40000gn/T/context-diet-config-preview/.codex/config.toml
+Manifest: <tmp>/context-diet-config-preview/.context-diet/install-manifest.json
+Changed files: <tmp>/context-diet-config-preview/.codex/config.toml
 
 Configuration locations:
 - User configuration: ~/.codex/config.toml
@@ -333,7 +333,7 @@ Current upstream: https://provider.example.test/v1
 Policy preset: Protect First
 Safety mode: Safe
 Dry run: no files, sessions or host configuration were changed.
-Manifest: /var/folders/tx/8p1lxl213g9_5c6g504xln_40000gn/T/context-diet-config-preview/.context-diet/install-manifest.json
+Manifest: <tmp>/context-diet-config-preview/.context-diet/install-manifest.json
 Changed files: none
 Restore direct routing by removing the local Context Diet base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.
 "

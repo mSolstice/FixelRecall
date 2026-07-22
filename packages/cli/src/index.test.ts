@@ -163,7 +163,7 @@ describe("context-diet CLI commands", () => {
 
     expect(result.exitCode).toBeGreaterThanOrEqual(0);
     expect(result.stderr).toBe("");
-    expect(result.stdout).toMatchSnapshot();
+    expect(result.stdout.replaceAll(tmpdir(), "<tmp>")).toMatchSnapshot();
     expect(result.stdout).not.toContain("SECRET_VALUE");
     expect(result.stdout).not.toContain("token:SECRET");
   });
