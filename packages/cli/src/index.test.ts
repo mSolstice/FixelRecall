@@ -20,6 +20,7 @@ import {
   runRendererDoctor,
   type CompatibilityAuditVerdict
 } from "./index.js";
+import { installLocalConfig, uninstallLocalConfig } from "./local-config.js";
 
 const execFileAsync = promisify(execFile);
 const cliDistPath = resolve(dirname(fileURLToPath(import.meta.url)), "..", "dist", "index.js");
@@ -378,15 +379,20 @@ describe("context-diet CLI commands", () => {
     }
   });
 
-  it("rolls back backed-up files and uninstalls only managed entries", async () => {
+  it("rolls back and uninstalls by restoring backed-up files byte-for-byte", async () => {
     const rollbackRoot = await mkdtemp(join(tmpdir(), "context-diet-cli-rollback-"));
     const uninstallRoot = await mkdtemp(join(tmpdir(), "context-diet-cli-uninstall-"));
     try {
       const originalCodex = 'model = "before-context-diet"\n';
+      const uninstallCodex = 'model = "before-uninstall"\n# keep exact trailing text';
       const originalClaude = `${JSON.stringify({ keep: "user-value" }, null, 2)}\n`;
       await mkdir(join(rollbackRoot, ".codex"), { recursive: true });
+      await mkdir(join(uninstallRoot, ".codex"), { recursive: true });
       await mkdir(join(uninstallRoot, ".claude"), { recursive: true });
       await writeFile(join(rollbackRoot, ".codex", "config.toml"), originalCodex, { mode: 0o600 });
+      await writeFile(join(uninstallRoot, ".codex", "config.toml"), uninstallCodex, {
+        mode: 0o600
+      });
       await writeFile(join(uninstallRoot, ".claude", "settings.json"), originalClaude, {
         mode: 0o600
       });
@@ -397,15 +403,26 @@ describe("context-diet CLI commands", () => {
         originalCodex
       );
 
-      await runCliCommand(["setup", "claude-code", "--claude-hook", "--confirm"], {
-        configRoot: uninstallRoot
+      await installLocalConfig({
+        confirm: true,
+        hosts: ["codex", "claude-code"],
+        includeClaudeHook: true,
+        includeMcp: true,
+        rootDir: uninstallRoot
       });
-      await runCliCommand(["uninstall", "--confirm"], { configRoot: uninstallRoot });
+      await uninstallLocalConfig(uninstallRoot);
+      expect(await readFile(join(uninstallRoot, ".codex", "config.toml"), "utf8")).toBe(
+        uninstallCodex
+      );
       const uninstalledClaude = JSON.parse(
         await readFile(join(uninstallRoot, ".claude", "settings.json"), "utf8")
       ) as { readonly keep?: string; readonly contextDietManaged?: unknown };
       expect(uninstalledClaude.keep).toBe("user-value");
       expect(uninstalledClaude.contextDietManaged).toBeUndefined();
+      expect(await readFile(join(uninstallRoot, ".claude", "settings.json"), "utf8")).toBe(
+        originalClaude
+      );
+      expect(existsSync(join(uninstallRoot, ".context-diet", "mcp.json"))).toBe(false);
     } finally {
       await rm(rollbackRoot, { force: true, recursive: true });
       await rm(uninstallRoot, { force: true, recursive: true });

@@ -192,7 +192,7 @@ export async function uninstallLocalConfig(rootDir: string): Promise<LocalConfig
   const changedFiles: string[] = [];
 
   for (const backup of manifest.backups) {
-    await removeManagedContent(backup.target, backup.existed);
+    await restoreBackup(backup);
     changedFiles.push(backup.target);
   }
 
@@ -278,22 +278,6 @@ async function restoreBackup(backup: ManagedFileBackup): Promise<void> {
   }
   await mkdir(dirname(backup.target), { recursive: true });
   await copyFile(backup.backup, backup.target);
-}
-
-async function removeManagedContent(path: string, existedBeforeInstall: boolean): Promise<void> {
-  if (!existedBeforeInstall) {
-    await rm(path, { force: true });
-    return;
-  }
-  const existing = await readOptional(path);
-  if (path.endsWith(".json")) {
-    const parsed = parseJsonObject(existing, path);
-    const rest = { ...parsed };
-    delete rest["contextDietManaged"];
-    await writeFile(path, `${JSON.stringify(rest, null, 2)}\n`, { mode: 0o600 });
-    return;
-  }
-  await writeFile(path, removeMarkedBlock(existing), { mode: 0o600 });
 }
 
 async function readManifest(path: string): Promise<LocalInstallManifest> {
