@@ -1,14 +1,14 @@
 # Release Readiness
 
-Review date: 2026-07-22
+Review date: 2026-08-02
 
 Decision: **NO-GO**
 
-This review re-ran the current repository commands against `docs/ACCEPTANCE_CRITERIA.md`. The
-release-candidate commit passes local fake-provider checks, but it is not release-ready because real
-provider canaries have not been explicitly approved or run, Linux CI has not been reviewed for this
-commit, Windows native and WSL are unsupported, IDE surfaces are not release-tested, and real
-user-level install/uninstall has not been canaried outside temporary test directories.
+This is a **fake-provider release candidate only**. The current repository passes local
+fake-provider checks, local skill validation and limited real-provider canaries, but production
+go-live remains **NO-GO** because the real-provider benchmark canary has not run, Windows native and
+WSL are unsupported, IDE surfaces are not release-tested, and real user-level install/uninstall has
+not been canaried outside temporary test directories.
 
 ## Version
 
@@ -19,8 +19,8 @@ user-level install/uninstall has not been canaried outside temporary test direct
 
 ## Commit And Tree
 
-- Commit reviewed: `2cc1b1269cf06188e90e00204ba5f7fd6095c61b`
-- Short commit: `2cc1b12`
+- Commit reviewed: `55fb258a41e6c8c62129d72a0e95c6f399771aad`
+- Short commit: `55fb258`
 - Tree before this report update: clean
 - Tree after this report update: dirty until `RELEASE_READINESS.md` is committed
 
@@ -38,7 +38,7 @@ See `docs/OS_SUPPORT.md` for path, permission, temp directory, symlink and loopb
 
 - Codex CLI: fake-provider tested through the OpenAI Responses-compatible route `/v1/responses`.
 - Codex IDE: not release-tested and not supported for this release.
-- Real Codex provider canary: not run; explicit consent was not provided.
+- Real Codex provider canary: PASS with explicit user consent on 2026-08-02.
 - Real Codex user-level configuration migration: not canaried outside temporary test directories.
 
 ## Supported Claude Code Surfaces
@@ -46,7 +46,7 @@ See `docs/OS_SUPPORT.md` for path, permission, temp directory, symlink and loopb
 - Claude Code CLI: fake-provider tested through the Anthropic Messages-compatible route
   `/v1/messages`.
 - Claude Code IDE: not release-tested and not supported for this release.
-- Real Claude Code provider canary: not run; explicit consent was not provided.
+- Real Claude Code provider canary: PASS with explicit user consent on 2026-08-02.
 - Real Claude Code user-level settings migration: not canaried outside temporary test directories.
 
 ## Provider And Model Profiles
@@ -99,10 +99,15 @@ local loopback permission passed. No real-provider traffic was sent.
   delete-session and temporary uninstall.
 - OpenAI fake smoke: PASS.
 - Anthropic fake smoke: PASS.
+- Local fake-provider skill validation: READY.
 - Skill sync: PASS.
 - Test-output canary scan: PASS.
-- Real Codex provider canary: not run.
-- Real Claude Code provider canary: not run.
+- Real Codex provider canary: PASS. Safe-mode synthetic prompt returned the expected sentence
+  through `/v1/responses`.
+- Real Claude Code provider canary: PASS. Safe-mode synthetic prompt returned the expected sentence
+  through `/v1/messages`.
+- Real-provider benchmark canary: ROUTE PASS, TASK BENCHMARK FAIL. OpenAI and Anthropic benchmark
+  routes returned `200`, but deterministic patch application failed.
 
 ## Acceptance Criteria Review
 
@@ -125,8 +130,7 @@ Pass or mostly pass locally:
 No-go against acceptance criteria:
 
 - Linux checks were not reviewed from CI for this exact commit.
-- Codex real-provider canary has not passed with explicit consent.
-- Claude Code real-provider canary has not passed with explicit consent.
+- Real-provider canaries are limited canary evidence only, not production benchmark evidence.
 - Real user-level uninstall/rollback is not canaried outside temporary test directories.
 - Codex IDE and Claude Code IDE are not release-tested.
 
@@ -146,12 +150,18 @@ Current review notes:
 
 - No critical or high security finding is known open in the current local fake-provider scope.
 - Repository canary scan passed.
-- Real provider credentials were not used.
+- Real provider credentials were used only by the user's local terminal environment for the
+  explicitly approved canaries. Credentials were not committed, printed by repository tooling or
+  stored in evidence.
 
 ## Known Limitations
 
 - Current evidence is fake-provider and synthetic-data only.
-- Real-provider canaries were not run.
+- This is a local fake-provider release candidate, not a production release.
+- Real-provider canaries passed, but they are route canaries only and do not prove production
+  savings or broad model compatibility.
+- Real-provider benchmark canary did not pass deterministic validation because returned patches were
+  not strict applyable unified diffs.
 - No production database is present.
 - Install, uninstall and rollback have temp-directory evidence only.
 - Dashboard is static/local-rendered in this package; no release-grade dashboard server boundary is
@@ -177,8 +187,9 @@ Current local fake-provider evidence shows:
 
 Release caveat:
 
-- This privacy statement is supported by synthetic/fake tests only. It is not yet backed by real
-  provider canaries, Linux CI review for this commit, or third-party security review.
+- This privacy statement is supported by synthetic/fake tests and limited real-provider canaries. It
+  is not yet backed by a passing real-provider benchmark, Linux CI review for this commit, or
+  third-party security review.
 
 ## Install, Uninstall And Rollback
 
@@ -205,7 +216,35 @@ Release limitation:
 
 ## Benchmark Evidence
 
-Evidence origin: `synthetic`.
+Evidence origin: `synthetic` for the comparable benchmark table below.
+
+Real-provider benchmark canary: ROUTE PASS, TASK BENCHMARK FAIL.
+
+Real-provider benchmark canary evidence:
+
+- Date: 2026-08-02.
+- Scope: generated toy project in `/private/tmp/context-diet-real-benchmark-canary-demo`.
+- Provider routes: OpenAI `/v1/responses` and Anthropic `/v1/messages`.
+- Route result: all six benchmark requests returned provider status `200`.
+- Gateway safety result: gateway stayed Safe mode, `rawBodiesPersisted=false` and
+  `authValuesRetained=false`.
+- Variants attempted for each provider: `uncompressed_control`, `safe_compressed` and
+  `safe_compressed_exact_retrieval`.
+- Deterministic result: failed. The returned patches were not strict applyable unified diffs, so the
+  generated demo tests could not be used to prove task success.
+- Conclusion: this is real-provider benchmark canary evidence, but it is a failed task benchmark and
+  must not be used to claim production savings or quality.
+
+Real-provider route canary evidence:
+
+- OpenAI/Codex canary: PASS on 2026-08-02 through `/v1/responses` in Safe mode. The synthetic prompt
+  returned `Context Diet real-provider canary passed.` Earlier failed attempts were caused by
+  invalid or stale OpenAI credential/model setup before the successful run.
+- Anthropic/Claude Code canary: PASS on 2026-08-02 through `/v1/messages` in Safe mode with
+  `claude-haiku-4-5-20251001`. The synthetic prompt returned
+  `Context Diet real-provider canary passed.` One earlier rejected request used a stale model alias.
+- This is real-provider canary evidence only. It is not a production benchmark and must not be used
+  to claim real-world savings.
 
 Comparable benchmark result:
 
@@ -226,12 +265,16 @@ This is not real-provider cost evidence and must remain labelled synthetic.
 
 ## Go Or No-Go Decision
 
-**NO-GO for release.**
+**NO-GO for production go-live.**
+
+Local fake-provider skill validation is ready, but this repository is only a fake-provider release
+candidate until a real-provider benchmark canary passes deterministic task validation and remaining
+release blockers pass.
 
 Reasons:
 
-1. Real Codex and Claude Code provider canaries have not passed with explicit consent.
-2. Linux CI has not been reviewed for this exact commit.
+1. Real-provider benchmark canary did not pass deterministic task validation.
+2. Real-provider route and benchmark canary evidence is not production benchmark evidence.
 3. Windows native, WSL, Codex IDE and Claude Code IDE are unsupported for this release.
 4. Real user-level install/uninstall/rollback has not been canaried outside temporary test
    directories.
@@ -239,8 +282,7 @@ Reasons:
 
 Recommended next release blockers:
 
-1. Review a clean Linux CI run for commit `2cc1b1269cf06188e90e00204ba5f7fd6095c61b`.
-2. Run real-provider canaries only after explicit user consent using
-   `docs/REAL_PROVIDER_CANARY_PLAN.md`.
+1. Review a clean Linux CI run for commit `55fb258a41e6c8c62129d72a0e95c6f399771aad`.
+2. Improve benchmark prompting or patch extraction, then rerun the real-provider benchmark canary.
 3. Canary real user-level install/uninstall/rollback with safe fake credentials and reversible
    configuration.
