@@ -22,6 +22,7 @@ import {
 } from "@context-diet/renderer";
 import {
   installLocalConfig,
+  type LocalConfigHost,
   rollbackLocalConfig,
   resumeInterruptedLocalConfig,
   uninstallLocalConfig
@@ -43,7 +44,7 @@ export type CompatibilityPreset = "SAFE" | "BALANCED" | "MAX" | "BYPASS";
 export type CompatibilityHost = "codex" | "claude_code" | "both";
 export type CliSafetyMode = "Safe" | "Balanced" | "Max" | "Bypass";
 export type CliOutputFormat = "text" | "json" | "markdown";
-export type HostSetupTarget = "codex" | "claude-code";
+export type HostSetupTarget = "codex" | "claude-code" | "both";
 export type InstallerConfigTarget =
   | "codex-user-config"
   | "codex-project-config"
@@ -531,6 +532,21 @@ export function createClaudeCodeSetupPreview(env: CliEnvironment): HostSetupPrev
   };
 }
 
+export function createBothHostsSetupPreview(env: CliEnvironment): HostSetupPreview {
+  const codex = createCodexSetupPreview(env);
+  const claude = createClaudeCodeSetupPreview(env);
+  return {
+    configLocations: [...codex.configLocations, ...claude.configLocations],
+    preview: [codex.preview, claude.preview].join("\n\n"),
+    requiresConfirmation: true,
+    restoreInstructions: [...codex.restoreInstructions, ...claude.restoreInstructions],
+    target: "both",
+    title: "Codex and Claude Code setup preview",
+    uninstallInstructions: [...codex.uninstallInstructions, ...claude.uninstallInstructions],
+    writesUserConfig: false
+  };
+}
+
 export function createInstallationManifestPlan(options: {
   readonly hosts: readonly HostSetupTarget[];
   readonly includeMcp: boolean;
@@ -732,11 +748,17 @@ async function renderSetup(
   options: { readonly confirm: boolean; readonly dryRun: boolean },
   commandOptions: CliCommandOptions
 ): Promise<string> {
-  const target = parseSetupTarget(argv);
+  const hosts = parseSetupHosts(argv);
+  const target = setupPreviewTarget(hosts);
   const preview =
-    target === "claude-code" ? createClaudeCodeSetupPreview(env) : createCodexSetupPreview(env);
+    target === "both"
+      ? createBothHostsSetupPreview(env)
+      : target === "claude-code"
+        ? createClaudeCodeSetupPreview(env)
+        : createCodexSetupPreview(env);
   const includeMcp = argv.includes("--mcp");
   const includeClaudeHook = argv.includes("--claude-hook");
+  const replaceExistingManifest = argv.includes("--replace-existing-manifest");
   const configRoot = configRootFor(commandOptions);
   const applyResult =
     argv.includes("--resume") && options.confirm && !options.dryRun
@@ -744,15 +766,16 @@ async function renderSetup(
       : options.confirm && !options.dryRun
         ? await installLocalConfig({
             confirm: true,
-            hosts: [target],
-            includeClaudeHook: target === "claude-code" && includeClaudeHook,
+            hosts,
+            includeClaudeHook: hosts.includes("claude-code") && includeClaudeHook,
             includeMcp,
+            replaceExistingManifest,
             rootDir: configRoot
           })
         : await installLocalConfig({
             confirm: false,
-            hosts: [target],
-            includeClaudeHook: target === "claude-code" && includeClaudeHook,
+            hosts,
+            includeClaudeHook: hosts.includes("claude-code") && includeClaudeHook,
             includeMcp,
             rootDir: configRoot
           });
@@ -957,10 +980,21 @@ function parseProductPreset(value: string | undefined): ProductPolicyPreset | un
   );
 }
 
-function parseSetupTarget(argv: readonly string[]): HostSetupTarget {
+function parseSetupHosts(argv: readonly string[]): readonly LocalConfigHost[] {
   const value = argv[1] ?? valueAfter(argv, "--host") ?? valueAfter(argv, "--target") ?? "codex";
   const normalised = value.toLowerCase().replaceAll("_", "-");
-  return normalised === "claude" || normalised === "claude-code" ? "claude-code" : "codex";
+  if (normalised === "both" || normalised === "all") {
+    return ["codex", "claude-code"];
+  }
+  return normalised === "claude" || normalised === "claude-code" ? ["claude-code"] : ["codex"];
+}
+
+function setupPreviewTarget(hosts: readonly LocalConfigHost[]): HostSetupTarget {
+  return hosts.includes("codex") && hosts.includes("claude-code")
+    ? "both"
+    : hosts.includes("claude-code")
+      ? "claude-code"
+      : "codex";
 }
 
 function configRootFor(options: CliCommandOptions): string {

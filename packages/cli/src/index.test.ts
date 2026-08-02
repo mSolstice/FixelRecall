@@ -8,6 +8,7 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
 import {
+  createBothHostsSetupPreview,
   createClaudeCodeSetupPreview,
   createInstallationManifestPlan,
   createCodexSetupPreview,
@@ -214,7 +215,10 @@ describe("context-diet CLI commands", () => {
   });
 
   it("generates a safe Claude Code setup preview with optional hooks only", async () => {
-    const result = await runCliCommand(["setup", "claude-code", "--confirm"]);
+    const root = await mkdtemp(join(tmpdir(), "context-diet-cli-claude-preview-"));
+    const result = await runCliCommand(["setup", "claude-code", "--confirm"], {
+      configRoot: root
+    });
     const preview = createClaudeCodeSetupPreview({
       activeHosts: ["claude_code"],
       fakeProviderDevelopmentMode: false,
@@ -235,6 +239,30 @@ describe("context-diet CLI commands", () => {
     expect(result.stdout).toContain("Hooks are optional");
     expect(result.stdout).toContain("Confirmed: local configuration was written");
     expect(result.stdout).not.toContain("ANTHROPIC_API_KEY=");
+    expect(result.stdout).not.toContain("sk-");
+    await rm(root, { force: true, recursive: true });
+  });
+
+  it("generates a combined Codex and Claude Code setup preview", async () => {
+    const result = await runCliCommand(["setup", "both", "--mcp"]);
+    const preview = createBothHostsSetupPreview({
+      activeHosts: ["both"],
+      fakeProviderDevelopmentMode: false,
+      gatewayRunning: false,
+      organisationForbiddenPresets: [],
+      policyPreset: "Protect First",
+      safetyMode: "Safe",
+      syntheticSession: false,
+      experimentalSession: false,
+      upstreamBaseUrl: "https://provider.example.test/v1"
+    });
+
+    expect(preview.writesUserConfig).toBe(false);
+    expect(result.stdout).toContain("Codex and Claude Code setup preview");
+    expect(result.stdout).toContain("~/.codex/config.toml");
+    expect(result.stdout).toContain("~/.claude/settings.json");
+    expect(result.stdout).toContain("context-diet-retrieval");
+    expect(result.stdout).not.toContain("Bearer ");
     expect(result.stdout).not.toContain("sk-");
   });
 
@@ -374,6 +402,106 @@ describe("context-diet CLI commands", () => {
       expect(settings.contextDietManaged?.hooks?.SessionStart).toHaveLength(1);
       expect(JSON.stringify(settings)).not.toContain("ANTHROPIC_API_KEY=");
       expect(JSON.stringify(settings)).not.toContain("sk-");
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  it("applies Codex and Claude Code setup in one manifest with no credentials", async () => {
+    const root = await mkdtemp(join(tmpdir(), "context-diet-cli-both-"));
+    try {
+      const codexPath = join(root, ".codex", "config.toml");
+      const claudePath = join(root, ".claude", "settings.json");
+      await mkdir(dirname(codexPath), { recursive: true });
+      await mkdir(dirname(claudePath), { recursive: true });
+      await writeFile(codexPath, 'model = "direct-before-canary"\n', { mode: 0o600 });
+      await writeFile(claudePath, `${JSON.stringify({ keep: "claude-user" }, null, 2)}\n`, {
+        mode: 0o600
+      });
+
+      const applied = await runCliCommand(
+        ["setup", "both", "--mcp", "--claude-hook", "--confirm"],
+        {
+          configRoot: root
+        }
+      );
+
+      const codexConfig = await readFile(codexPath, "utf8");
+      const claudeSettings = await readFile(claudePath, "utf8");
+      const mcpConfig = await readFile(join(root, ".context-diet", "mcp.json"), "utf8");
+      const manifest = JSON.parse(
+        await readFile(join(root, ".context-diet", "install-manifest.json"), "utf8")
+      ) as {
+        readonly backups: readonly { readonly backup: string; readonly target: string }[];
+        readonly hosts: readonly string[];
+      };
+
+      expect(applied.stdout).toContain("Confirmed");
+      expect(codexConfig).toContain("BEGIN context-diet managed");
+      expect(claudeSettings).toContain("contextDietManaged");
+      expect(mcpConfig).toContain("context-diet-retrieval");
+      expect(manifest.hosts).toEqual(["codex", "claude-code"]);
+      expect(manifest.backups.map((backup) => backup.target).sort()).toEqual(
+        [codexPath, claudePath, join(root, ".context-diet", "mcp.json")].sort()
+      );
+      expect(`${applied.stdout}\n${codexConfig}\n${claudeSettings}\n${mcpConfig}`).not.toContain(
+        "sk-"
+      );
+      expect(`${applied.stdout}\n${codexConfig}\n${claudeSettings}\n${mcpConfig}`).not.toContain(
+        "Bearer "
+      );
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  });
+
+  it("refuses to overwrite an existing install manifest unless explicitly replaced", async () => {
+    const root = await mkdtemp(join(tmpdir(), "context-diet-cli-existing-manifest-"));
+    try {
+      const codexPath = join(root, ".codex", "config.toml");
+      const manifestPath = join(root, ".context-diet", "install-manifest.json");
+      const originalCodex = 'model = "keep-before-refusal"\n';
+      await mkdir(dirname(codexPath), { recursive: true });
+      await mkdir(dirname(manifestPath), { recursive: true });
+      await writeFile(codexPath, originalCodex, { mode: 0o600 });
+      await writeFile(
+        manifestPath,
+        `${JSON.stringify({
+          backups: [],
+          createdAt: "2026-07-22T00:00:00.000Z",
+          credentialPolicy: "environment-variable-references-only",
+          gatewayBaseUrl: "http://127.0.0.1:4317",
+          hosts: ["codex"],
+          includeClaudeHook: false,
+          includeMcp: false,
+          installationId: "existing-install",
+          managedMarkers: ["# BEGIN context-diet managed", "# END context-diet managed"],
+          manifestVersion: 1,
+          status: "complete"
+        })}\n`,
+        { mode: 0o600 }
+      );
+
+      const refused = await runCliCommand(["setup", "both", "--mcp", "--confirm"], {
+        configRoot: root
+      });
+
+      expect(refused.stdout).toContain("Refused");
+      expect(await readFile(codexPath, "utf8")).toBe(originalCodex);
+      expect(existsSync(join(root, ".claude", "settings.json"))).toBe(false);
+
+      const replaced = await runCliCommand(
+        ["setup", "both", "--mcp", "--confirm", "--replace-existing-manifest"],
+        { configRoot: root }
+      );
+      const replacedManifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
+        readonly backups: readonly { readonly backup: string }[];
+        readonly hosts: readonly string[];
+      };
+
+      expect(replaced.stdout).toContain("Confirmed");
+      expect(replacedManifest.hosts).toEqual(["codex", "claude-code"]);
+      expect(replacedManifest.backups.every((backup) => existsSync(backup.backup))).toBe(true);
     } finally {
       await rm(root, { force: true, recursive: true });
     }

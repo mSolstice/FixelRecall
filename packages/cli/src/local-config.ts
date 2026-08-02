@@ -12,6 +12,7 @@ export interface LocalConfigInstallOptions {
   readonly gatewayBaseUrl?: string;
   readonly installationId?: string;
   readonly createdAt?: string;
+  readonly replaceExistingManifest?: boolean;
 }
 
 export interface ManagedFileBackup {
@@ -56,6 +57,7 @@ export async function installLocalConfig(
   const gatewayBaseUrl = options.gatewayBaseUrl ?? "http://127.0.0.1:4317";
   const manifestPath = localManifestPath(options.rootDir);
   const changedFiles = targetFiles(options);
+  const installationId = options.installationId ?? "context-diet-local-install";
 
   if (!options.confirm) {
     return {
@@ -67,11 +69,22 @@ export async function installLocalConfig(
     };
   }
 
+  if ((await manifestExists(manifestPath)) && options.replaceExistingManifest !== true) {
+    return {
+      applied: false,
+      changedFiles: [],
+      dryRun: true,
+      manifestPath,
+      message:
+        "Refused: an existing Context Diet install manifest was found. Run rollback or uninstall first, or re-run with --replace-existing-manifest after reviewing the preview."
+    };
+  }
+
   const backups: ManagedFileBackup[] = [];
   await mkdir(dirname(manifestPath), { recursive: true });
 
   for (const path of changedFiles) {
-    backups.push(await backupFile(path, options.rootDir));
+    backups.push(await backupFile(path, options.rootDir, installationId));
   }
 
   if (options.hosts.includes("codex")) {
@@ -125,7 +138,7 @@ export async function installLocalConfig(
     hosts: [...options.hosts],
     includeClaudeHook: options.includeClaudeHook,
     includeMcp: options.includeMcp,
-    installationId: options.installationId ?? "context-diet-local-install",
+    installationId,
     managedMarkers,
     manifestVersion: 1,
     status: "complete"
@@ -163,6 +176,7 @@ export async function resumeInterruptedLocalConfig(
     includeClaudeHook: manifest.includeClaudeHook,
     includeMcp: manifest.includeMcp,
     installationId: manifest.installationId,
+    replaceExistingManifest: true,
     rootDir
   });
 }
@@ -205,8 +219,19 @@ export async function uninstallLocalConfig(rootDir: string): Promise<LocalConfig
   };
 }
 
-async function backupFile(path: string, rootDir: string): Promise<ManagedFileBackup> {
-  const backup = join(rootDir, ".context-diet", "backups", encodeURIComponent(path));
+async function backupFile(
+  path: string,
+  rootDir: string,
+  installationId: string
+): Promise<ManagedFileBackup> {
+  const baseBackup = join(
+    rootDir,
+    ".context-diet",
+    "backups",
+    safeBackupSegment(installationId),
+    encodeURIComponent(path)
+  );
+  const backup = await uniqueBackupPath(baseBackup);
   await mkdir(dirname(path), { recursive: true });
   await mkdir(dirname(backup), { recursive: true });
   try {
@@ -219,6 +244,37 @@ async function backupFile(path: string, rootDir: string): Promise<ManagedFileBac
     }
     throw error;
   }
+}
+
+async function uniqueBackupPath(basePath: string): Promise<string> {
+  for (let index = 0; index < 1_000; index += 1) {
+    const candidate = index === 0 ? basePath : `${basePath}.${index}`;
+    if (!(await fileExists(candidate))) {
+      return candidate;
+    }
+  }
+  throw new Error(`Could not allocate a unique backup path for ${basePath}`);
+}
+
+async function manifestExists(path: string): Promise<boolean> {
+  return fileExists(path);
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await readFile(path, "utf8");
+    return true;
+  } catch (error) {
+    if (isNodeError(error) && error.code === "ENOENT") {
+      return false;
+    }
+    throw error;
+  }
+}
+
+function safeBackupSegment(value: string): string {
+  const safe = value.replaceAll(/[^A-Za-z0-9._-]/g, "_");
+  return safe.length === 0 ? "context-diet-local-install" : safe;
 }
 
 function targetFiles(options: LocalConfigInstallOptions): readonly string[] {
