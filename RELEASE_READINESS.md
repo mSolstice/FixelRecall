@@ -2,13 +2,16 @@
 
 Review date: 2026-08-02
 
-Decision: **NO-GO**
+Decision: **GO for macOS CLI-only; NO-GO for broad production go-live**
 
-This is a **fake-provider release candidate only**. The current repository passes local
-fake-provider checks, local skill validation, limited real-provider route canaries and a generated
-toy-project real-provider benchmark canary, but production go-live remains **NO-GO** because Windows
-native and WSL are unsupported, IDE surfaces are not release-tested, Linux CI still needs review for
-the final local commit, and broad workload evidence is still synthetic.
+This is a **macOS CLI-only release candidate**. The current repository passes local fake-provider
+checks, local skill validation, limited real-provider route canaries, a generated toy-project
+real-provider benchmark canary, real macOS user-level install/rollback/uninstall canary and Linux CI
+for the pushed release-readiness commit.
+
+Broad production go-live remains **NO-GO** because Windows native and WSL are unsupported, IDE
+surfaces are not release-tested, broad workload evidence is still synthetic and no third-party
+security review has been completed.
 
 ## Version
 
@@ -19,12 +22,10 @@ the final local commit, and broad workload evidence is still synthetic.
 
 ## Commit And Tree
 
-- Commit reviewed: `ce47a92aefaa658f43d663abaf82610ada411afa`
-- Short commit: `ce47a92`
+- Commit reviewed: `1e74a4500429801bc040e45ce02a2d170466f547`
+- Short commit: `1e74a45`
 - GitHub Actions evidence: user reported Linux CI green for pushed commit
-  `89e84505c803039ce2d79c3150a125276fffe60c`.
-- Current local commit `ce47a92aefaa658f43d663abaf82610ada411afa` includes the later both-host
-  transactional install guard and still needs remote CI review after push.
+  `1e74a4500429801bc040e45ce02a2d170466f547`.
 - Tree before this report update: clean
 - Tree after this report update: dirty until `RELEASE_READINESS.md` is committed
 
@@ -32,8 +33,7 @@ the final local commit, and broad workload evidence is still synthetic.
 
 - macOS: local fake-provider beta tested on Darwin 24.6.0 arm64 with Node.js 26 and pnpm 11.
 - Linux: GitHub Actions is configured for Ubuntu with Node.js 24 and 26. The user reported a green
-  Linux CI run for commit `89e84505c803039ce2d79c3150a125276fffe60c`; the later local commit
-  `ce47a92aefaa658f43d663abaf82610ada411afa` still needs remote CI review after push.
+  Linux CI run for commit `1e74a4500429801bc040e45ce02a2d170466f547`.
 - Windows native: unsupported for this release.
 - WSL: unsupported for this release.
 
@@ -97,7 +97,7 @@ local loopback permission passed. No real-provider traffic was sent.
 
 ## Test Totals
 
-- Full Vitest suite: 17 files, 291 tests passed.
+- Full Vitest suite: 17 files, 294 tests passed.
 - Compatibility suite: 1 file, 3 tests passed.
 - Fake beta: 13 beta steps passed for gateway, fake Codex client, fake Claude Code client,
   transform, MCP retrieval, benchmark, dashboard smoke, kill switch, direct fake routing,
@@ -137,11 +137,11 @@ Pass or mostly pass locally:
 - Metrics, dashboard, benchmark and skills have synthetic/local tests.
 - Windows/WSL are clearly marked unsupported.
 
-No-go against acceptance criteria:
+No-go outside macOS CLI-only scope:
 
-- Linux checks were not reviewed from CI for the final local commit `ce47a92`.
 - Real-provider canaries are limited canary evidence only, not broad production benchmark evidence.
 - Codex IDE and Claude Code IDE are not release-tested.
+- Windows native and WSL are not release-tested.
 
 ## Security Findings
 
@@ -167,7 +167,7 @@ Current review notes:
 ## Known Limitations
 
 - Current evidence is fake-provider, synthetic-data and limited real-provider canary evidence only.
-- This is a local fake-provider release candidate, not a production release.
+- This is a macOS CLI-only release candidate, not a broad production release.
 - Real-provider canaries passed for route checks and one generated toy-project benchmark canary, but
   they do not prove production savings or broad model compatibility.
 - The real-provider benchmark canary used generated public-safe toy code only. It is not a private
@@ -198,9 +198,9 @@ Current local fake-provider evidence shows:
 
 Release caveat:
 
-- This privacy statement is supported by synthetic/fake tests, limited real-provider canaries and
-  one macOS CLI real user-level install canary. It is not yet backed by Linux CI review for the
-  final local commit, broad real workload evidence or third-party security review.
+- This privacy statement is supported by synthetic/fake tests, limited real-provider canaries, one
+  macOS CLI real user-level install canary and a green Linux CI run for commit `1e74a45`. It is not
+  yet backed by broad real workload evidence or third-party security review.
 
 ## Install, Uninstall And Rollback
 
@@ -308,24 +308,37 @@ This is not real-provider cost evidence and must remain labelled synthetic.
 
 ## Go Or No-Go Decision
 
-**NO-GO for production go-live.**
+**GO for macOS CLI-only release candidate.**
 
-Local fake-provider skill validation is ready, and the generated toy-project real-provider benchmark
-canary has passed. The macOS CLI-only scope should now be reassessed separately. Broad production
-go-live remains NO-GO until the remaining release blockers pass.
+Approved narrow scope:
+
+- macOS only.
+- Codex CLI only.
+- Claude Code CLI only.
+- Safe mode default.
+- Local fake-provider skill validation.
+- Real OpenAI/Codex and Anthropic/Claude Code route canaries.
+- Generated toy-project real-provider benchmark canary.
+- Real macOS user-level install, rollback and uninstall canary.
+- Linux CI green for commit `1e74a4500429801bc040e45ce02a2d170466f547`.
+
+**NO-GO for broad production go-live.**
+
+Broad production remains NO-GO until the unsupported platforms, IDE surfaces, broad workload
+evidence and remaining security hardening work are addressed.
 
 Reasons:
 
 1. Real-provider route and generated toy-project benchmark canary evidence is not broad production
    benchmark evidence.
-2. Linux CI has not been reviewed for the final local commit `ce47a92`.
-3. Windows native, WSL, Codex IDE and Claude Code IDE are unsupported for this release.
-4. Real user-level install/uninstall/rollback is canaried only for macOS CLI.
-5. Broad benchmark evidence remains synthetic only.
+2. Windows native, WSL, Codex IDE and Claude Code IDE are unsupported for this release.
+3. Real user-level install/uninstall/rollback is canaried only for macOS CLI.
+4. Broad benchmark evidence remains synthetic only.
+5. No third-party security review has been completed.
 
 Recommended next release blockers:
 
-1. Push commit `ce47a92aefaa658f43d663abaf82610ada411afa` and review a clean Linux CI run.
-2. Reassess GO/NO-GO for a narrowed macOS CLI-only release scope.
+1. Commit and push this updated release-readiness decision.
+2. Confirm GitHub Actions remains green for the final release-candidate commit.
 3. Decide whether this release is scoped to macOS CLI only, or add tested support for Linux, WSL,
    Windows native and IDE surfaces before claiming them.
