@@ -1,155 +1,274 @@
 # Context Diet
 
-**Reduce waste. Protect facts. Prove the result.**
+**Make coding-agent context cheaper, safer and easier to understand.**
 
-Context Diet is a local context optimisation layer for coding agents. It is designed to audit large
-requests, protect exact and sensitive information, transform only suitable older context, keep
-recoverable local references, and measure whether the result is actually worthwhile.
+Context Diet is a local safety and efficiency layer for coding agents. It helps Codex CLI and Claude
+Code CLI carry less wasteful context while protecting the exact details that should never be
+compressed, rendered or guessed.
 
-## Current Status
+Think of it as a local nutrition label for your agent context:
 
-Context Diet is currently at **local fake-provider beta** status.
+- What is useful?
+- What is old or repetitive?
+- What must stay exact?
+- What might be unsafe to transform?
+- Did the change actually save anything?
 
-What is proven now:
+## Why Developers Care
 
-- OpenAI Responses-shaped fake traffic can pass through the local gateway.
-- Anthropic Messages-shaped fake traffic can pass through the local gateway.
-- The gateway, adapters, firewall, vault, MCP retrieval, renderer interface, CLI, dashboard and
-  benchmark flows are covered by local synthetic tests.
-- The complete fake beta flow is available as `pnpm beta:fake`.
+Long coding-agent sessions can quietly collect a lot of baggage: old chat, repeated tool output,
+logs, file snippets, previous attempts and context that no longer matters. That can make requests
+larger, slower, more expensive and harder for the model to reason about.
 
-What is not proven yet:
+Context Diet helps by:
 
-- Real OpenAI provider traffic.
-- Real Anthropic provider traffic.
-- Real user configuration writes.
-- Production release readiness.
+- reducing token and context waste where it is safe
+- keeping code, commands, paths, IDs, hashes, secrets and active tool state protected
+- preserving exact context through local retrieval when recovery is needed
+- explaining why something was transformed or left untouched
+- benchmarking whether Context Diet is worth using for a setup
+- supporting both Codex CLI and Claude Code CLI through one local engine
+- providing rollback and uninstall commands for local configuration changes
 
-Do not claim real-provider support from this repository state.
+The goal is not to compress everything. The goal is **safe context reduction with evidence**.
 
-## Supported Hosts
+## Shrink The Context. Keep The Details.
 
-Current surface status:
+Context Diet turns safe old context into images, while exact text stays protected and recoverable.
 
-- Codex CLI: fake-provider tested through an OpenAI Responses-compatible local route.
-- Codex IDE: not release-tested.
-- Claude Code CLI: fake-provider tested through an Anthropic Messages-compatible local route.
-- Claude Code IDE: not release-tested.
+It is not just compression. Instead of sending every old message, log and repeated note back to the
+model as text, Context Diet decides what can safely become a compact visual memory.
 
-## Supported Operating Systems
+- Current instructions, code, commands, paths, IDs, hashes and secrets stay as native text.
+- Secrets are never rendered.
+- The local vault keeps authorised original text for exact recovery.
+- MCP retrieval can fetch a narrow exact section later.
+- pxpipe sits behind the renderer interface to create approved images.
+- If rendering fails, the original text is preserved.
+- Image compression only happens when policy says it is safe and worthwhile.
 
-Current evidence:
+## What This Adds Around OpenAI And Anthropic
 
-- macOS: locally tested on Darwin arm64 with Node.js 26 and pnpm 11.
-- Linux: GitHub Actions is configured for Ubuntu with Node.js 24 and Node.js 26, but current support
-  should be treated as CI-targeted until a clean remote run is reviewed.
-- Windows native: unsupported for this release.
-- WSL: unsupported for this release.
+OpenAI and Anthropic provide the models and coding agents. Context Diet adds a local product layer
+around them:
 
-See `docs/OS_SUPPORT.md` for path, permission, temp directory, symlink and loopback details.
+- provider-neutral context policy across Codex CLI and Claude Code CLI
+- a local gateway for OpenAI Responses-shaped and Anthropic Messages-shaped traffic
+- an Exactness Firewall for code, commands, paths, IDs, hashes, versions, numbers, dates, URLs,
+  secrets and other exact values
+- local vault and MCP retrieval for narrow exact recovery
+- reason codes that explain every policy decision
+- synthetic and canary benchmark evidence
+- local install, rollback and uninstall safeguards
+- dashboard-ready metrics and context summaries
 
-## How It Connects
+Context Diet does not replace OpenAI or Anthropic. It helps developers use coding agents with more
+visibility, safety and cost awareness.
 
-### Codex CLI
+## Current Release Status
 
-Codex can be pointed to a custom model provider with a local `base_url`. Context Diet exposes an
-OpenAI Responses-compatible gateway endpoint:
+**GO: macOS CLI-only release candidate**
 
-```text
-http://127.0.0.1:<gateway-port>/v1/responses
-```
+Supported now:
 
-### Claude Code CLI
+- macOS
+- Codex CLI
+- Claude Code CLI
+- local loopback gateway
+- Safe mode default
+- fake-provider development mode
+- local MCP retrieval in tested flows
+- setup preview, confirmed setup, rollback and uninstall on macOS CLI
 
-Claude Code can be pointed to the local gateway with `ANTHROPIC_BASE_URL`. Context Diet exposes an
-Anthropic Messages-compatible gateway endpoint:
+Not claimed:
 
-```text
-http://127.0.0.1:<gateway-port>/v1/messages
-```
+- Codex IDE support
+- Claude Code IDE support
+- Windows native support
+- WSL support
+- broad production readiness
+- hosted or multi-user deployment
+- proven real-world savings across private repositories
+- third-party security review
 
-## Fake-Provider Setup
+See [RELEASE_READINESS.md](RELEASE_READINESS.md) and
+[docs/MACOS_CLI_RELEASE_CHECKLIST.md](docs/MACOS_CLI_RELEASE_CHECKLIST.md).
 
-Use fake-provider checks before any real canary:
+## How A Developer Uses It
+
+### 1. Install And Build
+
+Run in Terminal:
 
 ```bash
+git clone git@github.com:mSolstice/ContextDiet.git
+cd ContextDiet
+corepack enable
 pnpm install
 pnpm build
-pnpm check:environment
+```
+
+### 2. Run Local Checks
+
+```bash
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm test:compatibility
+pnpm check:skills
+```
+
+### 3. Start The Local Gateway
+
+Start the gateway in Safe mode:
+
+```bash
+node --input-type=module -e 'import { createLocalGateway } from "./packages/proxy/dist/index.js"; const gateway = createLocalGateway({ bindHost: "127.0.0.1", mode: "safe", upstreams: { openai: "https://api.openai.com/v1/responses", anthropic: "https://api.anthropic.com/v1/messages" }, upstreamAllowlist: ["https://api.openai.com", "https://api.anthropic.com"], requestTimeoutMs: 30000 }); gateway.server.listen(4317, "127.0.0.1", () => console.log("Context Diet gateway listening on http://127.0.0.1:4317")); const shutdown = async () => { await gateway.close(); process.exit(0); }; process.on("SIGINT", shutdown); process.on("SIGTERM", shutdown); setInterval(() => {}, 1000);'
+```
+
+Check it from another Terminal tab:
+
+```bash
+curl -sS http://127.0.0.1:4317/health
+curl -sS http://127.0.0.1:4317/status
+```
+
+Expected health shape:
+
+```json
+{ "status": "ok", "gateway": "context-diet-local", "mode": "safe" }
+```
+
+### 4. Preview Setup
+
+Preview writes nothing:
+
+```bash
+CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js setup both --mcp
+```
+
+The preview shows the Codex, Claude Code and MCP files that would be touched. Provider credentials
+are not written.
+
+### 5. Confirm Setup
+
+Only after reviewing the preview:
+
+```bash
+CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js setup both --mcp --confirm --replace-existing-manifest
+```
+
+This records a local manifest and backups.
+
+### 6. Use Codex CLI Or Claude Code CLI Normally
+
+After configuration, normal coding prompts can continue as normal. Developers do not need to add
+“use Context Diet” to every prompt for gateway behavior.
+
+The skill is for Context Diet-specific operations, such as:
+
+- diagnose Context Diet
+- run a benchmark
+- explain a policy decision
+- retrieve exact context
+- start or stop the local service
+- troubleshoot Codex or Claude Code setup
+
+Simple rule:
+
+```text
+Gateway = automatic once configured.
+Skill = invoked for Context Diet-specific questions or commands.
+```
+
+## What Developers See
+
+Gateway health:
+
+```json
+{ "status": "ok", "gateway": "context-diet-local", "mode": "safe" }
+```
+
+Setup:
+
+```text
+Confirmed: local configuration was written and backups were recorded.
+Provider credentials are not stored, printed or generated.
+```
+
+Rollback:
+
+```text
+Rollback complete: backed-up files were restored from the install manifest.
+Credentials: not displayed
+```
+
+Uninstall:
+
+```text
+Uninstall complete: only Context Diet managed entries were removed.
+```
+
+Policy explanations are plain-language:
+
+```text
+This block stayed native because it contained source code and exact file paths.
+Safe mode keeps that content unchanged.
+```
+
+## Fake-Provider Mode
+
+Fake-provider checks use synthetic prompts, fake credentials, loopback servers and temporary local
+state. They do not require provider API keys.
+
+```bash
 pnpm smoke:openai
 pnpm smoke:anthropic
 pnpm beta:fake
 ```
 
-The fake beta uses synthetic prompts, fake credentials, loopback servers and temporary local state.
-It does not require provider API keys.
+## Real-Provider Canaries
 
-## Real-Provider Canary
+Real-provider canaries require explicit consent and a small provider budget. Do not paste provider
+keys into chat and do not commit them to the repository.
 
-Real-provider testing requires explicit consent and a separate plan.
-
-Read:
+Read first:
 
 ```text
 docs/REAL_PROVIDER_CANARY_PLAN.md
 ```
 
-Do not run real-provider traffic unless the user explicitly consents in the same session. The canary
-must use Safe mode only, a minimal synthetic prompt, strict token/cost limits and no private source
-code.
+Canaries must use Safe mode, synthetic prompts only, strict cost limits and no private source code.
 
-## Install Preview
+## Rollback And Uninstall
 
-Current install behavior is preview-only.
-
-Codex preview:
+Rollback:
 
 ```bash
-context-diet setup codex
+CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js rollback --confirm
 ```
 
-Claude Code preview:
+Uninstall:
 
 ```bash
-context-diet setup claude-code
+CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js uninstall --confirm
 ```
-
-These commands are expected to print safe configuration previews. They must not write user
-configuration or include provider credentials without explicit confirmation.
-
-## Uninstall Preview
-
-Current uninstall behavior is preview-only.
-
-```bash
-context-diet uninstall
-```
-
-Manual restoration guidance:
-
-- Codex: switch back to the previous direct provider and remove the Context Diet custom-provider
-  entry when no longer needed.
-- Claude Code: unset `ANTHROPIC_BASE_URL` and remove any optional local hook or MCP entry created
-  for testing.
-- Stop the local gateway.
-- Delete temporary Context Diet sessions only after confirming the target session.
-
-Transactional install, rollback and uninstall are not release-proven yet.
 
 ## Privacy And Safety Defaults
 
-Safe mode is the default.
+Safe mode is default.
 
 Safe mode keeps these as native text:
 
-- Current instructions
-- Active code and diffs
-- Shell commands and SQL
-- Paths, URLs, IDs and hashes
-- Numbers, versions, dates and ports
-- Secrets and authentication material
-- Open or incomplete tool calls
-- Unknown or unsupported content
+- current instructions
+- active code and diffs
+- shell commands and SQL
+- paths, URLs, IDs and hashes
+- numbers, versions, dates and ports
+- secrets and authentication material
+- open or incomplete tool calls
+- unknown or unsupported content
 
 Context Diet must not log authentication headers or raw request bodies. Secret-sensitive values are
 not render-eligible and must not be stored in the vault.
@@ -157,18 +276,22 @@ not render-eligible and must not be stored in the vault.
 If parsing, scanning, rendering, vault storage, profile validation or rebuilding fails, the original
 provider content is preserved.
 
-## Benchmark Evidence
+## Evidence
 
-Current benchmark evidence is **synthetic only**.
+Current macOS CLI release candidate evidence includes:
 
-The personal benchmark harness compares:
+- local checks passing
+- fake-provider beta passing
+- OpenAI/Codex and Anthropic/Claude Code route canaries passing with explicit user consent
+- generated toy-project real-provider benchmark canary passing
+- real macOS user-level setup, rollback and uninstall canary passing
+- GitHub Actions green according to user report for the release candidate commits
 
-- uncompressed control
-- Safe compressed
-- Safe compressed with exact retrieval
+See:
 
-The current synthetic benchmark is useful for repeatable local regression checks. It must not be
-presented as real provider cost savings or real workload quality evidence.
+- [RELEASE_READINESS.md](RELEASE_READINESS.md)
+- [docs/MACOS_CLI_RELEASE_CHECKLIST.md](docs/MACOS_CLI_RELEASE_CHECKLIST.md)
+- [docs/MACOS_CLI_PRIVATE_USAGE.md](docs/MACOS_CLI_PRIVATE_USAGE.md)
 
 ## Canonical Skill
 
@@ -192,38 +315,24 @@ pnpm check:skills
 
 Do not manually maintain three different skill versions.
 
-## Repository Instructions
+## What Not To Claim
 
-Codex reads `AGENTS.md`.
+Do not claim:
 
-Claude Code reads `CLAUDE.md`, which imports the shared `AGENTS.md` rules and adds Claude-specific
-guidance.
+- broad production readiness
+- Codex IDE support
+- Claude Code IDE support
+- Windows native support
+- WSL support
+- hosted or multi-user deployment support
+- proven real-world savings across private repositories
+- approved real model profiles
+- third-party security review
+- published package availability
 
-The full blueprint is in:
-
-```text
-docs/CONTEXT_DIET_BLUEPRINT.md
-```
-
-## Known Limitations
-
-- Real OpenAI and Anthropic provider canaries have not been run.
-- Codex IDE and Claude Code IDE are not release-tested.
-- Windows native and WSL are unsupported for this release.
-- Install, uninstall and rollback are preview-only.
-- The dashboard is local/static in this package; no production dashboard server is release-proven.
-- Model profiles and benchmark evidence are synthetic.
-- Highly cached, code-heavy or exactness-sensitive workloads may show neutral or negative value.
-- No production database is included.
-- This repository is not ready for a real-provider release until the release readiness report
-  reaches a go decision.
-
-## Release Readiness
-
-See:
+The honest current claim is:
 
 ```text
-RELEASE_READINESS.md
+Context Diet is GO as a macOS CLI-only release candidate for Codex CLI and Claude Code CLI.
+Broad production remains NO-GO.
 ```
-
-A no-go result is acceptable and should not be hidden.

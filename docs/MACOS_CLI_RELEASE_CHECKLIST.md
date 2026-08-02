@@ -2,7 +2,7 @@
 
 Review date: 2026-08-02
 
-Release candidate commit: `c1d59c0`
+Release candidate commit: `2df94b1`
 
 Status: **GO for macOS CLI-only release candidate**
 
@@ -35,8 +35,8 @@ Broad production status: **NO-GO**
 
 ## Evidence
 
-- Latest commit: `c1d59c0`.
-- GitHub Actions: green according to user report for commit `c1d59c0`.
+- Latest commit: `2df94b1`.
+- GitHub Actions: green according to user report for commit `2df94b1`.
 - Local checks passed:
   - `pnpm format:check`
   - `pnpm lint`
