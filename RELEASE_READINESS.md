@@ -8,8 +8,7 @@ This is a **fake-provider release candidate only**. The current repository passe
 fake-provider checks, local skill validation, limited real-provider route canaries and a generated
 toy-project real-provider benchmark canary, but production go-live remains **NO-GO** because Windows
 native and WSL are unsupported, IDE surfaces are not release-tested, Linux CI still needs review for
-the final commit, and real user-level install/uninstall has not been canaried outside temporary test
-directories.
+the final local commit, and broad workload evidence is still synthetic.
 
 ## Version
 
@@ -20,16 +19,21 @@ directories.
 
 ## Commit And Tree
 
-- Commit reviewed: `55fb258a41e6c8c62129d72a0e95c6f399771aad`
-- Short commit: `55fb258`
+- Commit reviewed: `ce47a92aefaa658f43d663abaf82610ada411afa`
+- Short commit: `ce47a92`
+- GitHub Actions evidence: user reported Linux CI green for pushed commit
+  `89e84505c803039ce2d79c3150a125276fffe60c`.
+- Current local commit `ce47a92aefaa658f43d663abaf82610ada411afa` includes the later both-host
+  transactional install guard and still needs remote CI review after push.
 - Tree before this report update: clean
 - Tree after this report update: dirty until `RELEASE_READINESS.md` is committed
 
 ## Supported OS
 
 - macOS: local fake-provider beta tested on Darwin 24.6.0 arm64 with Node.js 26 and pnpm 11.
-- Linux: GitHub Actions is configured for Ubuntu with Node.js 24 and 26, but a current remote CI run
-  was not reviewed in this pass.
+- Linux: GitHub Actions is configured for Ubuntu with Node.js 24 and 26. The user reported a green
+  Linux CI run for commit `89e84505c803039ce2d79c3150a125276fffe60c`; the later local commit
+  `ce47a92aefaa658f43d663abaf82610ada411afa` still needs remote CI review after push.
 - Windows native: unsupported for this release.
 - WSL: unsupported for this release.
 
@@ -40,7 +44,7 @@ See `docs/OS_SUPPORT.md` for path, permission, temp directory, symlink and loopb
 - Codex CLI: fake-provider tested through the OpenAI Responses-compatible route `/v1/responses`.
 - Codex IDE: not release-tested and not supported for this release.
 - Real Codex provider canary: PASS with explicit user consent on 2026-08-02.
-- Real Codex user-level configuration migration: not canaried outside temporary test directories.
+- Real Codex user-level configuration migration: PASS for the macOS CLI canary on 2026-08-02.
 
 ## Supported Claude Code Surfaces
 
@@ -48,7 +52,7 @@ See `docs/OS_SUPPORT.md` for path, permission, temp directory, symlink and loopb
   `/v1/messages`.
 - Claude Code IDE: not release-tested and not supported for this release.
 - Real Claude Code provider canary: PASS with explicit user consent on 2026-08-02.
-- Real Claude Code user-level settings migration: not canaried outside temporary test directories.
+- Real Claude Code user-level settings migration: PASS for the macOS CLI canary on 2026-08-02.
 
 ## Provider And Model Profiles
 
@@ -79,7 +83,7 @@ Release limitation:
 | `pnpm lint`                                                    | PASS                                                                               |
 | `pnpm typecheck`                                               | PASS                                                                               |
 | `pnpm build`                                                   | PASS                                                                               |
-| `pnpm test`                                                    | PASS with local loopback permission: 17 files, 279 tests.                          |
+| `pnpm test`                                                    | PASS with local loopback permission: 17 files, 294 tests.                          |
 | `pnpm test:compatibility`                                      | PASS: 1 file, 3 tests.                                                             |
 | `pnpm check:skills`                                            | PASS                                                                               |
 | `CONTEXT_DIET_TEST_CANARIES='[]' pnpm scan:test-canaries -- .` | PASS                                                                               |
@@ -111,6 +115,9 @@ local loopback permission passed. No real-provider traffic was sent.
   all three variants; Anthropic JSON retry passed `safe_compressed` and
   `safe_compressed_exact_retrieval`; Anthropic single-variant retry passed `uncompressed_control`.
   All accepted variants had valid JSON replacement output and deterministic `node --test` success.
+- Real user-level install/uninstall/rollback canary: PASS on macOS CLI.
+  `setup both --mcp --confirm --replace-existing-manifest` succeeded, rollback restored backed-up
+  files, and uninstall removed Context Diet-managed entries.
 
 ## Acceptance Criteria Review
 
@@ -132,9 +139,8 @@ Pass or mostly pass locally:
 
 No-go against acceptance criteria:
 
-- Linux checks were not reviewed from CI for this exact commit.
+- Linux checks were not reviewed from CI for the final local commit `ce47a92`.
 - Real-provider canaries are limited canary evidence only, not broad production benchmark evidence.
-- Real user-level uninstall/rollback is not canaried outside temporary test directories.
 - Codex IDE and Claude Code IDE are not release-tested.
 
 ## Security Findings
@@ -146,13 +152,14 @@ From `SECURITY_REVIEW.md`:
 - Open medium: user-defined firewall regexes can be expensive if exposed to untrusted users.
 - Open medium: MCP retrieval logs full opaque IDs; privacy hardening should hash or truncate them.
 - Open low: dashboard serving boundary is not implemented in this package.
-- Open low: installer/uninstaller have temp-directory coverage but no real user-config migration
-  canary.
+- Open low: installer/uninstaller have temp-directory coverage and one macOS CLI real user-level
+  canary, but no Linux, Windows, WSL or IDE user-config migration canary.
 
 Current review notes:
 
 - No critical or high security finding is known open in the current local fake-provider scope.
 - Repository canary scan passed.
+- Real user-level install canary used fake credentials only and no provider traffic.
 - Real provider credentials were used only by the user's local terminal environment for the
   explicitly approved canaries. Credentials were not committed, printed by repository tooling or
   stored in evidence.
@@ -166,7 +173,8 @@ Current review notes:
 - The real-provider benchmark canary used generated public-safe toy code only. It is not a private
   workload, broad workload, long-session or production benchmark.
 - No production database is present.
-- Install, uninstall and rollback have temp-directory evidence only.
+- Install, uninstall and rollback have temp-directory evidence plus one macOS CLI real user-level
+  canary.
 - Dashboard is static/local-rendered in this package; no release-grade dashboard server boundary is
   proven.
 - Model-profile approval is synthetic only.
@@ -190,32 +198,51 @@ Current local fake-provider evidence shows:
 
 Release caveat:
 
-- This privacy statement is supported by synthetic/fake tests and limited real-provider canaries. It
-  is not yet backed by Linux CI review for this final commit, real user-level install/uninstall
-  canary evidence, broad real workload evidence or third-party security review.
+- This privacy statement is supported by synthetic/fake tests, limited real-provider canaries and
+  one macOS CLI real user-level install canary. It is not yet backed by Linux CI review for the
+  final local commit, broad real workload evidence or third-party security review.
 
 ## Install, Uninstall And Rollback
 
 Install:
 
-- `context-diet setup codex` and `context-diet setup claude-code` dry-run by default.
+- `context-diet setup codex`, `context-diet setup claude-code` and `context-diet setup both` dry-run
+  by default.
 - Writes require explicit `--confirm`.
-- Tests use temporary configuration roots only.
+- Tests use temporary configuration roots.
+- Real macOS CLI canary used `setup both --mcp --confirm --replace-existing-manifest` after preview.
 - Provider credentials are never written.
 
 Uninstall:
 
-- `context-diet uninstall --confirm` removes only Context Diet-managed entries in tested temp roots.
+- `context-diet uninstall --confirm` removes only Context Diet-managed entries in tested temp roots
+  and in the macOS CLI real user-level canary.
 - Manual direct-route restoration remains documented for Codex and Claude Code.
 
 Rollback:
 
-- `context-diet rollback --confirm` restores backups in tested temp roots.
+- `context-diet rollback --confirm` restores backups in tested temp roots and in the macOS CLI real
+  user-level canary.
 - Interrupted install resume and rollback are tested against synthetic manifests in temp roots.
+
+MacOS CLI real user-level canary evidence:
+
+- Date: 2026-08-02.
+- Command: `setup both --mcp --confirm --replace-existing-manifest`.
+- Result: setup succeeded and wrote one manifest for Codex and Claude Code.
+- Manifest hosts: `codex` and `claude-code`.
+- Backups: 3 backup entries existed.
+- Rollback: restored backed-up files.
+- Uninstall: removed Context Diet-managed entries.
+- Post-uninstall verification: Codex managed block absent, Claude managed object absent and MCP file
+  absent.
+- Credential check: no obvious credential markers were found in checked managed files or manifest.
+- Provider traffic: none sent.
 
 Release limitation:
 
-- Real user-level host config install/uninstall/rollback has not been canaried.
+- Real user-level host config install/uninstall/rollback is canaried only on macOS CLI, not Linux,
+  Windows, WSL or IDE surfaces.
 
 ## Benchmark Evidence
 
@@ -284,23 +311,21 @@ This is not real-provider cost evidence and must remain labelled synthetic.
 **NO-GO for production go-live.**
 
 Local fake-provider skill validation is ready, and the generated toy-project real-provider benchmark
-canary has passed. This repository remains a fake-provider release candidate until the remaining
-release blockers pass.
+canary has passed. The macOS CLI-only scope should now be reassessed separately. Broad production
+go-live remains NO-GO until the remaining release blockers pass.
 
 Reasons:
 
 1. Real-provider route and generated toy-project benchmark canary evidence is not broad production
    benchmark evidence.
-2. Linux CI has not been reviewed for the final commit.
+2. Linux CI has not been reviewed for the final local commit `ce47a92`.
 3. Windows native, WSL, Codex IDE and Claude Code IDE are unsupported for this release.
-4. Real user-level install/uninstall/rollback has not been canaried outside temporary test
-   directories.
+4. Real user-level install/uninstall/rollback is canaried only for macOS CLI.
 5. Broad benchmark evidence remains synthetic only.
 
 Recommended next release blockers:
 
-1. Review a clean Linux CI run for the final release-candidate commit.
-2. Canary real user-level install/uninstall/rollback with safe fake credentials and reversible
-   configuration.
+1. Push commit `ce47a92aefaa658f43d663abaf82610ada411afa` and review a clean Linux CI run.
+2. Reassess GO/NO-GO for a narrowed macOS CLI-only release scope.
 3. Decide whether this release is scoped to macOS CLI only, or add tested support for Linux, WSL,
    Windows native and IDE surfaces before claiming them.
