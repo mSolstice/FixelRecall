@@ -13,11 +13,15 @@ import {
   createPersonalBenchmarkReport,
   createSyntheticBenchmarkReport,
   exportShareCard,
+  renderJsonReplacementBenchmarkCanaryInstructions,
+  renderStrictBenchmarkCanaryInstructions,
   renderBenchmarkMarkdown,
   renderSyntheticBenchmarkReadmeInstructions,
   shareCardForbiddenFields,
   syntheticBenchmarkEvidenceAllowedFields,
   syntheticBenchmarkForbiddenFields,
+  validateJsonReplacementBenchmarkOutput,
+  validateStrictUnifiedDiffPatch,
   validateComparableRuns,
   writeBenchmarkReport,
   type BenchmarkRun,
@@ -140,6 +144,227 @@ describe("personal benchmark harness", () => {
     expect(reasons.join("\n")).toContain("did not meet deterministic output agreement");
     expect(reasons.join("\n")).toContain("manual review");
     expect(reasons.join("\n")).toContain("passing task tests");
+  });
+
+  it("renders strict real-provider benchmark instructions", () => {
+    const instructions = renderStrictBenchmarkCanaryInstructions();
+
+    expect(instructions).toContain("No markdown fences");
+    expect(instructions).toContain("No explanation");
+    expect(instructions).toContain("src/list-utils.js");
+    expect(instructions).toContain("patch -p0 -i candidate.patch");
+    expect(instructions).toContain("node --test");
+  });
+
+  it("renders JSON replacement real-provider benchmark instructions", () => {
+    const instructions = renderJsonReplacementBenchmarkCanaryInstructions();
+
+    expect(instructions).toContain("Return JSON only");
+    expect(instructions).toContain("No markdown fences");
+    expect(instructions).toContain('"file":"src/list-utils.js"');
+    expect(instructions).toContain("complete replacement file content");
+    expect(instructions).toContain("node --test");
+  });
+
+  it("accepts only strict applyable unified diff candidates", () => {
+    const validPatch = [
+      "--- src/list-utils.js",
+      "+++ src/list-utils.js",
+      "@@ -1,3 +1,6 @@",
+      " export function normalizeShoppingList(items) {",
+      "-  return items;",
+      "+  return [...new Set(items",
+      "+    .map((item) => item.trim().toLowerCase())",
+      "+    .filter((item) => item.length > 0)",
+      "+  )].sort();",
+      " }",
+      ""
+    ].join("\n");
+
+    expect(validateStrictUnifiedDiffPatch(validPatch)).toEqual({ reasons: [], valid: true });
+  });
+
+  it("rejects fenced or explanatory benchmark diffs", () => {
+    const result = validateStrictUnifiedDiffPatch(
+      [
+        "Here is the patch:",
+        "```diff",
+        "--- src/list-utils.js",
+        "+++ src/list-utils.js",
+        "@@ -1,3 +1,3 @@",
+        " export function normalizeShoppingList(items) {",
+        "-  return items;",
+        "+  return [];",
+        " }",
+        "```",
+        ""
+      ].join("\n")
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.reasons.join("\n")).toContain("markdown fences");
+    expect(result.reasons.join("\n")).toContain("Patch must start");
+    expect(result.reasons.join("\n")).toContain("non-diff text");
+  });
+
+  it("rejects malformed hunk counts and non-p0 paths", () => {
+    const result = validateStrictUnifiedDiffPatch(
+      [
+        "--- a/src/list-utils.js",
+        "+++ b/src/list-utils.js",
+        "@@ -1,3 +1,8 @@",
+        " export function normalizeShoppingList(items) {",
+        "-  return items;",
+        "+  return [];",
+        " }",
+        ""
+      ].join("\n")
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.reasons.join("\n")).toContain("src/list-utils.js");
+    expect(result.reasons.join("\n")).toContain("a/ or b/");
+    expect(result.reasons.join("\n")).toContain("Hunk line counts do not match");
+  });
+
+  it("accepts strict JSON replacement candidates", () => {
+    const output = JSON.stringify({
+      file: "src/list-utils.js",
+      replacement: [
+        "export function normalizeShoppingList(items) {",
+        "  return [...new Set(items",
+        "    .map((item) => item.trim().toLowerCase())",
+        "    .filter((item) => item.length > 0)",
+        "  )].sort();",
+        "}",
+        ""
+      ].join("\n")
+    });
+
+    expect(validateJsonReplacementBenchmarkOutput(output)).toEqual({
+      reasons: [],
+      replacement: {
+        content: [
+          "export function normalizeShoppingList(items) {",
+          "  return [...new Set(items",
+          "    .map((item) => item.trim().toLowerCase())",
+          "    .filter((item) => item.length > 0)",
+          "  )].sort();",
+          "}",
+          ""
+        ].join("\n"),
+        file: "src/list-utils.js"
+      },
+      valid: true
+    });
+  });
+
+  it("accepts a single fenced JSON replacement object", () => {
+    const result = validateJsonReplacementBenchmarkOutput(
+      [
+        "```json",
+        JSON.stringify({
+          file: "src/list-utils.js",
+          replacement: [
+            "export function normalizeShoppingList(items) {",
+            "  return [...new Set(items",
+            "    .map((item) => item.trim().toLowerCase())",
+            "    .filter((item) => item.length > 0)",
+            "  )].sort();",
+            "}",
+            ""
+          ].join("\n")
+        }),
+        "```"
+      ].join("\n")
+    );
+
+    expect(result).toMatchObject({
+      reasons: [],
+      replacement: { file: "src/list-utils.js" },
+      valid: true
+    });
+  });
+
+  it("rejects multiple fenced JSON blocks", () => {
+    const block = [
+      "```json",
+      JSON.stringify({
+        file: "src/list-utils.js",
+        replacement: "export function normalizeShoppingList(items) { return items; }"
+      }),
+      "```"
+    ].join("\n");
+    const result = validateJsonReplacementBenchmarkOutput(`${block}\n${block}`);
+
+    expect(result.valid).toBe(false);
+    expect(result.reasons.join("\n")).toContain("multiple fenced JSON blocks");
+    expect(result.replacement).toBeNull();
+  });
+
+  it("rejects prose outside a fenced JSON replacement object", () => {
+    const result = validateJsonReplacementBenchmarkOutput(
+      [
+        "Here is the JSON:",
+        "```json",
+        JSON.stringify({
+          file: "src/list-utils.js",
+          replacement: "export function normalizeShoppingList(items) { return items; }"
+        }),
+        "```"
+      ].join("\n")
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.reasons.join("\n")).toContain("prose outside the fenced JSON block");
+    expect(result.replacement).toBeNull();
+  });
+
+  it("rejects non-json fenced replacement output", () => {
+    const result = validateJsonReplacementBenchmarkOutput(
+      [
+        "```js",
+        JSON.stringify({
+          file: "src/list-utils.js",
+          replacement: "export function normalizeShoppingList(items) { return items; }"
+        }),
+        "```"
+      ].join("\n")
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.reasons.join("\n")).toContain("labelled json");
+    expect(result.replacement).toBeNull();
+  });
+
+  it("rejects wrong JSON file, extra fields, missing export or imports", () => {
+    const result = validateJsonReplacementBenchmarkOutput(
+      JSON.stringify({
+        extra: "not allowed",
+        file: "src/list-utils.test.js",
+        replacement: [
+          'import { uniq } from "not-allowed";',
+          "export function otherName(items) {",
+          "  return uniq(items);",
+          "}"
+        ].join("\n")
+      })
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.reasons.join("\n")).toContain("exactly file and replacement fields");
+    expect(result.reasons.join("\n")).toContain("file field must be exactly src/list-utils.js");
+    expect(result.reasons.join("\n")).toContain("normalizeShoppingList");
+    expect(result.reasons.join("\n")).toContain("must not import dependencies");
+    expect(result.replacement).toBeNull();
+  });
+
+  it("rejects invalid JSON replacement output", () => {
+    const result = validateJsonReplacementBenchmarkOutput("{not-json");
+
+    expect(result.valid).toBe(false);
+    expect(result.reasons.join("\n")).toContain("valid JSON");
+    expect(result.replacement).toBeNull();
   });
 });
 

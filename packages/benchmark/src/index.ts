@@ -87,6 +87,20 @@ export interface BenchmarkReportFiles {
   readonly markdownPath: string;
 }
 
+export interface StrictPatchValidationResult {
+  readonly valid: boolean;
+  readonly reasons: readonly string[];
+}
+
+export interface JsonReplacementValidationResult {
+  readonly valid: boolean;
+  readonly reasons: readonly string[];
+  readonly replacement: {
+    readonly file: "src/list-utils.js";
+    readonly content: string;
+  } | null;
+}
+
 export interface ShareCardAllowedFields {
   readonly percentageInputReduction: number | null;
   readonly estimatedTotalSaving: number;
@@ -261,6 +275,132 @@ export const syntheticBenchmarkForbiddenFields = [
 
 export function benchmarkReadiness(): BenchmarkReadiness {
   return { comparableBaselineRequired: true };
+}
+
+export function renderStrictBenchmarkCanaryInstructions(): string {
+  return [
+    "REAL-PROVIDER BENCHMARK CANARY ONLY.",
+    "",
+    "Return a strict unified diff patch only.",
+    "",
+    "Output rules:",
+    "- No markdown fences.",
+    "- No explanation.",
+    "- No prose before or after the diff.",
+    "- File paths must be exactly src/list-utils.js.",
+    "- Use --- src/list-utils.js and +++ src/list-utils.js.",
+    "- Do not use a/ or b/ path prefixes.",
+    "- Use valid unified diff hunk headers with correct line counts.",
+    "- The patch must apply with: patch -p0 -i candidate.patch.",
+    "- The patched project must pass: node --test.",
+    "- Do not add dependencies.",
+    "- Do not change test expectations.",
+    "- Preserve exported function name."
+  ].join("\n");
+}
+
+export function renderJsonReplacementBenchmarkCanaryInstructions(): string {
+  return [
+    "REAL-PROVIDER BENCHMARK CANARY ONLY.",
+    "",
+    "Return JSON only.",
+    "",
+    "Output rules:",
+    "- No markdown fences.",
+    "- No explanation.",
+    "- No prose before or after the JSON.",
+    '- JSON schema: {"file":"src/list-utils.js","replacement":"complete replacement file content"}.',
+    "- File must be exactly src/list-utils.js.",
+    "- Replacement must be the complete src/list-utils.js file content.",
+    "- Replacement must preserve exported function name normalizeShoppingList.",
+    "- Replacement must not import dependencies.",
+    "- Do not change tests.",
+    "- Do not include extra JSON fields.",
+    "- The local harness will write replacement to a temp copy and run: node --test."
+  ].join("\n");
+}
+
+export function validateJsonReplacementBenchmarkOutput(
+  output: string,
+  expectedPath = "src/list-utils.js"
+): JsonReplacementValidationResult {
+  const reasons: string[] = [];
+  const candidate = extractJsonReplacementCandidate(output, reasons);
+  if (candidate === null) {
+    return { reasons: [...new Set(reasons)], replacement: null, valid: false };
+  }
+  const parsed = parseJsonReplacementCandidate(candidate, reasons);
+  if (parsed === null) {
+    return { reasons: [...new Set(reasons)], replacement: null, valid: false };
+  }
+  const keys = Object.keys(parsed).sort();
+  if (keys.join(",") !== "file,replacement") {
+    reasons.push("JSON object must contain exactly file and replacement fields.");
+  }
+  if (parsed.file !== expectedPath) {
+    reasons.push(`JSON file field must be exactly ${expectedPath}.`);
+  }
+  if (typeof parsed.replacement !== "string" || parsed.replacement.trim().length === 0) {
+    reasons.push("JSON replacement field must be non-empty complete file content.");
+  }
+  const replacement = typeof parsed.replacement === "string" ? parsed.replacement : "";
+  if (!/\bexport\s+function\s+normalizeShoppingList\s*\(/.test(replacement)) {
+    reasons.push("Replacement must preserve exported function normalizeShoppingList.");
+  }
+  if (/^\s*import\s/m.test(replacement)) {
+    reasons.push("Replacement must not import dependencies.");
+  }
+  if (/from\s+["'][^"']+["']/.test(replacement)) {
+    reasons.push("Replacement must not reference imported dependencies.");
+  }
+  return {
+    reasons: [...new Set(reasons)],
+    replacement: reasons.length === 0 ? { content: replacement, file: "src/list-utils.js" } : null,
+    valid: reasons.length === 0
+  };
+}
+
+export function validateStrictUnifiedDiffPatch(
+  patch: string,
+  expectedPath = "src/list-utils.js"
+): StrictPatchValidationResult {
+  const reasons: string[] = [];
+  if (patch.includes("```")) {
+    reasons.push("Patch must not contain markdown fences.");
+  }
+  const lines = patch.replaceAll("\r\n", "\n").split("\n");
+  const nonEmptyLines = lines.filter((line) => line.trim().length > 0);
+  if (nonEmptyLines.length === 0) {
+    reasons.push("Patch is empty.");
+    return { reasons, valid: false };
+  }
+  if (nonEmptyLines[0] !== `--- ${expectedPath}`) {
+    reasons.push(`Patch must start with --- ${expectedPath}.`);
+  }
+  const oldPathLines = nonEmptyLines.filter((line) => line.startsWith("--- "));
+  const newPathLines = nonEmptyLines.filter((line) => line.startsWith("+++ "));
+  if (oldPathLines.length !== 1 || oldPathLines[0] !== `--- ${expectedPath}`) {
+    reasons.push(`Patch must contain exactly one old path line for ${expectedPath}.`);
+  }
+  if (newPathLines.length !== 1 || newPathLines[0] !== `+++ ${expectedPath}`) {
+    reasons.push(`Patch must contain exactly one new path line for ${expectedPath}.`);
+  }
+  if (patch.includes("--- a/") || patch.includes("+++ b/")) {
+    reasons.push("Patch must not use a/ or b/ path prefixes.");
+  }
+  const illegalLine = nonEmptyLines.find(
+    (line, index) =>
+      index > 1 &&
+      !line.startsWith("@@") &&
+      !line.startsWith("+") &&
+      !line.startsWith("-") &&
+      !line.startsWith(" ")
+  );
+  if (illegalLine !== undefined) {
+    reasons.push(`Patch contains non-diff text: ${illegalLine.slice(0, 80)}.`);
+  }
+  reasons.push(...validateUnifiedDiffHunks(nonEmptyLines));
+  return { reasons: [...new Set(reasons)], valid: reasons.length === 0 };
 }
 
 export function createSyntheticBenchmarkReport(seed = 1): BenchmarkReport {
@@ -681,6 +821,111 @@ function runByVariant(
   variant: BenchmarkVariant
 ): BenchmarkRun | undefined {
   return report.runs.find((run) => run.variant === variant);
+}
+
+function extractJsonReplacementCandidate(output: string, reasons: string[]): string | null {
+  const trimmed = output.trim();
+  const fencedBlocks = [...trimmed.matchAll(/```(?<language>[^\n`]*)\n(?<body>[\s\S]*?)```/g)];
+  if (fencedBlocks.length === 0) {
+    if (trimmed.includes("```")) {
+      reasons.push("Fenced JSON block is malformed.");
+      return null;
+    }
+    if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
+      reasons.push("Output must be a single JSON object with no surrounding prose.");
+    }
+    return trimmed;
+  }
+  if (fencedBlocks.length > 1) {
+    reasons.push("Output must not contain multiple fenced JSON blocks.");
+    return null;
+  }
+  const block = fencedBlocks[0]!;
+  const language = (block.groups?.language ?? "").trim().toLowerCase();
+  if (language !== "json") {
+    reasons.push("Fenced JSON block must be labelled json.");
+  }
+  const blockIndex = block.index ?? 0;
+  const before = trimmed.slice(0, blockIndex).trim();
+  const after = trimmed.slice(blockIndex + block[0].length).trim();
+  if (before.length > 0 || after.length > 0) {
+    reasons.push("Output must not contain prose outside the fenced JSON block.");
+  }
+  const body = (block.groups?.body ?? "").trim();
+  if (!body.startsWith("{") || !body.endsWith("}")) {
+    reasons.push("Fenced JSON block must contain exactly one JSON object.");
+  }
+  return body;
+}
+
+function parseJsonReplacementCandidate(
+  value: string,
+  reasons: string[]
+): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      reasons.push("Output JSON must be an object.");
+      return null;
+    }
+    return parsed as Record<string, unknown>;
+  } catch {
+    reasons.push("Output must be valid JSON.");
+    return null;
+  }
+}
+
+function validateUnifiedDiffHunks(lines: readonly string[]): readonly string[] {
+  const reasons: string[] = [];
+  const hunkHeaderPattern =
+    /^@@ -(?<oldStart>\d+)(?:,(?<oldCount>\d+))? \+(?<newStart>\d+)(?:,(?<newCount>\d+))? @@/;
+  let hunkCount = 0;
+  let index = 0;
+  while (index < lines.length) {
+    const line = lines[index]!;
+    if (!line.startsWith("@@")) {
+      index += 1;
+      continue;
+    }
+    hunkCount += 1;
+    const match = line.match(hunkHeaderPattern);
+    if (match === null || match.groups === undefined) {
+      reasons.push(`Invalid unified diff hunk header: ${line}.`);
+      index += 1;
+      continue;
+    }
+    const expectedOld = Number.parseInt(match.groups.oldCount ?? "1", 10);
+    const expectedNew = Number.parseInt(match.groups.newCount ?? "1", 10);
+    let actualOld = 0;
+    let actualNew = 0;
+    index += 1;
+    while (index < lines.length && !lines[index]!.startsWith("@@")) {
+      const hunkLine = lines[index]!;
+      if (hunkLine.startsWith("--- ") || hunkLine.startsWith("+++ ")) {
+        reasons.push("Patch must not contain file path lines inside a hunk.");
+        index += 1;
+        continue;
+      }
+      if (hunkLine.startsWith(" ")) {
+        actualOld += 1;
+        actualNew += 1;
+      } else if (hunkLine.startsWith("-")) {
+        actualOld += 1;
+      } else if (hunkLine.startsWith("+")) {
+        actualNew += 1;
+      }
+      index += 1;
+    }
+    if (actualOld !== expectedOld || actualNew !== expectedNew) {
+      reasons.push(
+        `Hunk line counts do not match header ${line}: expected old/new ${expectedOld}/${expectedNew}, got ${actualOld}/${actualNew}.`
+      );
+    }
+  }
+  if (hunkCount === 0) {
+    reasons.push("Patch must contain at least one unified diff hunk.");
+  }
+  return reasons;
 }
 
 function renderBadge(input: {
