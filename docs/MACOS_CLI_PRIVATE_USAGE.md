@@ -1,11 +1,11 @@
 # macOS CLI Private Usage
 
-Status: private macOS CLI-only usage guide
+Status: macOS CLI usage guide
 
 Release evidence commit: `2df94b1`
 
-This guide is for local/private use only. It does not publish a package, create a GitHub release or
-claim broad production readiness.
+This guide is for macOS CLI users. It does not publish a package, create a GitHub release or claim
+broad hosted/enterprise production deployment.
 
 ## Who This Is For
 
@@ -24,9 +24,9 @@ claim broad production readiness.
 - Safe mode default.
 - Fake-provider development mode.
 - MCP exact retrieval in local tested flows.
-- Setup preview, confirmed setup, rollback and uninstall on macOS CLI.
+- Dry-run setup, confirmed setup, rollback and uninstall on macOS CLI.
 
-## Not Supported
+## Not Included In This Release
 
 - Codex IDE.
 - Claude Code IDE.
@@ -34,7 +34,7 @@ claim broad production readiness.
 - WSL.
 - Public hosted deployment.
 - Published npm/package release.
-- Broad production savings claims.
+- Broad hosted/enterprise production deployment.
 - Real model-profile approval beyond limited canary evidence.
 - Third-party security-reviewed release.
 
@@ -78,16 +78,15 @@ curl -sS http://127.0.0.1:4317/status
 
 Stop the gateway by pressing `Ctrl+C` in the Terminal tab where it is running.
 
-## Fake-Provider Mode
+## Fake-Provider Validation
 
-Fake-provider mode does not use real provider traffic.
+Fake-provider validation does not use real provider traffic.
 
 Run:
 
 ```bash
 pnpm smoke:openai
 pnpm smoke:anthropic
-pnpm beta:fake
 ```
 
 Expected result: all commands pass.
@@ -107,9 +106,9 @@ export ANTHROPIC_API_KEY="your_real_anthropic_key_here"
 
 Use only synthetic prompts for canaries. Do not use private source code or private prompts.
 
-## Setup Preview
+## Dry-Run Setup
 
-Preview only. This writes nothing:
+Dry-run setup writes nothing:
 
 ```bash
 CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js setup both --mcp
@@ -119,7 +118,7 @@ Review the listed files before confirming.
 
 ## Confirmed Setup
 
-Use only after reviewing the preview:
+Use only after reviewing the dry-run output:
 
 ```bash
 CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js setup both --mcp --confirm --replace-existing-manifest
@@ -171,8 +170,8 @@ If the gateway is not reachable:
 curl -sS http://127.0.0.1:4317/health
 ```
 
-If setup refuses to overwrite a manifest, run rollback or uninstall first, or preview carefully
-before using `--replace-existing-manifest`.
+If setup refuses to overwrite a manifest, run rollback or uninstall first, or review the dry-run
+output carefully before using `--replace-existing-manifest`.
 
 If provider requests fail, first confirm:
 
@@ -191,4 +190,5 @@ Primary release evidence:
 - `docs/INSTALL_UNINSTALL_EVIDENCE.md`
 - `docs/REAL_PROVIDER_CANARY_PLAN.md`
 
-Current private-use scope is GO only for macOS CLI. Broad production remains NO-GO.
+Current release scope is macOS CLI. Broad hosted/enterprise production deployment is not included in
+this release.

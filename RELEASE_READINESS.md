@@ -2,16 +2,17 @@
 
 Review date: 2026-08-02
 
-Decision: **GO for macOS CLI-only; NO-GO for broad production go-live**
+Decision: **GO for macOS CLI-only; NO-GO for broad hosted/enterprise production deployment**
 
-This is a **macOS CLI-only release candidate**. The current repository passes local fake-provider
-checks, local skill validation, limited real-provider route canaries, a generated toy-project
-real-provider benchmark canary, real macOS user-level install/rollback/uninstall canary and Linux CI
-for the pushed release-readiness commit.
+This is **Context Diet for macOS CLI**. Context Diet is available for macOS CLI users of Codex CLI
+and Claude Code CLI. The current repository passes local fake-provider checks, local skill
+validation, limited real-provider route canaries, a generated toy-project real-provider benchmark
+canary, real macOS user-level install/rollback/uninstall canary and Linux CI for the pushed
+release-readiness commit.
 
-Broad production go-live remains **NO-GO** because Windows native and WSL are unsupported, IDE
-surfaces are not release-tested, broad workload evidence is still synthetic and no third-party
-security review has been completed.
+Broad hosted/enterprise production deployment is not included in this release because Windows native
+and WSL support are not included, IDE surfaces are not included, broad workload evidence is still
+synthetic and no third-party security review has been completed.
 
 ## Version
 
@@ -31,18 +32,18 @@ security review has been completed.
 
 ## Supported OS
 
-- macOS: local fake-provider beta tested on Darwin 24.6.0 arm64 with Node.js 26 and pnpm 11.
+- macOS: local fake-provider validation tested on Darwin 24.6.0 arm64 with Node.js 26 and pnpm 11.
 - Linux: GitHub Actions is configured for Ubuntu with Node.js 24 and 26. The user reported a green
   Linux CI run for commit `1e74a4500429801bc040e45ce02a2d170466f547`.
-- Windows native: unsupported for this release.
-- WSL: unsupported for this release.
+- Windows native: not included in this release.
+- WSL: not included in this release.
 
 See `docs/OS_SUPPORT.md` for path, permission, temp directory, symlink and loopback notes.
 
 ## Supported Codex Surfaces
 
 - Codex CLI: fake-provider tested through the OpenAI Responses-compatible route `/v1/responses`.
-- Codex IDE: not release-tested and not supported for this release.
+- Codex IDE: not release-tested and not included in this release.
 - Real Codex provider canary: PASS with explicit user consent on 2026-08-02.
 - Real Codex user-level configuration migration: PASS for the macOS CLI canary on 2026-08-02.
 
@@ -50,7 +51,7 @@ See `docs/OS_SUPPORT.md` for path, permission, temp directory, symlink and loopb
 
 - Claude Code CLI: fake-provider tested through the Anthropic Messages-compatible route
   `/v1/messages`.
-- Claude Code IDE: not release-tested and not supported for this release.
+- Claude Code IDE: not release-tested and not included in this release.
 - Real Claude Code provider canary: PASS with explicit user consent on 2026-08-02.
 - Real Claude Code user-level settings migration: PASS for the macOS CLI canary on 2026-08-02.
 
@@ -89,17 +90,18 @@ Release limitation:
 | `CONTEXT_DIET_TEST_CANARIES='[]' pnpm scan:test-canaries -- .` | PASS                                                                               |
 | `pnpm smoke:openai`                                            | PASS with local loopback permission.                                               |
 | `pnpm smoke:anthropic`                                         | PASS with local loopback permission.                                               |
-| `pnpm beta:fake`                                               | PASS with local loopback permission.                                               |
+| Internal fake-provider validation command                      | PASS with local loopback permission.                                               |
 
 Sandbox note: the first sandboxed runs of `pnpm test`, `pnpm smoke:openai`, `pnpm smoke:anthropic`
-and `pnpm beta:fake` failed with `listen EPERM: operation not permitted 127.0.0.1`. Rerunning with
-local loopback permission passed. No real-provider traffic was sent.
+and the internal fake-provider validation command failed with
+`listen EPERM: operation not permitted 127.0.0.1`. Rerunning with local loopback permission passed.
+No real-provider traffic was sent.
 
 ## Test Totals
 
 - Full Vitest suite: 17 files, 294 tests passed.
 - Compatibility suite: 1 file, 3 tests passed.
-- Fake beta: 13 beta steps passed for gateway, fake Codex client, fake Claude Code client,
+- Fake-provider validation: 13 steps passed for gateway, fake Codex client, fake Claude Code client,
   transform, MCP retrieval, benchmark, dashboard smoke, kill switch, direct fake routing,
   delete-session and temporary uninstall.
 - OpenAI fake smoke: PASS.
@@ -125,7 +127,8 @@ Pass or mostly pass locally:
 
 - Repository foundation: Node/pnpm engines, strict TypeScript, scripts, concise agent files and
   local checks are present.
-- Dual fake-provider transport: Codex-shaped and Claude-shaped routes pass fake smoke and beta.
+- Dual fake-provider transport: Codex-shaped and Claude-shaped routes pass fake smoke and
+  fake-provider validation.
 - Normalised model: provider-neutral fixtures, ordering, metadata and pass-through tests exist.
 - Exactness Firewall: Safe-mode protection and reason-code tests exist.
 - Vault and retrieval: project/session isolation, expiry, deletion, integrity and MCP tests exist.
@@ -135,11 +138,11 @@ Pass or mostly pass locally:
 - Proxy: loopback default, allowlist, request limits, timeouts, kill switch, raw-body and credential
   tests exist.
 - Metrics, dashboard, benchmark and skills have synthetic/local tests.
-- Windows/WSL are clearly marked unsupported.
+- Windows native and WSL are clearly marked as not included in this release.
 
 No-go outside macOS CLI-only scope:
 
-- Real-provider canaries are limited canary evidence only, not broad production benchmark evidence.
+- Real-provider canaries are limited canary evidence only, not broad real-world benchmark evidence.
 - Codex IDE and Claude Code IDE are not release-tested.
 - Windows native and WSL are not release-tested.
 
@@ -167,7 +170,7 @@ Current review notes:
 ## Known Limitations
 
 - Current evidence is fake-provider, synthetic-data and limited real-provider canary evidence only.
-- This is a macOS CLI-only release candidate, not a broad production release.
+- This is Context Diet for macOS CLI, not a broad hosted/enterprise production deployment.
 - Real-provider canaries passed for route checks and one generated toy-project benchmark canary, but
   they do not prove production savings or broad model compatibility.
 - The real-provider benchmark canary used generated public-safe toy code only. It is not a private
@@ -181,7 +184,7 @@ Current review notes:
 - Benchmarks are synthetic and must not be marketed as real savings.
 - Highly cached or code-heavy workloads may produce neutral or negative value.
 - Codex IDE and Claude Code IDE are not release-tested.
-- Windows native and WSL are unsupported for this release.
+- Windows native and WSL are not included in this release.
 
 ## Privacy Statement
 
@@ -190,7 +193,7 @@ commands, exact values, paths, IDs, hashes, numbers and secret-sensitive values 
 
 Current local fake-provider evidence shows:
 
-- Fake provider credentials are not logged in smoke or beta flows.
+- Fake provider credentials are not logged in smoke or fake-provider validation flows.
 - Raw 4xx request-body persistence tests pass for both provider-shaped routes.
 - The vault rejects secret-sensitive spans.
 - Dashboard MVP exposes no raw-context API.
@@ -210,7 +213,8 @@ Install:
   by default.
 - Writes require explicit `--confirm`.
 - Tests use temporary configuration roots.
-- Real macOS CLI canary used `setup both --mcp --confirm --replace-existing-manifest` after preview.
+- Real macOS CLI canary used `setup both --mcp --confirm --replace-existing-manifest` after dry-run
+  review.
 - Provider credentials are never written.
 
 Uninstall:
@@ -276,7 +280,7 @@ Real-provider benchmark canary evidence:
 - JSON-output safety result: gateway stayed Safe mode, `rawBodiesPersisted=false` and
   `authValuesRetained=false`.
 - Conclusion: this is useful real-provider benchmark canary evidence for one generated toy project,
-  but it must not be used to claim production savings or broad production quality.
+  but it must not be used to claim real-world savings or broad hosted/enterprise quality.
 
 Real-provider route canary evidence:
 
@@ -308,7 +312,7 @@ This is not real-provider cost evidence and must remain labelled synthetic.
 
 ## Go Or No-Go Decision
 
-**GO for macOS CLI-only release candidate.**
+**GO for macOS CLI-only.**
 
 Approved narrow scope:
 
@@ -322,16 +326,17 @@ Approved narrow scope:
 - Real macOS user-level install, rollback and uninstall canary.
 - Linux CI green for commit `1e74a4500429801bc040e45ce02a2d170466f547`.
 
-**NO-GO for broad production go-live.**
+**NO-GO for broad hosted/enterprise production deployment.**
 
-Broad production remains NO-GO until the unsupported platforms, IDE surfaces, broad workload
-evidence and remaining security hardening work are addressed.
+Broad hosted/enterprise production deployment is not included in this release while the excluded
+platforms, IDE surfaces, broad workload evidence and remaining security hardening work are
+addressed.
 
 Reasons:
 
-1. Real-provider route and generated toy-project benchmark canary evidence is not broad production
+1. Real-provider route and generated toy-project benchmark canary evidence is not broad real-world
    benchmark evidence.
-2. Windows native, WSL, Codex IDE and Claude Code IDE are unsupported for this release.
+2. Windows native, WSL, Codex IDE and Claude Code IDE are not included in this release.
 3. Real user-level install/uninstall/rollback is canaried only for macOS CLI.
 4. Broad benchmark evidence remains synthetic only.
 5. No third-party security review has been completed.
@@ -339,6 +344,6 @@ Reasons:
 Recommended next release blockers:
 
 1. Commit and push this updated release-readiness decision.
-2. Confirm GitHub Actions remains green for the final release-candidate commit.
+2. Confirm GitHub Actions remains green for the final macOS CLI release commit.
 3. Decide whether this release is scoped to macOS CLI only, or add tested support for Linux, WSL,
    Windows native and IDE surfaces before claiming them.

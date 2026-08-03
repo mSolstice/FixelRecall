@@ -67,7 +67,9 @@ visibility, safety and cost awareness.
 
 ## Current Release Status
 
-**GO: macOS CLI-only release candidate**
+**Context Diet for macOS CLI**
+
+Context Diet is available for macOS CLI users of Codex CLI and Claude Code CLI.
 
 Supported now:
 
@@ -78,16 +80,15 @@ Supported now:
 - Safe mode default
 - fake-provider development mode
 - local MCP retrieval in tested flows
-- setup preview, confirmed setup, rollback and uninstall on macOS CLI
+- dry-run setup, confirmed setup, rollback and uninstall on macOS CLI
 
-Not claimed:
+Not included in this release:
 
-- Codex IDE support
-- Claude Code IDE support
-- Windows native support
-- WSL support
-- broad production readiness
-- hosted or multi-user deployment
+- Codex IDE
+- Claude Code IDE
+- Windows native
+- WSL
+- broad hosted or enterprise production deployment
 - proven real-world savings across private repositories
 - third-party security review
 
@@ -140,20 +141,20 @@ Expected health shape:
 { "status": "ok", "gateway": "context-diet-local", "mode": "safe" }
 ```
 
-### 4. Preview Setup
+### 4. Dry-Run Setup
 
-Preview writes nothing:
+Dry-run setup writes nothing:
 
 ```bash
 CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js setup both --mcp
 ```
 
-The preview shows the Codex, Claude Code and MCP files that would be touched. Provider credentials
+The dry run shows the Codex, Claude Code and MCP files that would be touched. Provider credentials
 are not written.
 
 ### 5. Confirm Setup
 
-Only after reviewing the preview:
+Only after reviewing the dry-run output:
 
 ```bash
 CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js setup both --mcp --confirm --replace-existing-manifest
@@ -217,15 +218,15 @@ This block stayed native because it contained source code and exact file paths.
 Safe mode keeps that content unchanged.
 ```
 
-## Fake-Provider Mode
+## Fake-Provider Validation
 
 Fake-provider checks use synthetic prompts, fake credentials, loopback servers and temporary local
-state. They do not require provider API keys.
+state. They do not require provider API keys. Run the repository fake-provider validation commands
+listed in [RELEASE_READINESS.md](RELEASE_READINESS.md).
 
 ```bash
 pnpm smoke:openai
 pnpm smoke:anthropic
-pnpm beta:fake
 ```
 
 ## Real-Provider Canaries
@@ -268,7 +269,7 @@ Safe mode keeps these as native text:
 - numbers, versions, dates and ports
 - secrets and authentication material
 - open or incomplete tool calls
-- unknown or unsupported content
+- unknown or incompatible content
 
 Context Diet must not log authentication headers or raw request bodies. Secret-sensitive values are
 not render-eligible and must not be stored in the vault.
@@ -278,14 +279,14 @@ provider content is preserved.
 
 ## Evidence
 
-Current macOS CLI release candidate evidence includes:
+Current macOS CLI evidence includes:
 
 - local checks passing
-- fake-provider beta passing
+- fake-provider validation passing
 - OpenAI/Codex and Anthropic/Claude Code route canaries passing with explicit user consent
 - generated toy-project real-provider benchmark canary passing
 - real macOS user-level setup, rollback and uninstall canary passing
-- GitHub Actions green according to user report for the release candidate commits
+- GitHub Actions green according to user report for the release commits
 
 See:
 
@@ -319,7 +320,7 @@ Do not manually maintain three different skill versions.
 
 Do not claim:
 
-- broad production readiness
+- broad hosted/enterprise deployment
 - Codex IDE support
 - Claude Code IDE support
 - Windows native support
@@ -333,6 +334,6 @@ Do not claim:
 The honest current claim is:
 
 ```text
-Context Diet is GO as a macOS CLI-only release candidate for Codex CLI and Claude Code CLI.
-Broad production remains NO-GO.
+Context Diet is available for macOS CLI users of Codex CLI and Claude Code CLI.
+IDE, Windows native, WSL, and broad hosted/enterprise production deployment are not included in this release.
 ```

@@ -2,11 +2,11 @@
 
 Review date: 2026-08-02
 
-Release candidate commit: `2df94b1`
+Release commit: `2df94b1`
 
-Status: **GO for macOS CLI-only release candidate**
+Status: **Context Diet for macOS CLI**
 
-Broad production status: **NO-GO**
+Broad hosted/enterprise production deployment: **not included in this release**
 
 ## Supported Scope
 
@@ -16,17 +16,17 @@ Broad production status: **NO-GO**
 - Safe mode default.
 - Local gateway on loopback.
 - Local fake-provider development and validation.
-- Local dashboard/static dashboard checks included in fake beta.
-- Local MCP exact retrieval path included in fake beta.
+- Local dashboard/static dashboard checks included in fake-provider validation.
+- Local MCP exact retrieval path included in fake-provider validation.
 - Skill validation for generated Codex and Claude Code skill copies.
 
-## Unsupported Scope
+## Not Included In This Release
 
 - Codex IDE.
 - Claude Code IDE.
 - Windows native.
 - WSL.
-- Broad production deployment.
+- Broad hosted or enterprise production deployment.
 - Public hosted service.
 - Production database.
 - Real savings claims across private or broad workloads.
@@ -48,8 +48,7 @@ Broad production status: **NO-GO**
   - `CONTEXT_DIET_TEST_CANARIES='[]' pnpm scan:test-canaries -- .`
   - `pnpm smoke:openai`
   - `pnpm smoke:anthropic`
-  - `pnpm beta:fake`
-- Fake-provider beta: passed.
+- Fake-provider validation: passed.
 - Real route canaries: passed for OpenAI/Codex and Anthropic/Claude Code with explicit user consent.
 - Generated toy-project real-provider benchmark canary: passed.
 - Real user-level install, rollback and uninstall canary: passed on macOS CLI.
@@ -66,15 +65,15 @@ Broad production status: **NO-GO**
 - Unknown or unsafe transformation shapes pass through unchanged.
 - Benchmark evidence must remain clearly labelled when synthetic or canary-only.
 
-## Install Preview
+## Dry-Run Setup
 
-The installer is dry-run by default. Preview first:
+The installer is dry-run by default. Run this first:
 
 ```bash
 CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js setup both --mcp
 ```
 
-Confirmed macOS CLI canary command used after preview:
+Confirmed macOS CLI canary command used after dry-run review:
 
 ```bash
 CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js setup both --mcp --confirm --replace-existing-manifest
@@ -101,7 +100,7 @@ manifest.
 
 ## What Not To Claim Publicly
 
-- Do not claim broad production readiness.
+- Do not claim broad hosted or enterprise production deployment.
 - Do not claim Codex IDE support.
 - Do not claim Claude Code IDE support.
 - Do not claim Windows native support.
