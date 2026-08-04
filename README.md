@@ -209,6 +209,124 @@ Gateway = automatic once configured.
 Skill = invoked for Context Diet-specific questions or commands.
 ```
 
+## User Journey: What Happens In Real Use
+
+### Right After Install
+
+The first win is confidence. The developer starts the local gateway and confirms Context Diet is
+running locally in Safe mode:
+
+```bash
+node packages/cli/dist/index.js start
+```
+
+They see:
+
+```text
+Context Diet gateway listening
+
+Gateway URL: http://127.0.0.1:4317
+Safety mode: Safe
+Credentials are kept in memory only and are not printed.
+```
+
+Then they check status:
+
+```bash
+node packages/cli/dist/index.js status
+```
+
+They see:
+
+```text
+Context Diet status
+
+Gateway: running
+Safety mode: Safe
+Hosts: both
+Credentials: not displayed
+```
+
+### Daily Coding Flow
+
+The developer keeps using their normal CLI:
+
+```bash
+codex
+```
+
+or:
+
+```bash
+claude
+```
+
+They do not need to add “use Context Diet” to every prompt. Once the gateway is configured, routing
+happens in the background.
+
+### Check Whether It Is Worth Using
+
+When the developer wants the savings story, they run:
+
+```bash
+node packages/cli/dist/index.js benchmark
+```
+
+or:
+
+```bash
+node packages/cli/dist/index.js benchmark --json
+```
+
+They see a local report with measured or synthetic labels, token counts, image cost, added latency,
+net saving and a verdict. The verdict can be positive, neutral or negative.
+
+### Understand Why Something Was Protected
+
+When the developer wants to know why Context Diet kept something as text, they run:
+
+```bash
+node packages/cli/dist/index.js explain
+```
+
+They see plain-language reasons such as:
+
+```text
+This block stayed native because it contained source code and exact file paths.
+Safe mode keeps that content unchanged.
+```
+
+### Recover Exact Context
+
+If Context Diet stored authorised original text in the local vault, exact retrieval can fetch a
+narrow section later:
+
+```bash
+node packages/cli/dist/index.js retrieve --block-id BLOCK_ID
+```
+
+They see a narrow recovery result, not a broad filesystem read, and credentials are not displayed.
+
+### Stop, Roll Back Or Remove
+
+Stop the gateway:
+
+```bash
+node packages/cli/dist/index.js stop
+```
+
+Restore backed-up config:
+
+```bash
+CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js rollback --confirm
+```
+
+Uninstall managed entries:
+
+```bash
+CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js uninstall --confirm
+```
+
 ## What Developers See
 
 Gateway health:
