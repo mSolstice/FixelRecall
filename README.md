@@ -6,6 +6,10 @@ Context Diet is a local safety and efficiency layer for coding agents. It helps 
 Code CLI carry less wasteful context while protecting the exact details that should never be
 compressed, rendered or guessed.
 
+<p align="center">
+  <img src="docs/assets/context-diet-overview.png" alt="Context Diet overview showing a local loopback gateway that keeps exact code and secrets protected, shrinks safe old context, uses a local vault, and reports savings honestly." width="900">
+</p>
+
 Think of it as a local nutrition label for your agent context:
 
 - What is useful?
@@ -64,6 +68,19 @@ around them:
 
 Context Diet does not replace OpenAI or Anthropic. It helps developers use coding agents with more
 visibility, safety and cost awareness.
+
+## Works With Your Existing CLI Login
+
+Context Diet does not ask you to paste provider keys into the app, the repository or chat.
+
+- Codex CLI uses custom-provider routing with `requires_openai_auth = true`, so Codex can reuse the
+  Codex auth state you already signed in with.
+- Claude Code CLI routes through `ANTHROPIC_BASE_URL`. If `ANTHROPIC_API_KEY` is unset, Claude Code
+  can keep using its normal signed-in subscription auth.
+- API keys are optional for users who intentionally want API-key billing.
+
+Context Diet forwards required authentication headers in memory only. It must not print, log, store
+or persist provider credentials.
 
 ## Current Release Status
 
