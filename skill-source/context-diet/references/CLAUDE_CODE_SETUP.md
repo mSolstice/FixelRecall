@@ -76,7 +76,7 @@ Non-destructive example:
     "SessionStart": [
       {
         "command": "context-diet status --no-credentials",
-        "description": "Preview-only local Context Diet status check"
+        "description": "Local Context Diet status check"
       }
     ]
   }

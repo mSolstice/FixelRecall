@@ -658,6 +658,7 @@ function forwardHeaders(request: IncomingMessage, provider: ProviderFamily): Hea
     copyHeader(request, headers, "authorization");
     copyHeader(request, headers, "openai-beta");
   } else {
+    copyHeader(request, headers, "authorization");
     copyHeader(request, headers, "x-api-key");
     copyHeader(request, headers, "anthropic-version");
     copyHeader(request, headers, "anthropic-beta");
@@ -673,9 +674,13 @@ function copyHeader(request: IncomingMessage, headers: Headers, name: string): v
 }
 
 function hasProviderAuth(request: IncomingMessage, provider: ProviderFamily): boolean {
-  const header =
+  const primary =
     provider === "openai" ? request.headers["authorization"] : request.headers["x-api-key"];
-  return typeof header === "string" && header.trim().length > 0;
+  const secondary = provider === "anthropic" ? request.headers["authorization"] : undefined;
+  return (
+    (typeof primary === "string" && primary.trim().length > 0) ||
+    (typeof secondary === "string" && secondary.trim().length > 0)
+  );
 }
 
 function hasJsonContentType(request: IncomingMessage): boolean {

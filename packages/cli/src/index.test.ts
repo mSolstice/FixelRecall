@@ -338,13 +338,17 @@ describe("context-diet CLI commands", () => {
     const root = await mkdtemp(join(tmpdir(), "context-diet-cli-install-"));
     try {
       const codexPath = join(root, ".codex", "config.toml");
+      const existingCodexConfig =
+        ['model = "existing-model"', "", "[mcp_servers.node_repl.env]", 'PATH = "/usr/bin"'].join(
+          "\n"
+        ) + "\n";
       await mkdir(dirname(codexPath), { recursive: true });
-      await writeFile(codexPath, 'model = "existing-model"\n', { mode: 0o600 });
+      await writeFile(codexPath, existingCodexConfig, { mode: 0o600 });
 
       const dryRun = await runCliCommand(["setup", "codex", "--mcp"], { configRoot: root });
       expect(dryRun.stdout).toContain("Dry run");
       expect(existsSync(join(root, ".context-diet", "install-manifest.json"))).toBe(false);
-      expect(await readFile(codexPath, "utf8")).toBe('model = "existing-model"\n');
+      expect(await readFile(codexPath, "utf8")).toBe(existingCodexConfig);
 
       const applied = await runCliCommand(["setup", "codex", "--mcp", "--confirm"], {
         configRoot: root
@@ -356,7 +360,10 @@ describe("context-diet CLI commands", () => {
       expect(applied.stdout).toContain("Confirmed");
       expect(codexConfig).toContain('model = "existing-model"');
       expect(codexConfig).toContain("BEGIN context-diet managed");
-      expect(codexConfig).toContain('env_key = "OPENAI_API_KEY"');
+      expect(codexConfig).toContain("requires_openai_auth = true");
+      expect(codexConfig.indexOf('model_provider = "context_diet_local"')).toBeLessThan(
+        codexConfig.indexOf("[mcp_servers.node_repl.env]")
+      );
       expect(mcpConfig).toContain("context-diet-retrieval");
       expect(manifest).toContain('"credentialPolicy": "environment-variable-references-only"');
       expect(`${applied.stdout}\n${codexConfig}\n${mcpConfig}\n${manifest}`).not.toContain(
@@ -386,22 +393,34 @@ describe("context-diet CLI commands", () => {
       });
 
       const settings = JSON.parse(await readFile(settingsPath, "utf8")) as {
+        readonly env?: { readonly ANTHROPIC_BASE_URL?: string };
         readonly existingSetting?: boolean;
         readonly theme?: string;
         readonly contextDietManaged?: {
-          readonly contextDiet?: { readonly anthropicBaseUrl?: string };
-          readonly hooks?: { readonly SessionStart?: readonly unknown[] };
+          readonly anthropicBaseUrl?: string;
         };
+        readonly hooks?: { readonly SessionStart?: readonly unknown[] };
+      };
+      const claudeMcp = JSON.parse(await readFile(join(root, ".claude.json"), "utf8")) as {
+        readonly mcpServers?: Record<
+          string,
+          { readonly command?: string; readonly args?: string[] }
+        >;
       };
 
       expect(settings.existingSetting).toBe(true);
       expect(settings.theme).toBe("dark");
-      expect(settings.contextDietManaged?.contextDiet?.anthropicBaseUrl).toBe(
-        "http://127.0.0.1:4317"
+      expect(settings.env?.ANTHROPIC_BASE_URL).toBe("http://127.0.0.1:4317");
+      expect(settings.contextDietManaged?.anthropicBaseUrl).toBe("http://127.0.0.1:4317");
+      expect(settings.hooks?.SessionStart).toHaveLength(1);
+      expect(claudeMcp.mcpServers?.["context-diet-retrieval"]?.command).toBe("node");
+      expect(claudeMcp.mcpServers?.["context-diet-retrieval"]?.args).toEqual(
+        expect.arrayContaining(["mcp", "retrieval"])
       );
-      expect(settings.contextDietManaged?.hooks?.SessionStart).toHaveLength(1);
       expect(JSON.stringify(settings)).not.toContain("ANTHROPIC_API_KEY=");
       expect(JSON.stringify(settings)).not.toContain("sk-");
+      expect(JSON.stringify(claudeMcp)).not.toContain("ANTHROPIC_API_KEY=");
+      expect(JSON.stringify(claudeMcp)).not.toContain("sk-");
     } finally {
       await rm(root, { force: true, recursive: true });
     }
@@ -429,6 +448,7 @@ describe("context-diet CLI commands", () => {
       const codexConfig = await readFile(codexPath, "utf8");
       const claudeSettings = await readFile(claudePath, "utf8");
       const mcpConfig = await readFile(join(root, ".context-diet", "mcp.json"), "utf8");
+      const claudeMcpConfig = await readFile(join(root, ".claude.json"), "utf8");
       const manifest = JSON.parse(
         await readFile(join(root, ".context-diet", "install-manifest.json"), "utf8")
       ) as {
@@ -438,18 +458,25 @@ describe("context-diet CLI commands", () => {
 
       expect(applied.stdout).toContain("Confirmed");
       expect(codexConfig).toContain("BEGIN context-diet managed");
+      expect(codexConfig).toContain("[mcp_servers.context-diet-retrieval]");
       expect(claudeSettings).toContain("contextDietManaged");
       expect(mcpConfig).toContain("context-diet-retrieval");
+      expect(claudeMcpConfig).toContain("context-diet-retrieval");
       expect(manifest.hosts).toEqual(["codex", "claude-code"]);
       expect(manifest.backups.map((backup) => backup.target).sort()).toEqual(
-        [codexPath, claudePath, join(root, ".context-diet", "mcp.json")].sort()
+        [
+          codexPath,
+          claudePath,
+          join(root, ".context-diet", "mcp.json"),
+          join(root, ".claude.json")
+        ].sort()
       );
-      expect(`${applied.stdout}\n${codexConfig}\n${claudeSettings}\n${mcpConfig}`).not.toContain(
-        "sk-"
-      );
-      expect(`${applied.stdout}\n${codexConfig}\n${claudeSettings}\n${mcpConfig}`).not.toContain(
-        "Bearer "
-      );
+      expect(
+        `${applied.stdout}\n${codexConfig}\n${claudeSettings}\n${mcpConfig}\n${claudeMcpConfig}`
+      ).not.toContain("sk-");
+      expect(
+        `${applied.stdout}\n${codexConfig}\n${claudeSettings}\n${mcpConfig}\n${claudeMcpConfig}`
+      ).not.toContain("Bearer ");
     } finally {
       await rm(root, { force: true, recursive: true });
     }
@@ -551,6 +578,7 @@ describe("context-diet CLI commands", () => {
         originalClaude
       );
       expect(existsSync(join(uninstallRoot, ".context-diet", "mcp.json"))).toBe(false);
+      expect(existsSync(join(uninstallRoot, ".claude.json"))).toBe(false);
     } finally {
       await rm(rollbackRoot, { force: true, recursive: true });
       await rm(uninstallRoot, { force: true, recursive: true });

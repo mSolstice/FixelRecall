@@ -243,7 +243,7 @@ Configuration locations:
 
 # Preview only: Codex custom provider
 
-No credentials are included. Keep OPENAI_API_KEY or provider keys in your normal secret store.
+No credentials are included. Codex reuses your existing Codex auth state for this provider.
 
 \`\`\`toml
 model_provider = "context_diet_local"
@@ -251,8 +251,10 @@ model_provider = "context_diet_local"
 [model_providers.context_diet_local]
 name = "Context Diet local gateway"
 base_url = "http://127.0.0.1:4317"
-env_key = "OPENAI_API_KEY"
+requires_openai_auth = true
 \`\`\`
+
+API-key users can still sign in to Codex with an API key; subscription users should stay signed in normally.
 
 Skill discovery: Codex should discover .agents/skills/context-diet and may invoke it for context audits, benchmarks, retrieval and setup troubleshooting.
 MCP retrieval preview:

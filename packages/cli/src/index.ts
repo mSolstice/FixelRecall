@@ -20,6 +20,7 @@ import {
   type ContextRendererInput,
   type ContextRendererResult
 } from "@context-diet/renderer";
+import { createLocalGateway } from "@context-diet/proxy";
 import {
   installLocalConfig,
   type LocalConfigHost,
@@ -225,6 +226,9 @@ export function describeCli(): string {
 }
 
 export async function runCli(argv: readonly string[] = process.argv.slice(2)): Promise<number> {
+  if (argv[0] === "start" && !argv.includes("--dry-run")) {
+    return runGatewayProcess(argv);
+  }
   const result = await runCliCommand(argv);
   if (result.stdout.length > 0) {
     process.stdout.write(result.stdout);
@@ -248,9 +252,9 @@ export async function runCliCommand(
     };
   }
   const command = argv[0] ?? "help";
-  const env = cliEnvironment(options.env);
   const format = options.format ?? formatFromArgs(argv);
   if (command === "doctor") {
+    const env = await cliEnvironment(options.env, true);
     return textResult(0, renderDoctorSummary(env));
   }
   if (command === "audit" || command === "compatibility-audit") {
@@ -263,21 +267,27 @@ export async function runCliCommand(
     );
   }
   if (command === "start") {
+    const env = await cliEnvironment(options.env, true);
     return textResult(0, renderStart(env));
   }
   if (command === "setup") {
+    const env = await cliEnvironment(options.env, false);
     return textResult(0, await renderSetup(env, argv, destructiveOptions(argv, options), options));
   }
   if (command === "stop") {
+    const env = await cliEnvironment(options.env, true);
     return textResult(0, renderStop(env, destructiveOptions(argv, options)));
   }
   if (command === "status") {
+    const env = await cliEnvironment(options.env, true);
     return textResult(0, renderStatus(env));
   }
   if (command === "explain") {
+    const env = await cliEnvironment(options.env, false);
     return textResult(0, renderExplain(env));
   }
   if (command === "preset") {
+    const env = await cliEnvironment(options.env, false);
     return textResult(0, renderPresetSelector(env, argv));
   }
   if (command === "benchmark") {
@@ -288,12 +298,15 @@ export async function runCliCommand(
     );
   }
   if (command === "retrieve") {
+    const env = await cliEnvironment(options.env, false);
     return textResult(0, renderRetrieve(env, argv));
   }
   if (command === "delete-session") {
+    const env = await cliEnvironment(options.env, false);
     return textResult(0, renderDeleteSession(env, destructiveOptions(argv, options)));
   }
   if (command === "uninstall") {
+    const env = await cliEnvironment(options.env, false);
     return textResult(0, await renderUninstall(env, destructiveOptions(argv, options), options));
   }
   if (command === "rollback") {
@@ -406,7 +419,7 @@ export function createCodexSetupPreview(env: CliEnvironment): HostSetupPreview {
     preview: [
       "# Preview only: Codex custom provider",
       "",
-      "No credentials are included. Keep OPENAI_API_KEY or provider keys in your normal secret store.",
+      "No credentials are included. Codex reuses your existing Codex auth state for this provider.",
       "",
       "```toml",
       'model_provider = "context_diet_local"',
@@ -414,8 +427,10 @@ export function createCodexSetupPreview(env: CliEnvironment): HostSetupPreview {
       "[model_providers.context_diet_local]",
       'name = "Context Diet local gateway"',
       `base_url = "${gatewayBaseUrl}"`,
-      'env_key = "OPENAI_API_KEY"',
+      "requires_openai_auth = true",
       "```",
+      "",
+      "API-key users can still sign in to Codex with an API key; subscription users should stay signed in normally.",
       "",
       "Skill discovery: Codex should discover .agents/skills/context-diet and may invoke it for context audits, benchmarks, retrieval and setup troubleshooting.",
       "MCP retrieval preview:",
@@ -482,7 +497,7 @@ export function createClaudeCodeSetupPreview(env: CliEnvironment): HostSetupPrev
             SessionStart: [
               {
                 command: "context-diet status --no-credentials",
-                description: "Preview-only local Context Diet status check"
+                description: "Local Context Diet status check"
               }
             ]
           }
@@ -670,11 +685,17 @@ export function createRollbackPlan(
   };
 }
 
-function cliEnvironment(override: Partial<CliEnvironment> = {}): CliEnvironment {
+async function cliEnvironment(
+  override: Partial<CliEnvironment> = {},
+  probeGateway: boolean
+): Promise<CliEnvironment> {
+  const gatewayRunning =
+    override.gatewayRunning ??
+    (probeGateway ? await probeLocalGateway("http://127.0.0.1:4317") : false);
   return {
     activeHosts: ["both"],
     fakeProviderDevelopmentMode: override.fakeProviderDevelopmentMode ?? false,
-    gatewayRunning: override.gatewayRunning ?? false,
+    gatewayRunning,
     experimentalSession: override.experimentalSession ?? false,
     organisationForbiddenPresets: override.organisationForbiddenPresets ?? [],
     policyPreset: override.policyPreset ?? defaultProductPolicyPreset,
@@ -683,6 +704,74 @@ function cliEnvironment(override: Partial<CliEnvironment> = {}): CliEnvironment 
     syntheticSession: override.syntheticSession ?? false,
     upstreamBaseUrl: sanitiseUrl(override.upstreamBaseUrl ?? "https://api.openai.example.invalid")
   };
+}
+
+async function runGatewayProcess(argv: readonly string[]): Promise<number> {
+  const port = numberAfter(argv, "--port") ?? 4317;
+  const bindHost = loopbackHostFromArg(valueAfter(argv, "--host"));
+  const gateway = createLocalGateway({
+    bindHost,
+    mode: "safe",
+    requestTimeoutMs: 30_000,
+    upstreamAllowlist: ["https://api.openai.com", "https://api.anthropic.com"],
+    upstreams: {
+      anthropic: "https://api.anthropic.com/v1/messages",
+      openai: "https://api.openai.com/v1/responses"
+    }
+  });
+
+  return new Promise((resolve) => {
+    gateway.server.once("error", (error) => {
+      process.stderr.write(`Context Diet gateway failed to start: ${error.message}\n`);
+      resolve(1);
+    });
+    gateway.server.listen(port, bindHost, () => {
+      process.stdout.write(
+        [
+          "Context Diet gateway listening",
+          "",
+          `Gateway URL: http://${bindHost}:${port}`,
+          "Safety mode: Safe",
+          "Upstream allowlist: https://api.openai.com, https://api.anthropic.com",
+          "Credentials are kept in memory only and are not printed.",
+          "Press Ctrl+C to stop."
+        ].join("\n") + "\n"
+      );
+    });
+
+    const shutdown = async (): Promise<void> => {
+      await gateway.close();
+      resolve(0);
+    };
+    process.once("SIGINT", () => {
+      void shutdown();
+    });
+    process.once("SIGTERM", () => {
+      void shutdown();
+    });
+  });
+}
+
+async function probeLocalGateway(baseUrl: string): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 250);
+  try {
+    const response = await fetch(`${baseUrl}/status`, { signal: controller.signal });
+    if (!response.ok) {
+      return false;
+    }
+    const body: unknown = await response.json();
+    return (
+      body !== null &&
+      typeof body === "object" &&
+      !Array.isArray(body) &&
+      (body as { readonly gateway?: unknown }).gateway === "context-diet-local"
+    );
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function formatFromArgs(argv: readonly string[]): CliOutputFormat {
@@ -1036,6 +1125,19 @@ function restoreDirectRouting(): string {
 function valueAfter(argv: readonly string[], key: string): string | undefined {
   const index = argv.indexOf(key);
   return index >= 0 ? argv[index + 1] : undefined;
+}
+
+function numberAfter(argv: readonly string[], key: string): number | undefined {
+  const value = valueAfter(argv, key);
+  if (value === undefined) {
+    return undefined;
+  }
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function loopbackHostFromArg(value: string | undefined): "127.0.0.1" | "::1" {
+  return value === "::1" ? "::1" : "127.0.0.1";
 }
 
 function sanitiseUrl(value: string): string {

@@ -8,17 +8,18 @@ credentials.
 
 ## Evidence Summary
 
-| Claim                                               | Evidence                                                                                                                                                                               |
-| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Install dry-run writes nothing                      | `packages/cli/src/index.test.ts` runs `setup codex --mcp` without `--confirm` against a temp root and verifies no manifest is created and the existing fake Codex config is unchanged. |
-| Confirmed install writes expected fake config       | The same test runs `setup codex --mcp --confirm` and verifies the temp `.codex/config.toml` contains the Context Diet managed provider block and fake loopback route.                  |
-| Manifest is created                                 | Confirmed install verifies `.context-diet/install-manifest.json` exists in the temp root and records `environment-variable-references-only`.                                           |
-| Credentials are never written                       | Tests scan command output, fake Codex config, fake MCP config, fake Claude Code settings and manifest text for fake credential canaries such as `SECRET_VALUE`, `Bearer ` and `sk-`.   |
-| Rollback restores previous config                   | A temp Codex config is installed, then `rollback --confirm` restores the exact previous file contents from the backup.                                                                 |
-| Uninstall removes only Context Diet-managed entries | A temp Claude Code settings file with unknown user fields is installed, then `uninstall --confirm` removes `contextDietManaged` while preserving the unrelated user field.             |
-| Interrupted install can be resumed                  | A synthetic interrupted manifest is written under a temp root, then `setup codex --resume --confirm` completes the managed Codex config write.                                         |
-| Interrupted install can be rolled back              | A synthetic interrupted manifest with a backup is written under a temp root, then `rollback --confirm` restores the backed-up Codex config.                                            |
-| Codex and Claude Code paths are both covered        | Codex tests cover custom provider and rollback. Claude Code tests cover `ANTHROPIC_BASE_URL` metadata, optional hook, MCP option and uninstall preservation.                           |
+| Claim                                               | Evidence                                                                                                                                                                                |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Install dry-run writes nothing                      | `packages/cli/src/index.test.ts` runs `setup codex --mcp` without `--confirm` against a temp root and verifies no manifest is created and the existing fake Codex config is unchanged.  |
+| Confirmed install writes expected fake config       | The same test runs `setup codex --mcp --confirm` and verifies the temp `.codex/config.toml` contains the Context Diet managed provider block, fake loopback route and MCP entry.        |
+| Manifest is created                                 | Confirmed install verifies `.context-diet/install-manifest.json` exists in the temp root and records `environment-variable-references-only`.                                            |
+| Credentials are never written                       | Tests scan command output, fake Codex config, fake MCP config, fake Claude Code settings and manifest text for fake credential canaries such as `SECRET_VALUE`, `Bearer ` and `sk-`.    |
+| Rollback restores previous config                   | A temp Codex config is installed, then `rollback --confirm` restores the exact previous file contents from the backup.                                                                  |
+| Uninstall removes only Context Diet-managed entries | A temp Claude Code settings file with unknown user fields is installed, then `uninstall --confirm` restores the backed-up settings byte-for-byte.                                       |
+| Interrupted install can be resumed                  | A synthetic interrupted manifest is written under a temp root, then `setup codex --resume --confirm` completes the managed Codex config write.                                          |
+| Interrupted install can be rolled back              | A synthetic interrupted manifest with a backup is written under a temp root, then `rollback --confirm` restores the backed-up Codex config.                                             |
+| Codex and Claude Code paths are both covered        | Codex tests cover custom provider, TOML root-key placement, MCP registration and rollback. Claude Code tests cover `ANTHROPIC_BASE_URL`, optional hook, MCP registration and uninstall. |
+| Subscription-style auth is covered                  | Proxy tests verify Anthropic bearer auth is accepted and forwarded while the bearer value and body canary stay out of logs.                                                             |
 
 ## Temp-Only Test Roots
 
@@ -30,6 +31,7 @@ Representative fake paths:
 
 - `<tmp>/context-diet-cli-install-*/.codex/config.toml`
 - `<tmp>/context-diet-cli-claude-*/.claude/settings.json`
+- `<tmp>/context-diet-cli-claude-*/.claude.json`
 - `<tmp>/context-diet-cli-install-*/.context-diet/mcp.json`
 - `<tmp>/context-diet-cli-install-*/.context-diet/install-manifest.json`
 
@@ -39,15 +41,22 @@ Codex confirmed install writes only a managed block with:
 
 - local loopback gateway base URL
 - `context_diet_local` provider name
-- `OPENAI_API_KEY` as an environment variable reference, not a value
+- `requires_openai_auth = true` so Codex can reuse its existing Codex auth state
+- `model_provider` at the TOML root before table headers
+- optional `context-diet-retrieval` MCP entry using the built CLI through `node`
 
-Claude Code confirmed install writes only a managed `contextDietManaged` object with:
+Claude Code confirmed install writes:
 
-- local loopback gateway base URL
+- `ANTHROPIC_BASE_URL` as a settings environment value
 - `ANTHROPIC_API_KEY environment variable` as a reference, not a value
+- a managed marker object for rollback and uninstall evidence
 - optional non-destructive SessionStart status hook when requested
+- optional `context-diet-retrieval` MCP entry in the user Claude configuration
 
-MCP confirmed install writes a local `context-diet-retrieval` entry with:
+For subscription use, leave `ANTHROPIC_API_KEY` unset so Claude Code can use its logged-in
+subscription auth while routing through `ANTHROPIC_BASE_URL`.
+
+The local `.context-diet/mcp.json` helper also records a `context-diet-retrieval` entry with:
 
 - command `context-diet`
 - args `mcp retrieval`

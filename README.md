@@ -125,7 +125,7 @@ pnpm check:skills
 Start the gateway in Safe mode:
 
 ```bash
-node --input-type=module -e 'import { createLocalGateway } from "./packages/proxy/dist/index.js"; const gateway = createLocalGateway({ bindHost: "127.0.0.1", mode: "safe", upstreams: { openai: "https://api.openai.com/v1/responses", anthropic: "https://api.anthropic.com/v1/messages" }, upstreamAllowlist: ["https://api.openai.com", "https://api.anthropic.com"], requestTimeoutMs: 30000 }); gateway.server.listen(4317, "127.0.0.1", () => console.log("Context Diet gateway listening on http://127.0.0.1:4317")); const shutdown = async () => { await gateway.close(); process.exit(0); }; process.on("SIGINT", shutdown); process.on("SIGTERM", shutdown); setInterval(() => {}, 1000);'
+node packages/cli/dist/index.js start
 ```
 
 Check it from another Terminal tab:
@@ -151,6 +151,15 @@ CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js setup both --mc
 
 The dry run shows the Codex, Claude Code and MCP files that would be touched. Provider credentials
 are not written.
+
+Setup places the Codex `model_provider` key at the TOML root before any table headers, adds the
+Codex MCP entry inside the managed Codex block, writes Claude Code `ANTHROPIC_BASE_URL` as a
+settings environment value, and registers Claude MCP in the user Claude configuration.
+
+Subscription users do not need to add provider API keys just to route through Context Diet. Codex
+uses `requires_openai_auth = true` so Codex can reuse its own signed-in auth state. Claude Code uses
+`ANTHROPIC_BASE_URL`; keep `ANTHROPIC_API_KEY` unset if you want Claude Code to keep using your
+subscription instead of API billing.
 
 ### 5. Confirm Setup
 

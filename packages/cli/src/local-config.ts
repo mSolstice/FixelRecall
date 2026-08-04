@@ -1,5 +1,6 @@
 import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export type LocalConfigHost = "codex" | "claude-code";
 
@@ -88,33 +89,18 @@ export async function installLocalConfig(
   }
 
   if (options.hosts.includes("codex")) {
-    await writeManagedTextBlock(
+    await writeCodexManagedConfig(
       join(options.rootDir, ".codex", "config.toml"),
-      renderCodexManagedBlock(gatewayBaseUrl)
+      renderCodexManagedBlock(gatewayBaseUrl, options.includeMcp)
     );
   }
 
   if (options.hosts.includes("claude-code")) {
-    await writeManagedJsonObject(join(options.rootDir, ".claude", "settings.json"), {
-      contextDiet: {
-        anthropicBaseUrl: gatewayBaseUrl,
-        credential: "ANTHROPIC_API_KEY environment variable",
-        managed: true
-      },
-      ...(options.includeClaudeHook
-        ? {
-            hooks: {
-              SessionStart: [
-                {
-                  command: "context-diet status --no-credentials",
-                  description: "Context Diet local status check",
-                  managedBy: "context-diet"
-                }
-              ]
-            }
-          }
-        : {})
-    });
+    await writeClaudeSettings(
+      join(options.rootDir, ".claude", "settings.json"),
+      gatewayBaseUrl,
+      options.includeClaudeHook
+    );
   }
 
   if (options.includeMcp) {
@@ -128,6 +114,9 @@ export async function installLocalConfig(
         }
       }
     });
+    if (options.hosts.includes("claude-code")) {
+      await writeClaudeMcpConfig(join(options.rootDir, ".claude.json"));
+    }
   }
 
   const manifest: LocalInstallManifest = {
@@ -287,31 +276,120 @@ function targetFiles(options: LocalConfigInstallOptions): readonly string[] {
   }
   if (options.includeMcp) {
     files.push(join(options.rootDir, ".context-diet", "mcp.json"));
+    if (options.hosts.includes("claude-code")) {
+      files.push(join(options.rootDir, ".claude.json"));
+    }
   }
   return files;
 }
 
-function renderCodexManagedBlock(gatewayBaseUrl: string): string {
-  return [
+function renderCodexManagedBlock(gatewayBaseUrl: string, includeMcp: boolean): string {
+  const lines = [
     'model_provider = "context_diet_local"',
     "",
     "[model_providers.context_diet_local]",
     'name = "Context Diet local gateway"',
     `base_url = "${gatewayBaseUrl}"`,
-    'env_key = "OPENAI_API_KEY"'
-  ].join("\n");
+    "requires_openai_auth = true"
+  ];
+
+  if (includeMcp) {
+    lines.push(
+      "",
+      "[mcp_servers.context-diet-retrieval]",
+      'command = "node"',
+      `args = ${JSON.stringify(contextDietCliArgs())}`
+    );
+  }
+
+  return lines.join("\n");
 }
 
-async function writeManagedTextBlock(path: string, block: string): Promise<void> {
+async function writeCodexManagedConfig(path: string, block: string): Promise<void> {
   const existing = await readOptional(path);
   const cleaned = removeMarkedBlock(existing);
-  await writeFile(
-    path,
-    `${cleaned}${cleaned.endsWith("\n") || cleaned.length === 0 ? "" : "\n"}${beginMarker}\n${block}\n${endMarker}\n`,
-    {
-      mode: 0o600
+  const next = insertTomlRootManagedBlock(cleaned, `${beginMarker}\n${block}\n${endMarker}`);
+  await writeFile(path, next, { mode: 0o600 });
+}
+
+function insertTomlRootManagedBlock(text: string, block: string): string {
+  const tableIndex = firstTomlTableIndex(text);
+  const normalisedBlock = `${block}\n`;
+  if (tableIndex === -1) {
+    return `${text}${text.endsWith("\n") || text.length === 0 ? "" : "\n"}${normalisedBlock}`;
+  }
+  const prefix = text.slice(0, tableIndex).trimEnd();
+  const suffix = text.slice(tableIndex).trimStart();
+  return `${prefix}${prefix.length === 0 ? "" : "\n\n"}${normalisedBlock}\n${suffix}`;
+}
+
+function firstTomlTableIndex(text: string): number {
+  const match = /^\s*\[[^\]\n]+]/m.exec(text);
+  return match?.index ?? -1;
+}
+
+async function writeClaudeSettings(
+  path: string,
+  gatewayBaseUrl: string,
+  includeClaudeHook: boolean
+): Promise<void> {
+  const existing = await readOptional(path);
+  const parsed = parseJsonObject(existing, path);
+  const existingEnv = recordFrom(parsed["env"]);
+  const next: Record<string, unknown> = {
+    ...parsed,
+    env: {
+      ...existingEnv,
+      ANTHROPIC_BASE_URL: gatewayBaseUrl
+    },
+    contextDietManaged: {
+      anthropicBaseUrl: gatewayBaseUrl,
+      credential: "ANTHROPIC_API_KEY environment variable",
+      managed: true
     }
-  );
+  };
+
+  if (includeClaudeHook) {
+    const existingHooks = recordFrom(parsed["hooks"]);
+    const sessionStart = Array.isArray(existingHooks["SessionStart"])
+      ? existingHooks["SessionStart"]
+      : [];
+    next["hooks"] = {
+      ...existingHooks,
+      SessionStart: [
+        ...sessionStart.filter((hook) => !isContextDietHook(hook)),
+        {
+          command: `${contextDietCliCommandForDisplay()} status --no-credentials`,
+          description: "Context Diet local status check",
+          managedBy: "context-diet"
+        }
+      ]
+    };
+  }
+
+  await writeFile(path, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 });
+}
+
+async function writeClaudeMcpConfig(path: string): Promise<void> {
+  const existing = await readOptional(path);
+  const parsed = parseJsonObject(existing, path);
+  const existingServers = recordFrom(parsed["mcpServers"]);
+  const next = {
+    ...parsed,
+    mcpServers: {
+      ...existingServers,
+      "context-diet-retrieval": {
+        args: contextDietCliArgs(),
+        command: "node",
+        env: {},
+        managedBy: "context-diet",
+        type: "stdio"
+      }
+    }
+  };
+  await writeFile(path, `${JSON.stringify(next, null, 2)}\n`, {
+    mode: 0o600
+  });
 }
 
 async function writeManagedJsonObject(
@@ -370,6 +448,29 @@ function parseJsonObject(text: string, path: string): Record<string, unknown> {
     throw new Error(`Expected JSON object in ${path}`);
   }
   return value as Record<string, unknown>;
+}
+
+function recordFrom(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function isContextDietHook(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    (value as { readonly managedBy?: unknown }).managedBy === "context-diet"
+  );
+}
+
+function contextDietCliArgs(): readonly string[] {
+  return [join(dirname(fileURLToPath(import.meta.url)), "index.js"), "mcp", "retrieval"];
+}
+
+function contextDietCliCommandForDisplay(): string {
+  return "context-diet";
 }
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {

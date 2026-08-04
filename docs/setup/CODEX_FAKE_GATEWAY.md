@@ -7,7 +7,7 @@ credentials.
 2. Note the loopback base URL, for example `http://127.0.0.1:4317`.
 3. Configure a Codex custom provider to use that base URL for the OpenAI Responses protocol.
 
-Illustrative project-local TOML:
+Illustrative project-local TOML for fake API-key testing only:
 
 ```toml
 model = "fake-openai-model"

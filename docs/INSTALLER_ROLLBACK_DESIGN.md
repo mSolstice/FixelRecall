@@ -2,9 +2,9 @@
 
 ## Status
 
-This document designs transactional local install and uninstall for Context Diet. It does not
-approve write-enabled installation yet. Current CLI setup remains preview-only until these plans are
-implemented with tests against temporary config fixtures.
+This document describes the transactional local install, uninstall and rollback design for Context
+Diet. The CLI now keeps dry-run as the default, requires `--confirm` for writes, records a manifest
+and has tests against temporary config fixtures.
 
 ## Codex Config Targets
 
@@ -28,7 +28,7 @@ Claude Code support targets the CLI first.
 - Project instructions: `CLAUDE.md`, which imports `AGENTS.md`
 - Generated skill copy: `.claude/skills/context-diet/`
 
-The installer may add or preview `ANTHROPIC_BASE_URL` routing to the local gateway. It must not
+The installer may add or dry-run `ANTHROPIC_BASE_URL` routing to the local gateway. It must not
 remove or rewrite unrelated Claude Code settings.
 
 ## MCP Config Targets

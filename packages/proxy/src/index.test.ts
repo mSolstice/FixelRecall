@@ -324,6 +324,41 @@ describe("createLocalGateway", () => {
     }
   });
 
+  it("forwards Anthropic bearer auth for subscription-style routing without logging it", async () => {
+    const logs: StructuredLogEvent[] = [];
+    const capturedHeaders: Record<string, string> = {};
+    const anthropic = await startHeaderCaptureUpstream(capturedHeaders);
+    const { baseUrl, close } = await startProductionGateway(logs, {
+      anthropic: `${anthropic.baseUrl}/v1/messages`
+    });
+    try {
+      const response = await fetch(`${baseUrl}/v1/messages`, {
+        method: "POST",
+        headers: {
+          "anthropic-version": "2023-06-01",
+          authorization: "Bearer fake-anthropic-subscription-token",
+          "content-type": "application/json",
+          "x-request-id": "anthropic-subscription-auth"
+        },
+        body: JSON.stringify({
+          model: "fake",
+          messages: [{ role: "user", content: "BODY_CANARY_SUBSCRIPTION_AUTH_DO_NOT_LOG" }]
+        })
+      });
+
+      expect(response.status).toBe(200);
+      expect(capturedHeaders.authorization).toBe("Bearer fake-anthropic-subscription-token");
+      expect(capturedHeaders["x-api-key"]).toBeUndefined();
+
+      const serialisedLogs = JSON.stringify(logs);
+      expect(serialisedLogs).not.toContain("fake-anthropic-subscription-token");
+      expect(serialisedLogs).not.toContain("BODY_CANARY_SUBSCRIPTION_AUTH_DO_NOT_LOG");
+    } finally {
+      await close();
+      await anthropic.close();
+    }
+  });
+
   it("supports runtime bypass and kill switch", async () => {
     const { baseUrl, close } = await startProductionGateway();
     try {

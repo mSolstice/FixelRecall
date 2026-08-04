@@ -14,16 +14,16 @@ Do not write real API keys or provider credentials into the repository.
 - Optional project-local metadata: `.codex/` when present
 - Generated skill copy: `.agents/skills/context-diet/`
 
-## Custom Provider Preview
+## Custom Provider Dry Run
 
-Use the local setup generator for a safe preview:
+Use the local setup generator for a safe dry run:
 
 ```bash
 context-diet setup codex
 ```
 
-The generator prints a TOML preview and does not write user configuration without confirmation. It
-must not include provider credentials.
+The generator prints the TOML it will manage and does not write user configuration without
+confirmation. It must not include provider credentials.
 
 Illustrative provider shape:
 
@@ -33,8 +33,12 @@ model_provider = "context_diet_local"
 [model_providers.context_diet_local]
 name = "Context Diet local gateway"
 base_url = "http://127.0.0.1:4317"
-env_key = "OPENAI_API_KEY"
+requires_openai_auth = true
 ```
+
+`requires_openai_auth = true` lets Codex reuse the Codex auth state the user already signed in with.
+API-key users can still use an API-key Codex login; subscription users should stay signed in
+normally.
 
 ## Skill Discovery and Invocation
 

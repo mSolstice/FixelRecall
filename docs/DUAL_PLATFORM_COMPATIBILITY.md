@@ -53,10 +53,11 @@ model_provider = "context_diet"
 [model_providers.context_diet]
 name = "Context Diet local gateway"
 base_url = "http://127.0.0.1:YOUR_PORT"
-env_key = "OPENAI_API_KEY"
+requires_openai_auth = true
 ```
 
-The build must generate the exact supported configuration after the transport feasibility test.
+The generated Codex configuration keeps `model_provider` at the TOML root and uses
+`requires_openai_auth = true` so Codex can reuse its existing auth state.
 
 Never commit real user-level configuration or API keys.
 
