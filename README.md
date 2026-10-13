@@ -102,13 +102,12 @@ raw-body absence checks in
 
 Fixel Recall does not ask you to paste provider keys into the app, the repository or chat.
 
-- Codex CLI uses custom-provider routing with `requires_openai_auth = true`, so Codex can reuse the
-  Codex auth state you already signed in with.
-- Claude Code CLI can route through `ANTHROPIC_BASE_URL`. API-key mode is the documented default for
-  this gateway because it has the clearest third-party routing and billing boundary.
-- Subscription-based routing is an optional user choice, not a compliance promise. Users must review
-  Anthropic's current Claude Code and consumer terms before enabling it. Fixel Recall does not
-  extract or store subscription tokens.
+- Codex CLI uses API-key custom-provider routing by default. Fixel Recall does not claim to reuse a
+  signed-in Codex subscription session through the gateway.
+- Claude Code CLI can route through `ANTHROPIC_BASE_URL`; API-key mode is the documented and tested
+  authentication path for this gateway.
+- Subscription-based routing is unproven and not supported by the default setup. Do not assume that
+  a provider's signed-in subscription credential may be forwarded through a third-party gateway.
 - API keys remain in the user's normal secret store or environment and are never written by Context
   Diet.
 
@@ -211,10 +210,9 @@ Setup places the Codex `model_provider` key at the TOML root before any table he
 Codex MCP entry inside the managed Codex block, writes Claude Code `ANTHROPIC_BASE_URL` as a
 settings environment value, and registers Claude MCP in the user Claude configuration.
 
-Subscription users do not need to add provider API keys just to route through Fixel Recall. Codex
-uses `requires_openai_auth = true` so Codex can reuse its own signed-in auth state. Claude Code uses
-`ANTHROPIC_BASE_URL`; keep `ANTHROPIC_API_KEY` unset if you want Claude Code to keep using your
-subscription instead of API billing.
+The default setup uses API-key authentication. Keep provider keys in the provider CLI's normal
+secret store or environment; Fixel Recall never writes or prints them. Subscription routing through
+the gateway is not supported or claimed.
 
 ### 5. Confirm Setup
 

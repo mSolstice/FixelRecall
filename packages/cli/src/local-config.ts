@@ -299,7 +299,8 @@ function renderCodexManagedBlock(
     "[model_providers.fixel_recall_local]",
     'name = "Fixel Recall local gateway"',
     `base_url = "${gatewayBaseUrl}"`,
-    "requires_openai_auth = true"
+    "requires_openai_auth = false",
+    'env_key = "OPENAI_API_KEY"'
   ];
 
   if (includeMcp) {

@@ -275,17 +275,8 @@ function createPxpipeCompatibleImage(
   const heightPx = Math.min(input.dimensionLimits.maxHeightPx, 728);
   // Provider image inputs require raster data. Keep this deterministic adapter
   // dependency-free; the production pxpipe adapter can replace the pixels.
-  const stripeCount = Math.max(1, Math.min(32, sourcePage.length));
   const pixels = Buffer.alloc(widthPx * heightPx * 4, 255);
-  for (let stripe = 0; stripe < stripeCount; stripe += 1) {
-    const x = Math.floor((stripe / stripeCount) * widthPx);
-    for (let y = 0; y < Math.min(4, heightPx); y += 1) {
-      const offset = (y * widthPx + x) * 4;
-      pixels[offset] = 17;
-      pixels[offset + 1] = 24;
-      pixels[offset + 2] = 39;
-    }
-  }
+  drawBitmapText(pixels, widthPx, heightPx, sourcePage, input.dimensionLimits.minFontSizePx);
 
   return {
     pageIndex,
@@ -305,13 +296,113 @@ function createPxpipeCompatibleImage(
 
 function createGlyphCoverage(sourceText: string): GlyphCoverageReport {
   const codePoints = Array.from(sourceText);
-  const unsupportedGlyphs = codePoints.filter((glyph) => glyph.codePointAt(0)! > 0xffff);
+  const unsupportedGlyphs = [
+    ...new Set(codePoints.filter((glyph) => glyphPattern(glyph) === null))
+  ];
   return {
     checkedCodePoints: codePoints.length,
-    coveredCodePoints: codePoints.length - unsupportedGlyphs.length,
+    coveredCodePoints: codePoints.filter((glyph) => glyphPattern(glyph) !== null).length,
     missingGlyphs: [],
     unsupportedGlyphs
   };
+}
+
+type Glyph = readonly string[];
+
+const GLYPHS: Readonly<Record<string, Glyph>> = {
+  " ": ["00000", "00000", "00000", "00000", "00000", "00000", "00000"],
+  "!": ["00100", "00100", "00100", "00100", "00100", "00000", "00100"],
+  ".": ["00000", "00000", "00000", "00000", "00000", "00110", "00110"],
+  ",": ["00000", "00000", "00000", "00000", "00110", "00110", "00100"],
+  ":": ["00000", "00110", "00110", "00000", "00110", "00110", "00000"],
+  "-": ["00000", "00000", "00000", "01110", "00000", "00000", "00000"],
+  _: ["00000", "00000", "00000", "00000", "00000", "00000", "11111"],
+  "/": ["00001", "00010", "00100", "01000", "10000", "00000", "00000"],
+  "?": ["01110", "10001", "00001", "00010", "00100", "00000", "00100"],
+  "0": ["01110", "10001", "10011", "10101", "11001", "10001", "01110"],
+  "1": ["00100", "01100", "00100", "00100", "00100", "00100", "01110"],
+  "2": ["01110", "10001", "00001", "00010", "00100", "01000", "11111"],
+  "3": ["11110", "00001", "00001", "01110", "00001", "00001", "11110"],
+  "4": ["00010", "00110", "01010", "10010", "11111", "00010", "00010"],
+  "5": ["11111", "10000", "10000", "11110", "00001", "00001", "11110"],
+  "6": ["01110", "10000", "10000", "11110", "10001", "10001", "01110"],
+  "7": ["11111", "00001", "00010", "00100", "01000", "01000", "01000"],
+  "8": ["01110", "10001", "10001", "01110", "10001", "10001", "01110"],
+  "9": ["01110", "10001", "10001", "01111", "00001", "00001", "01110"],
+  A: ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
+  B: ["11110", "10001", "10001", "11110", "10001", "10001", "11110"],
+  C: ["01110", "10001", "10000", "10000", "10000", "10001", "01110"],
+  D: ["11110", "10001", "10001", "10001", "10001", "10001", "11110"],
+  E: ["11111", "10000", "10000", "11110", "10000", "10000", "11111"],
+  F: ["11111", "10000", "10000", "11110", "10000", "10000", "10000"],
+  G: ["01110", "10001", "10000", "10111", "10001", "10001", "01110"],
+  H: ["10001", "10001", "10001", "11111", "10001", "10001", "10001"],
+  I: ["01110", "00100", "00100", "00100", "00100", "00100", "01110"],
+  J: ["00111", "00010", "00010", "00010", "10010", "10010", "01100"],
+  K: ["10001", "10010", "10100", "11000", "10100", "10010", "10001"],
+  L: ["10000", "10000", "10000", "10000", "10000", "10000", "11111"],
+  M: ["10001", "11011", "10101", "10101", "10001", "10001", "10001"],
+  N: ["10001", "11001", "11001", "10101", "10011", "10011", "10001"],
+  O: ["01110", "10001", "10001", "10001", "10001", "10001", "01110"],
+  P: ["11110", "10001", "10001", "11110", "10000", "10000", "10000"],
+  Q: ["01110", "10001", "10001", "10001", "10101", "10010", "01101"],
+  R: ["11110", "10001", "10001", "11110", "10100", "10010", "10001"],
+  S: ["01111", "10000", "10000", "01110", "00001", "00001", "11110"],
+  T: ["11111", "00100", "00100", "00100", "00100", "00100", "00100"],
+  U: ["10001", "10001", "10001", "10001", "10001", "10001", "01110"],
+  V: ["10001", "10001", "10001", "10001", "10001", "01010", "00100"],
+  W: ["10001", "10001", "10001", "10101", "10101", "11011", "10001"],
+  X: ["10001", "10001", "01010", "00100", "01010", "10001", "10001"],
+  Y: ["10001", "10001", "01010", "00100", "00100", "00100", "00100"],
+  Z: ["11111", "00001", "00010", "00100", "01000", "10000", "11111"]
+};
+
+function glyphPattern(value: string): Glyph | null {
+  if (value === "\n") return GLYPHS[" "] ?? null;
+  return GLYPHS[value] ?? GLYPHS[value.toUpperCase()] ?? null;
+}
+
+function drawBitmapText(
+  pixels: Buffer,
+  width: number,
+  height: number,
+  source: string,
+  minFontSizePx: number
+): void {
+  const scale = Math.max(1, Math.min(4, Math.floor(minFontSizePx / 4)));
+  const advance = 6 * scale;
+  const lineHeight = 8 * scale;
+  let x = scale;
+  let y = scale;
+  for (const character of source) {
+    if (character === "\n" || x + advance > width) {
+      x = scale;
+      y += lineHeight;
+      if (character === "\n") continue;
+    }
+    if (y + 7 * scale > height) break;
+    const glyph = glyphPattern(character);
+    if (glyph === null) {
+      x += advance;
+      continue;
+    }
+    for (let row = 0; row < glyph.length; row += 1) {
+      for (let column = 0; column < glyph[row]!.length; column += 1) {
+        if (glyph[row]![column] !== "1") continue;
+        for (let dy = 0; dy < scale; dy += 1) {
+          for (let dx = 0; dx < scale; dx += 1) {
+            const pixelX = x + column * scale + dx;
+            const pixelY = y + row * scale + dy;
+            const offset = (pixelY * width + pixelX) * 4;
+            pixels[offset] = 17;
+            pixels[offset + 1] = 24;
+            pixels[offset + 2] = 39;
+          }
+        }
+      }
+    }
+    x += advance;
+  }
 }
 
 function createPng(

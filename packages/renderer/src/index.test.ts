@@ -101,6 +101,7 @@ describe("createPxpipeCompatibleRenderer", () => {
         137, 80, 78, 71, 13, 10, 26, 10
       ]);
       expect(new TextDecoder().decode(result.images[0].bytes)).not.toContain("<svg");
+      expect(result.images[0].bytes.some((byte) => byte !== 255)).toBe(true);
     }
     expect(logEvents).toEqual([
       {
@@ -135,6 +136,18 @@ describe("createPxpipeCompatibleRenderer", () => {
     ).resolves.toMatchObject({
       status: "failure",
       failureReason: "renderer_failure"
+    });
+  });
+
+  it("fails closed when the source contains an unsupported glyph", async () => {
+    const renderer = createPxpipeCompatibleRenderer({ nowMs: 7_000 });
+
+    await expect(
+      renderer.render({ ...input, sourceText: "Safe text \u2603" })
+    ).resolves.toMatchObject({
+      status: "failure",
+      failureReason: "unsupported_glyphs",
+      glyphCoverage: { unsupportedGlyphs: ["\u2603"] }
     });
   });
 

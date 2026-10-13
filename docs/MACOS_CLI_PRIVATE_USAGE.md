@@ -131,9 +131,9 @@ For Codex, setup keeps `model_provider` at the TOML root so Codex actually route
 gateway. For Claude Code, setup writes `ANTHROPIC_BASE_URL` as a settings environment value and
 registers the retrieval MCP server in the user Claude configuration.
 
-Subscription users do not need to add API keys just to route through Fixel Recall. Keep
-`ANTHROPIC_API_KEY` unset if you want Claude Code to use your subscription. Codex uses
-`requires_openai_auth = true` so it can reuse the Codex auth state you already signed in with.
+The documented setup uses API-key authentication. Subscription-session routing through Fixel Recall
+is unproven and is not supported or claimed. Keep provider credentials in the provider CLI's normal
+secret store; Fixel Recall never writes or prints them.
 
 ## Rollback
 

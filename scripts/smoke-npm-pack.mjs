@@ -79,7 +79,9 @@ try {
   );
   check(
     "published manifest declares bin and Node >=24",
-    manifest.bin?.["fixel-recall"] === "./bundle/index.js" && manifest.engines?.node === ">=24"
+    (manifest.bin?.["fixel-recall"] === "bundle/index.js" ||
+      manifest.bin?.["fixel-recall"] === "./bundle/index.js") &&
+      manifest.engines?.node === ">=24"
   );
 
   // 2. install the tarball like a user

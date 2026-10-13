@@ -21,7 +21,7 @@
   },
   "type": "module",
   "bin": {
-    "fixel-recall": "./bundle/index.js"
+    "fixel-recall": "bundle/index.js"
   },
   "exports": {
     ".": "./bundle/index.js"

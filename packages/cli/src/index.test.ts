@@ -363,7 +363,8 @@ describe("fixel-recall CLI commands", () => {
       expect(applied.stdout).toContain("Confirmed");
       expect(codexConfig).toContain('model = "existing-model"');
       expect(codexConfig).toContain("BEGIN fixel-recall managed");
-      expect(codexConfig).toContain("requires_openai_auth = true");
+      expect(codexConfig).toContain("requires_openai_auth = false");
+      expect(codexConfig).toContain('env_key = "OPENAI_API_KEY"');
       expect(codexConfig.indexOf('model_provider = "fixel_recall_local"')).toBeLessThan(
         codexConfig.indexOf("[mcp_servers.node_repl.env]")
       );

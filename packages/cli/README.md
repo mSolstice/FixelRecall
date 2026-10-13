@@ -2,8 +2,9 @@
 
 Image memory with exact recovery for Claude Code and Codex CLI.
 
-Fixel Recall reduces safe old context locally while keeping code, commands, IDs and secrets exact
-and recoverable.
+Fixel Recall is a local Safe-mode gateway that keeps code, commands, IDs and secrets protected.
+Context compression is an in-development capability; the current live gateway forwards supported
+requests unchanged.
 
 > Shrink the context. Keep the details.
 
@@ -28,8 +29,8 @@ Run `npx fixel-recall --help` for every command.
 
 - Runs a local loopback gateway (127.0.0.1 only), in Safe mode by default.
 - Keeps code, commands, paths and IDs exact. Secrets are never rendered.
-- Turns safe old context into compact image memory.
-- Keeps the original text in a local vault.
+- Provides the local components for future safe image memory and exact recovery.
+- Keeps authorised original text available through local retrieval when configured.
 - Preserves the original text when it is uncertain, and reports savings honestly.
 - No remote analytics by default.
 
