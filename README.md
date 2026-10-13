@@ -2,9 +2,9 @@
 
 **Make coding-agent context cheaper, safer and easier to understand.**
 
-Fixel Recall is a local safety and efficiency layer for coding agents. It helps Codex CLI and Claude
-Code CLI carry less wasteful context while protecting the exact details that should never be
-compressed, rendered or guessed.
+Fixel Recall is a local Safe-mode gateway for coding agents. It gives Codex CLI and Claude Code CLI
+local routing, safety controls, diagnostics and reversible configuration. Context compression is an
+in-development capability and is not currently performed on every live provider request.
 
 <p align="center">
   <img src="docs/assets/fixel-recall-overview.png" alt="Fixel Recall overview showing a local loopback gateway that keeps exact code and secrets protected, shrinks safe old context, uses a local vault, and reports savings honestly." width="900">
@@ -24,21 +24,23 @@ Long coding-agent sessions can quietly collect a lot of baggage: old chat, repea
 logs, file snippets, previous attempts and context that no longer matters. That can make requests
 larger, slower, more expensive and harder for the model to reason about.
 
-Fixel Recall helps by:
+Fixel Recall currently helps by:
 
-- reducing token and context waste where it is safe
+- routing supported CLI traffic through a local loopback gateway
 - keeping code, commands, paths, IDs, hashes, secrets and active tool state protected
-- preserving exact context through local retrieval when recovery is needed
-- explaining why something was transformed or left untouched
-- benchmarking whether Fixel Recall is worth using for a setup
+- providing local status, safety controls, rollback and uninstall
+- preserving exact context through local retrieval components when configured
+- testing and measuring future context-reduction behavior with synthetic fixtures
 - supporting both Codex CLI and Claude Code CLI through one local engine
-- providing rollback and uninstall commands for local configuration changes
 
-The goal is not to compress everything. The goal is **safe context reduction with evidence**.
+The goal is to make context reduction safe and evidence-based before enabling it in the live
+gateway.
 
 ## Shrink The Context. Keep The Details.
 
-Fixel Recall turns safe old context into images, while exact text stays protected and recoverable.
+Fixel Recall is designed to turn eligible old context into compact image memory while exact text
+stays protected and recoverable. That transformation is currently in development and is not claimed
+as active for every live request.
 
 It is not just compression. Instead of sending every old message, log and repeated note back to the
 model as text, Fixel Recall decides what can safely become a compact visual memory.
@@ -47,9 +49,17 @@ model as text, Fixel Recall decides what can safely become a compact visual memo
 - Secrets are never rendered.
 - The local vault keeps authorised original text for exact recovery.
 - MCP retrieval can fetch a narrow exact section later.
-- pxpipe sits behind the renderer interface to create approved images.
+- pxpipe sits behind the renderer interface for the in-development rendering path.
 - If rendering fails, the original text is preserved.
-- Image compression only happens when policy says it is safe and worthwhile.
+- Image compression will only happen when policy says it is safe and worthwhile.
+
+### Current Gateway Reality
+
+The live gateway currently provides local routing, authentication forwarding, request limits,
+streaming, kill-switch controls, Safe mode, privacy-safe metrics and reversible setup. The firewall,
+renderer and vault are implemented as protected components and testable interfaces, but they are not
+yet connected to transform every live `/v1/responses` or `/v1/messages` request. Until that wiring
+is complete, supported requests are forwarded unchanged.
 
 ## What This Adds Around OpenAI And Anthropic
 
