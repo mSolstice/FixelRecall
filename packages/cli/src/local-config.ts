@@ -44,12 +44,12 @@ export interface LocalConfigOperationResult {
   readonly message: string;
 }
 
-const beginMarker = "# BEGIN context-diet managed";
-const endMarker = "# END context-diet managed";
+const beginMarker = "# BEGIN fixel-recall managed";
+const endMarker = "# END fixel-recall managed";
 const managedMarkers = [beginMarker, endMarker] as const;
 
 export function localManifestPath(rootDir: string): string {
-  return join(rootDir, ".context-diet", "install-manifest.json");
+  return join(rootDir, ".fixel-recall", "install-manifest.json");
 }
 
 export async function installLocalConfig(
@@ -58,7 +58,7 @@ export async function installLocalConfig(
   const gatewayBaseUrl = options.gatewayBaseUrl ?? "http://127.0.0.1:4317";
   const manifestPath = localManifestPath(options.rootDir);
   const changedFiles = targetFiles(options);
-  const installationId = options.installationId ?? "context-diet-local-install";
+  const installationId = options.installationId ?? "fixel-recall-local-install";
 
   if (!options.confirm) {
     return {
@@ -77,7 +77,7 @@ export async function installLocalConfig(
       dryRun: true,
       manifestPath,
       message:
-        "Refused: an existing Context Diet install manifest was found. Run rollback or uninstall first, or re-run with --replace-existing-manifest after reviewing the preview."
+        "Refused: an existing Fixel Recall install manifest was found. Run rollback or uninstall first, or re-run with --replace-existing-manifest after reviewing the preview."
     };
   }
 
@@ -104,13 +104,13 @@ export async function installLocalConfig(
   }
 
   if (options.includeMcp) {
-    await writeManagedJsonObject(join(options.rootDir, ".context-diet", "mcp.json"), {
+    await writeManagedJsonObject(join(options.rootDir, ".fixel-recall", "mcp.json"), {
       mcpServers: {
-        "context-diet-retrieval": {
+        "fixel-recall-retrieval": {
           args: ["mcp", "retrieval"],
-          command: "context-diet",
+          command: "fixel-recall",
           env: {},
-          managedBy: "context-diet"
+          managedBy: "fixel-recall"
         }
       }
     });
@@ -204,7 +204,7 @@ export async function uninstallLocalConfig(rootDir: string): Promise<LocalConfig
     changedFiles,
     dryRun: false,
     manifestPath,
-    message: "Uninstall complete: only Context Diet managed entries were removed."
+    message: "Uninstall complete: only Fixel Recall managed entries were removed."
   };
 }
 
@@ -215,7 +215,7 @@ async function backupFile(
 ): Promise<ManagedFileBackup> {
   const baseBackup = join(
     rootDir,
-    ".context-diet",
+    ".fixel-recall",
     "backups",
     safeBackupSegment(installationId),
     encodeURIComponent(path)
@@ -263,7 +263,7 @@ async function fileExists(path: string): Promise<boolean> {
 
 function safeBackupSegment(value: string): string {
   const safe = value.replaceAll(/[^A-Za-z0-9._-]/g, "_");
-  return safe.length === 0 ? "context-diet-local-install" : safe;
+  return safe.length === 0 ? "fixel-recall-local-install" : safe;
 }
 
 function targetFiles(options: LocalConfigInstallOptions): readonly string[] {
@@ -275,7 +275,7 @@ function targetFiles(options: LocalConfigInstallOptions): readonly string[] {
     files.push(join(options.rootDir, ".claude", "settings.json"));
   }
   if (options.includeMcp) {
-    files.push(join(options.rootDir, ".context-diet", "mcp.json"));
+    files.push(join(options.rootDir, ".fixel-recall", "mcp.json"));
     if (options.hosts.includes("claude-code")) {
       files.push(join(options.rootDir, ".claude.json"));
     }
@@ -285,10 +285,10 @@ function targetFiles(options: LocalConfigInstallOptions): readonly string[] {
 
 function renderCodexManagedBlock(gatewayBaseUrl: string, includeMcp: boolean): string {
   const lines = [
-    'model_provider = "context_diet_local"',
+    'model_provider = "fixel_recall_local"',
     "",
-    "[model_providers.context_diet_local]",
-    'name = "Context Diet local gateway"',
+    "[model_providers.fixel_recall_local]",
+    'name = "Fixel Recall local gateway"',
     `base_url = "${gatewayBaseUrl}"`,
     "requires_openai_auth = true"
   ];
@@ -296,9 +296,9 @@ function renderCodexManagedBlock(gatewayBaseUrl: string, includeMcp: boolean): s
   if (includeMcp) {
     lines.push(
       "",
-      "[mcp_servers.context-diet-retrieval]",
+      "[mcp_servers.fixel-recall-retrieval]",
       'command = "node"',
-      `args = ${JSON.stringify(contextDietCliArgs())}`
+      `args = ${JSON.stringify(fixelRecallCliArgs())}`
     );
   }
 
@@ -342,7 +342,7 @@ async function writeClaudeSettings(
       ...existingEnv,
       ANTHROPIC_BASE_URL: gatewayBaseUrl
     },
-    contextDietManaged: {
+    fixelRecallManaged: {
       anthropicBaseUrl: gatewayBaseUrl,
       credential: "ANTHROPIC_API_KEY environment variable",
       managed: true
@@ -357,11 +357,11 @@ async function writeClaudeSettings(
     next["hooks"] = {
       ...existingHooks,
       SessionStart: [
-        ...sessionStart.filter((hook) => !isContextDietHook(hook)),
+        ...sessionStart.filter((hook) => !isFixelRecallHook(hook)),
         {
-          command: `${contextDietCliCommandForDisplay()} status --no-credentials`,
-          description: "Context Diet local status check",
-          managedBy: "context-diet"
+          command: `${fixelRecallCliCommandForDisplay()} status --no-credentials`,
+          description: "Fixel Recall local status check",
+          managedBy: "fixel-recall"
         }
       ]
     };
@@ -378,11 +378,11 @@ async function writeClaudeMcpConfig(path: string): Promise<void> {
     ...parsed,
     mcpServers: {
       ...existingServers,
-      "context-diet-retrieval": {
-        args: contextDietCliArgs(),
+      "fixel-recall-retrieval": {
+        args: fixelRecallCliArgs(),
         command: "node",
         env: {},
-        managedBy: "context-diet",
+        managedBy: "fixel-recall",
         type: "stdio"
       }
     }
@@ -400,7 +400,7 @@ async function writeManagedJsonObject(
   const parsed = parseJsonObject(existing, path);
   const next = {
     ...parsed,
-    contextDietManaged: managedObject
+    fixelRecallManaged: managedObject
   };
   await writeFile(path, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 });
 }
@@ -456,21 +456,21 @@ function recordFrom(value: unknown): Record<string, unknown> {
     : {};
 }
 
-function isContextDietHook(value: unknown): boolean {
+function isFixelRecallHook(value: unknown): boolean {
   return (
     value !== null &&
     typeof value === "object" &&
     !Array.isArray(value) &&
-    (value as { readonly managedBy?: unknown }).managedBy === "context-diet"
+    (value as { readonly managedBy?: unknown }).managedBy === "fixel-recall"
   );
 }
 
-function contextDietCliArgs(): readonly string[] {
+function fixelRecallCliArgs(): readonly string[] {
   return [join(dirname(fileURLToPath(import.meta.url)), "index.js"), "mcp", "retrieval"];
 }
 
-function contextDietCliCommandForDisplay(): string {
-  return "context-diet";
+function fixelRecallCliCommandForDisplay(): string {
+  return "fixel-recall";
 }
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {

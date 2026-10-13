@@ -5,12 +5,12 @@ import {
   type DecisionAction,
   type ProductPolicyPreset,
   type ReasonCode
-} from "@context-diet/core";
+} from "@fixel-recall/core";
 import {
   createLocalCompatibilityLeaderboard,
   createSeededLeaderboardEvidence,
   type LocalCompatibilityLeaderboard
-} from "@context-diet/leaderboard";
+} from "@fixel-recall/leaderboard";
 
 export interface DashboardBoundary {
   readonly rawContentHiddenByDefault: true;
@@ -210,7 +210,7 @@ export function renderDashboard(options: DashboardRenderOptions = {}): string {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Context Diet Dashboard</title>
+  <title>Fixel Recall Dashboard</title>
   <style>
     :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
     body { margin: 0; background: #f7f8fa; color: #16181d; }
@@ -248,7 +248,7 @@ export function renderDashboard(options: DashboardRenderOptions = {}): string {
   <main class="shell">
     <section class="topbar" aria-labelledby="dashboard-title">
       <div>
-        <h1 id="dashboard-title" class="title">Context Diet local dashboard</h1>
+        <h1 id="dashboard-title" class="title">Fixel Recall local dashboard</h1>
         <p class="muted">SYNTHETIC DATA. Raw context is hidden by default. The MVP exposes no raw-context API.</p>
       </div>
       <div class="status-row" aria-label="Current routing and safety">
@@ -285,7 +285,7 @@ export function renderCompatibilityLeaderboardPage(
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Context Diet Compatibility Leaderboard</title>
+  <title>Fixel Recall Compatibility Leaderboard</title>
 </head>
 <body>
   <main>
@@ -383,7 +383,7 @@ export function createContextXrayDemoStory(story: DemoStoryId): ContextXrayDetai
         3 + offset,
         "Blocks whose provider cache status affects savings."
       ),
-      xrayMetric("Context Diet cache", 2 + offset, "Blocks eligible for local reuse accounting.")
+      xrayMetric("Fixel Recall cache", 2 + offset, "Blocks eligible for local reuse accounting.")
     ],
     codeAndCommandContent: [
       xrayMetric(

@@ -1,4 +1,4 @@
-# @context-diet/proxy
+# @fixel-recall/proxy
 
 Local gateway boundary.
 

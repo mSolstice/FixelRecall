@@ -1,4 +1,4 @@
-import type { ExactnessRisk, NonEmptyReadonlyArray, ReasonCode } from "@context-diet/core";
+import type { ExactnessRisk, NonEmptyReadonlyArray, ReasonCode } from "@fixel-recall/core";
 
 export type SpanKind =
   | "current_instruction"

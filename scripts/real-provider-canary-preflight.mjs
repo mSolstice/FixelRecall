@@ -18,8 +18,8 @@ export async function runPreflight(input = {}) {
   checks.push(checkSafeMode(env));
   checks.push(checkLoopbackGateway(env));
   checks.push(checkUpstreamAllowlist(env));
-  checks.push(checkBooleanEnv(env, "CONTEXT_DIET_KILL_SWITCH_READY", "kill switch reachable"));
-  checks.push(checkBooleanEnv(env, "CONTEXT_DIET_FAKE_BETA_PASSED", "fake beta passed"));
+  checks.push(checkBooleanEnv(env, "FIXEL_RECALL_KILL_SWITCH_READY", "kill switch reachable"));
+  checks.push(checkBooleanEnv(env, "FIXEL_RECALL_FAKE_BETA_PASSED", "fake beta passed"));
   checks.push(checkRawBodyLogging(env));
   checks.push(checkBudget(env));
   checks.push(await checkNoCredentialsInRepo(cwd));
@@ -49,18 +49,18 @@ export function renderPreflightReport(report) {
 }
 
 function checkSafeMode(env) {
-  const mode = (env.CONTEXT_DIET_CANARY_MODE ?? env.CONTEXT_DIET_MODE ?? "").toLowerCase();
+  const mode = (env.FIXEL_RECALL_CANARY_MODE ?? env.FIXEL_RECALL_MODE ?? "").toLowerCase();
   return mode === "safe"
     ? pass("Safe mode only", "Safe mode is explicitly configured.")
     : fail(
         "Safe mode only",
         "Safe mode is not explicitly configured.",
-        "Set CONTEXT_DIET_CANARY_MODE=Safe."
+        "Set FIXEL_RECALL_CANARY_MODE=Safe."
       );
 }
 
 function checkLoopbackGateway(env) {
-  const value = env.CONTEXT_DIET_GATEWAY_BASE_URL ?? "";
+  const value = env.FIXEL_RECALL_GATEWAY_BASE_URL ?? "";
   try {
     const parsed = new URL(value);
     const loopback =
@@ -76,13 +76,13 @@ function checkLoopbackGateway(env) {
     return fail(
       "loopback gateway",
       "Gateway base URL is missing or invalid.",
-      "Set CONTEXT_DIET_GATEWAY_BASE_URL."
+      "Set FIXEL_RECALL_GATEWAY_BASE_URL."
     );
   }
 }
 
 function checkUpstreamAllowlist(env) {
-  const values = (env.CONTEXT_DIET_UPSTREAM_ALLOWLIST ?? "")
+  const values = (env.FIXEL_RECALL_UPSTREAM_ALLOWLIST ?? "")
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
@@ -90,7 +90,7 @@ function checkUpstreamAllowlist(env) {
     return fail(
       "upstream allowlist set",
       "No upstream allowlist is configured.",
-      "Set CONTEXT_DIET_UPSTREAM_ALLOWLIST to expected provider origins."
+      "Set FIXEL_RECALL_UPSTREAM_ALLOWLIST to expected provider origins."
     );
   }
   const invalid = values.filter((value) => {
@@ -117,20 +117,20 @@ function checkBooleanEnv(env, key, label) {
 }
 
 function checkRawBodyLogging(env) {
-  return env.CONTEXT_DIET_RAW_BODY_LOGGING === "false"
+  return env.FIXEL_RECALL_RAW_BODY_LOGGING === "false"
     ? pass("no raw-body logging", "Raw-body logging is explicitly disabled.")
     : fail(
         "no raw-body logging",
         "Raw-body logging is not explicitly disabled.",
-        "Set CONTEXT_DIET_RAW_BODY_LOGGING=false."
+        "Set FIXEL_RECALL_RAW_BODY_LOGGING=false."
       );
 }
 
 function checkBudget(env) {
-  const maxRequests = numberEnv(env, "CONTEXT_DIET_CANARY_MAX_REQUESTS");
-  const maxInputTokens = numberEnv(env, "CONTEXT_DIET_CANARY_MAX_INPUT_TOKENS");
-  const maxOutputTokens = numberEnv(env, "CONTEXT_DIET_CANARY_MAX_OUTPUT_TOKENS");
-  const maxCostUsd = numberEnv(env, "CONTEXT_DIET_CANARY_MAX_COST_USD");
+  const maxRequests = numberEnv(env, "FIXEL_RECALL_CANARY_MAX_REQUESTS");
+  const maxInputTokens = numberEnv(env, "FIXEL_RECALL_CANARY_MAX_INPUT_TOKENS");
+  const maxOutputTokens = numberEnv(env, "FIXEL_RECALL_CANARY_MAX_OUTPUT_TOKENS");
+  const maxCostUsd = numberEnv(env, "FIXEL_RECALL_CANARY_MAX_COST_USD");
   const valid =
     maxRequests !== null &&
     maxRequests <= 2 &&

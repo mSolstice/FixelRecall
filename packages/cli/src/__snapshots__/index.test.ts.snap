@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`context-diet CLI commands > prints safe output for audit 1`] = `
+exports[`fixel-recall CLI commands > prints safe output for audit 1`] = `
 "{
   "accuracyRiskBand": "LOW",
   "compatibilityScore": 79,
@@ -68,15 +68,15 @@ exports[`context-diet CLI commands > prints safe output for audit 1`] = `
     "Codex route canary",
     "Claude Code route canary"
   ],
-  "title": "Context Diet Compatibility Audit",
+  "title": "Fixel Recall Compatibility Audit",
   "unsupportedCapabilities": [],
   "verdict": "RECOMMENDED"
 }
 "
 `;
 
-exports[`context-diet CLI commands > prints safe output for benchmark 1`] = `
-"# Context Diet Personal Benchmark
+exports[`fixel-recall CLI commands > prints safe output for benchmark 1`] = `
+"# Fixel Recall Personal Benchmark
 
 SYNTHETIC DATA
 
@@ -123,7 +123,7 @@ Output tokens: 4000
 Cached input tokens: 2000
 Image tokens: 900
 Latency: 2050 ms
-Cache treatment: context_diet_cache
+Cache treatment: fixel_recall_cache
 Tool actions: read_file, apply_patch, run_tests
 Files changed: src/synthetic-format-helper.ts, src/synthetic-format-helper.test.ts
 Retrieval calls: 0
@@ -143,7 +143,7 @@ Output tokens: 4000
 Cached input tokens: 2500
 Image tokens: 900
 Latency: 2250 ms
-Cache treatment: context_diet_cache
+Cache treatment: fixel_recall_cache
 Tool actions: read_file, apply_patch, run_tests
 Files changed: src/synthetic-format-helper.ts, src/synthetic-format-helper.test.ts
 Retrieval calls: 2
@@ -157,8 +157,8 @@ Test commands:
 "
 `;
 
-exports[`context-diet CLI commands > prints safe output for delete-session 1`] = `
-"Context Diet delete-session
+exports[`fixel-recall CLI commands > prints safe output for delete-session 1`] = `
+"Fixel Recall delete-session
 
 Session: session_test_123
 Dry run: no session data was deleted.
@@ -167,8 +167,8 @@ Credentials: not displayed
 "
 `;
 
-exports[`context-diet CLI commands > prints safe output for doctor 1`] = `
-"Context Diet doctor
+exports[`fixel-recall CLI commands > prints safe output for doctor 1`] = `
+"Fixel Recall doctor
 
 Status: ready for local synthetic checks.
 Current upstream: https://provider.example.test/v1
@@ -178,14 +178,14 @@ Gateway: running
 Fake-provider development mode: on
 
 No credentials were read or printed.
-Restore direct routing by removing the local Context Diet base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.
+Restore direct routing by removing the local Fixel Recall base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.
 "
 `;
 
-exports[`context-diet CLI commands > prints safe output for explain 1`] = `
-"Context Diet explain
+exports[`fixel-recall CLI commands > prints safe output for explain 1`] = `
+"Fixel Recall explain
 
-Context Diet keeps Safe mode as the default. Current instructions, secrets, exact values, code, commands and active tool state stay native.
+Fixel Recall keeps Safe mode as the default. Current instructions, secrets, exact values, code, commands and active tool state stay native.
 When a block is eligible, the policy can render a compact image and keep an exact local sidecar for retrieval.
 If parsing, scanning, rendering, storage or rebuilding fails, the original provider request is sent unchanged.
 Product presets map to existing internal modes and never weaken the built-in safety floor.
@@ -194,12 +194,12 @@ Current upstream: https://provider.example.test/v1
 Policy preset: Protect First
 Safety mode: Safe
 Preset maps to safe; eligible sources: conversation_history, tool_result, documentation.
-Restore direct routing by removing the local Context Diet base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.
+Restore direct routing by removing the local Fixel Recall base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.
 "
 `;
 
-exports[`context-diet CLI commands > prints safe output for preset 1`] = `
-"Context Diet policy preset
+exports[`fixel-recall CLI commands > prints safe output for preset 1`] = `
+"Fixel Recall policy preset
 
 Requested preset: Protect First
 Allowed: yes
@@ -217,8 +217,8 @@ Reasons:
 "
 `;
 
-exports[`context-diet CLI commands > prints safe output for retrieve 1`] = `
-"Context Diet retrieve
+exports[`fixel-recall CLI commands > prints safe output for retrieve 1`] = `
+"Fixel Recall retrieve
 
 Session: session_test_123
 Block ID: not provided
@@ -228,13 +228,13 @@ Credentials: not displayed
 "
 `;
 
-exports[`context-diet CLI commands > prints safe output for setup 1`] = `
+exports[`fixel-recall CLI commands > prints safe output for setup 1`] = `
 "Codex setup preview
 
 Dry run: no configuration files were written. Re-run with --confirm to apply.
 Provider credentials are not stored, printed or generated.
-Manifest: <tmp>/context-diet-config-preview/.context-diet/install-manifest.json
-Changed files: <tmp>/context-diet-config-preview/.codex/config.toml
+Manifest: <tmp>/fixel-recall-config-preview/.fixel-recall/install-manifest.json
+Changed files: <tmp>/fixel-recall-config-preview/.codex/config.toml
 
 Configuration locations:
 - User configuration: ~/.codex/config.toml
@@ -246,27 +246,27 @@ Configuration locations:
 No credentials are included. Codex reuses your existing Codex auth state for this provider.
 
 \`\`\`toml
-model_provider = "context_diet_local"
+model_provider = "fixel_recall_local"
 
-[model_providers.context_diet_local]
-name = "Context Diet local gateway"
+[model_providers.fixel_recall_local]
+name = "Fixel Recall local gateway"
 base_url = "http://127.0.0.1:4317"
 requires_openai_auth = true
 \`\`\`
 
 API-key users can still sign in to Codex with an API key; subscription users should stay signed in normally.
 
-Skill discovery: Codex should discover .agents/skills/context-diet and may invoke it for context audits, benchmarks, retrieval and setup troubleshooting.
+Skill discovery: Codex should discover .agents/skills/fixel-recall and may invoke it for context audits, benchmarks, retrieval and setup troubleshooting.
 MCP retrieval preview:
 \`\`\`json
 {
   "mcpServers": {
-    "context-diet-retrieval": {
+    "fixel-recall-retrieval": {
       "args": [
         "mcp",
         "retrieval"
       ],
-      "command": "context-diet",
+      "command": "fixel-recall",
       "env": {}
     }
   }
@@ -278,19 +278,19 @@ Safety mode: Safe
 Policy preset: Protect First
 
 Restore direct routing:
-- Switch model_provider back to the direct provider you used before Context Diet.
-- Remove the context_diet_local provider block after confirming direct routing works.
-- Remove the context-diet-retrieval MCP entry if exact retrieval should be disabled.
+- Switch model_provider back to the direct provider you used before Fixel Recall.
+- Remove the fixel_recall_local provider block after confirming direct routing works.
+- Remove the fixel-recall-retrieval MCP entry if exact retrieval should be disabled.
 
 Uninstall:
 - Stop the local gateway.
-- Delete Context Diet custom-provider and MCP entries from Codex configuration.
+- Delete Fixel Recall custom-provider and MCP entries from Codex configuration.
 - Keep AGENTS.md unless you are removing all project agent instructions.
 "
 `;
 
-exports[`context-diet CLI commands > prints safe output for start 1`] = `
-"Context Diet gateway start
+exports[`fixel-recall CLI commands > prints safe output for start 1`] = `
+"Fixel Recall gateway start
 
 Current upstream: http://127.0.0.1:8787/fake-provider
 Policy preset: Protect First
@@ -298,12 +298,12 @@ Safety mode: Safe
 Fake-provider development mode: on
 Host configuration was not changed.
 Use your host's custom provider/base URL setting to point at the local gateway.
-Restore direct routing by removing the local Context Diet base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.
+Restore direct routing by removing the local Fixel Recall base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.
 "
 `;
 
-exports[`context-diet CLI commands > prints safe output for status 1`] = `
-"Context Diet status
+exports[`fixel-recall CLI commands > prints safe output for status 1`] = `
+"Fixel Recall status
 
 Gateway: running
 Current upstream: https://provider.example.test/v1
@@ -312,31 +312,31 @@ Safety mode: Safe
 Hosts: both
 Fake-provider development mode: on
 Credentials: not displayed
-Restore direct routing by removing the local Context Diet base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.
+Restore direct routing by removing the local Fixel Recall base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.
 "
 `;
 
-exports[`context-diet CLI commands > prints safe output for stop 1`] = `
-"Context Diet gateway stop
+exports[`fixel-recall CLI commands > prints safe output for stop 1`] = `
+"Fixel Recall gateway stop
 
 Current upstream: https://provider.example.test/v1
 Policy preset: Protect First
 Safety mode: Safe
 Dry run: no running process or host configuration was changed.
 Use --confirm to stop managed local routing after reviewing the current status.
-Restore direct routing by removing the local Context Diet base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.
+Restore direct routing by removing the local Fixel Recall base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.
 "
 `;
 
-exports[`context-diet CLI commands > prints safe output for uninstall 1`] = `
-"Context Diet uninstall
+exports[`fixel-recall CLI commands > prints safe output for uninstall 1`] = `
+"Fixel Recall uninstall
 
 Current upstream: https://provider.example.test/v1
 Policy preset: Protect First
 Safety mode: Safe
 Dry run: no files, sessions or host configuration were changed.
-Manifest: <tmp>/context-diet-config-preview/.context-diet/install-manifest.json
+Manifest: <tmp>/fixel-recall-config-preview/.fixel-recall/install-manifest.json
 Changed files: none
-Restore direct routing by removing the local Context Diet base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.
+Restore direct routing by removing the local Fixel Recall base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.
 "
 `;

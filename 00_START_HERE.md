@@ -1,10 +1,10 @@
-# Context Diet Build Pack: Start Here
+# Fixel Recall Build Pack: Start Here
 
 ## What this folder is
 
-This is the founder-ready build pack for **Context Diet Version 2**.
+This is the founder-ready build pack for **Fixel Recall Version 2**.
 
-Context Diet is a local, safety-first context optimiser for AI coding agents. It is designed to work
+Fixel Recall is a local, safety-first context optimiser for AI coding agents. It is designed to work
 with:
 
 - OpenAI Codex CLI and IDE
@@ -40,7 +40,7 @@ The most important files are:
 | ------------------------------------------------ | ------------------------------------------------------- |
 | `AGENTS.md`                                      | Permanent project rules for Codex                       |
 | `CLAUDE.md`                                      | Loads the shared rules for Claude Code                  |
-| `docs/CONTEXT_DIET_BLUEPRINT.md`                 | Full product source of truth                            |
+| `docs/FIXEL_RECALL_BLUEPRINT.md`                 | Full product source of truth                            |
 | `docs/ARCHITECTURE.md`                           | Technical boundaries and data flow                      |
 | `docs/BUILD_PLAN.md`                             | Build phases and order                                  |
 | `docs/ACCEPTANCE_CRITERIA.md`                    | What "done" actually means                              |
@@ -49,7 +49,7 @@ The most important files are:
 | `docs/DUAL_PLATFORM_COMPATIBILITY.md`            | Codex and Claude Code compatibility contract            |
 | `docs/BEGINNER_STEP_BY_STEP_GUIDE.md`            | Plain-language setup instructions                       |
 | `docs/UPDATED_BUILD_PROMPTS_CODEX_AND_CLAUDE.md` | Copy-paste prompts                                      |
-| `skill-source/context-diet/SKILL.md`             | Canonical skill instructions                            |
+| `skill-source/fixel-recall/SKILL.md`             | Canonical skill instructions                            |
 
 ## Do I upload the blueprint into every chat?
 
@@ -57,7 +57,7 @@ No.
 
 Keep the blueprint in the repository at:
 
-`docs/CONTEXT_DIET_BLUEPRINT.md`
+`docs/FIXEL_RECALL_BLUEPRINT.md`
 
 Codex and Claude Code can read it from the project when needed. `AGENTS.md` and `CLAUDE.md` tell
 them where it lives.
@@ -73,7 +73,7 @@ every comma-level change.
 
 The skill itself cannot rewrite the same request that invoked the skill.
 
-Actual context transformation requires the local Context Diet proxy or gateway to sit between the
+Actual context transformation requires the local Fixel Recall proxy or gateway to sit between the
 coding agent and the model provider.
 
 The skill is the operator. The proxy is the engine.
@@ -92,5 +92,4 @@ The skill is the operator. The proxy is the engine.
 
 ## Version
 
-Context Diet Build Pack Version 2.0  
-Prepared: 14 July 2026
+Fixel Recall Build Pack Version 2.0 Prepared: 14 July 2026

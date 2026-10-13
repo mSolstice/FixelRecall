@@ -79,7 +79,7 @@ async function postJson(url, headers, body) {
 }
 
 async function main() {
-  const tempRoot = await mkdtemp(join(tmpdir(), "context-diet-fake-beta-"));
+  const tempRoot = await mkdtemp(join(tmpdir(), "fixel-recall-fake-beta-"));
   const fakeConfigRoot = join(tempRoot, "host-config");
   const logs = [];
   const fakeUpstream = createFakeGateway({ log: (event) => logs.push({ upstream: true, event }) });
@@ -272,7 +272,7 @@ async function main() {
       clock: fixedClock
     });
     const project = createProjectIdentity({
-      projectPath: "/synthetic/context-diet/fake-beta",
+      projectPath: "/synthetic/fixel-recall/fake-beta",
       localIdentitySecret: "fake-local-identity-secret-for-beta-only-0001"
     });
     const session = createSessionIdentity({

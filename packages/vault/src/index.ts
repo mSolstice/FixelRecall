@@ -1,4 +1,4 @@
-import type { SourceCategory } from "@context-diet/core";
+import type { SourceCategory } from "@fixel-recall/core";
 
 import {
   createHash,

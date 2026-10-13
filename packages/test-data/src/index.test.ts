@@ -103,7 +103,7 @@ describe("seeded synthetic factories", () => {
   });
 
   it("keeps test outputs in a temporary test directory", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "context-diet-test-data-"));
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "fixel-recall-test-data-"));
     const outputPath = path.join(tempDir, "usage-history.json");
 
     await writeFile(

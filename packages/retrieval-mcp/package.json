@@ -1,5 +1,5 @@
 {
-  "name": "@context-diet/retrieval-mcp",
+  "name": "@fixel-recall/retrieval-mcp",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,6 +11,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@context-diet/vault": "workspace:*"
+    "@fixel-recall/vault": "workspace:*"
   }
 }

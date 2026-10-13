@@ -1,4 +1,4 @@
-# @context-diet/cli
+# @fixel-recall/cli
 
 Command-line operator boundary.
 

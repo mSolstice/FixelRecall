@@ -1,4 +1,4 @@
-# @context-diet/providers-anthropic
+# @fixel-recall/providers-anthropic
 
 Anthropic Messages adapter boundary.
 

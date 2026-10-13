@@ -1,4 +1,4 @@
-# @context-diet/vault
+# @fixel-recall/vault
 
 Local context vault boundary.
 

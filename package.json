@@ -1,11 +1,11 @@
 {
-  "name": "context-diet",
+  "name": "fixel-recall",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "tsc -b tsconfig.build.json",
-    "benchmark:synthetic:ci": "node scripts/generate-synthetic-benchmark-artifacts.mjs --seed 1 --output artifacts/context-diet-synthetic-benchmark",
+    "benchmark:synthetic:ci": "node scripts/generate-synthetic-benchmark-artifacts.mjs --seed 1 --output artifacts/fixel-recall-synthetic-benchmark",
     "beta:fake": "node scripts/fake-beta.mjs",
     "check:environment": "node scripts/check-environment.mjs",
     "canary:preflight": "node scripts/real-provider-canary-preflight.mjs",

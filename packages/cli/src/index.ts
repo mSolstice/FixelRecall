@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { createSyntheticBenchmarkReport, renderBenchmarkMarkdown } from "@context-diet/benchmark";
+import { createSyntheticBenchmarkReport, renderBenchmarkMarkdown } from "@fixel-recall/benchmark";
 import {
   defaultProductPolicyPreset,
   isoTimestamp,
@@ -13,14 +13,15 @@ import {
   selectProductPolicyPreset,
   type ModelProfileSummary,
   type ProductPolicyPreset
-} from "@context-diet/core";
+} from "@fixel-recall/core";
 import {
   createPxpipeCompatibleRenderer,
   type ContextRenderer,
   type ContextRendererInput,
   type ContextRendererResult
-} from "@context-diet/renderer";
-import { createLocalGateway } from "@context-diet/proxy";
+} from "@fixel-recall/renderer";
+import { createLocalGateway } from "@fixel-recall/proxy";
+import { gatewayStartOptions } from "./gateway-config.js";
 import {
   installLocalConfig,
   type LocalConfigHost,
@@ -29,7 +30,7 @@ import {
   uninstallLocalConfig
 } from "./local-config.js";
 
-export const cliName = "context-diet";
+export const cliName = "fixel-recall";
 
 export type RendererDoctorStatus = "HEALTHY" | "DEGRADED" | "UNSAFE" | "UNSUPPORTED";
 export type CompatibilityAuditVerdict =
@@ -145,7 +146,7 @@ export interface RendererDoctorCheck {
 }
 
 export interface RendererDoctorReport {
-  readonly command: "context-diet renderer doctor";
+  readonly command: "fixel-recall renderer doctor";
   readonly status: RendererDoctorStatus;
   readonly checks: readonly RendererDoctorCheck[];
   readonly nextActions: readonly string[];
@@ -181,7 +182,7 @@ export interface CompatibilityAuditInput {
 }
 
 export interface CompatibilityAuditReport {
-  readonly title: "Context Diet Compatibility Audit";
+  readonly title: "Fixel Recall Compatibility Audit";
   readonly dataNotice: "SYNTHETIC TEST DATA";
   readonly input: CompatibilityAuditInput;
   readonly compatibilityScore: number;
@@ -267,6 +268,17 @@ export async function runCliCommand(
     );
   }
   if (command === "start") {
+    if (argv.includes("--dry-run")) {
+      try {
+        const planned = gatewayStartOptions(argv);
+        return textResult(
+          0,
+          `Gateway dry run: no service started\nSafety mode: Safe\nUpstream allowlist: ${planned.upstreamAllowlist?.join(", ")}\nCanary: ${planned.canary ? `blocked until output limit and budget evidence are verified (${planned.canary.provider})` : "disabled"}\n`
+        );
+      } catch {
+        return textResult(2, "Choose --codex-auth api or --codex-auth subscription\n");
+      }
+    }
     const env = await cliEnvironment(options.env, true);
     return textResult(0, renderStart(env));
   }
@@ -314,7 +326,7 @@ export async function runCliCommand(
   }
   return {
     exitCode: 64,
-    stderr: `Unknown command: ${command}\nRun context-diet help to see available commands.\n`,
+    stderr: `Unknown command: ${command}\nRun fixel-recall help to see available commands.\n`,
     stdout: ""
   };
 }
@@ -370,7 +382,7 @@ export function runCompatibilityAudit(
     recommendedPreset,
     recommendedProductPreset,
     requiredCanaries,
-    title: "Context Diet Compatibility Audit",
+    title: "Fixel Recall Compatibility Audit",
     unsupportedCapabilities,
     verdict
   };
@@ -382,7 +394,7 @@ export function renderCompatibilityAuditJson(report: CompatibilityAuditReport): 
 
 export function renderCompatibilityAuditMarkdown(report: CompatibilityAuditReport): string {
   return [
-    "# Context Diet Compatibility Audit",
+    "# Fixel Recall Compatibility Audit",
     "",
     "**SYNTHETIC TEST DATA**",
     "",
@@ -422,25 +434,25 @@ export function createCodexSetupPreview(env: CliEnvironment): HostSetupPreview {
       "No credentials are included. Codex reuses your existing Codex auth state for this provider.",
       "",
       "```toml",
-      'model_provider = "context_diet_local"',
+      'model_provider = "fixel_recall_local"',
       "",
-      "[model_providers.context_diet_local]",
-      'name = "Context Diet local gateway"',
+      "[model_providers.fixel_recall_local]",
+      'name = "Fixel Recall local gateway"',
       `base_url = "${gatewayBaseUrl}"`,
       "requires_openai_auth = true",
       "```",
       "",
       "API-key users can still sign in to Codex with an API key; subscription users should stay signed in normally.",
       "",
-      "Skill discovery: Codex should discover .agents/skills/context-diet and may invoke it for context audits, benchmarks, retrieval and setup troubleshooting.",
+      "Skill discovery: Codex should discover .agents/skills/fixel-recall and may invoke it for context audits, benchmarks, retrieval and setup troubleshooting.",
       "MCP retrieval preview:",
       "```json",
       JSON.stringify(
         {
           mcpServers: {
-            "context-diet-retrieval": {
+            "fixel-recall-retrieval": {
               args: ["mcp", "retrieval"],
-              command: "context-diet",
+              command: "fixel-recall",
               env: {}
             }
           }
@@ -456,15 +468,15 @@ export function createCodexSetupPreview(env: CliEnvironment): HostSetupPreview {
     ].join("\n"),
     requiresConfirmation: true,
     restoreInstructions: [
-      "Switch model_provider back to the direct provider you used before Context Diet.",
-      "Remove the context_diet_local provider block after confirming direct routing works.",
-      "Remove the context-diet-retrieval MCP entry if exact retrieval should be disabled."
+      "Switch model_provider back to the direct provider you used before Fixel Recall.",
+      "Remove the fixel_recall_local provider block after confirming direct routing works.",
+      "Remove the fixel-recall-retrieval MCP entry if exact retrieval should be disabled."
     ],
     target: "codex",
     title: "Codex setup preview",
     uninstallInstructions: [
       "Stop the local gateway.",
-      "Delete Context Diet custom-provider and MCP entries from Codex configuration.",
+      "Delete Fixel Recall custom-provider and MCP entries from Codex configuration.",
       "Keep AGENTS.md unless you are removing all project agent instructions."
     ],
     writesUserConfig: false
@@ -496,8 +508,8 @@ export function createClaudeCodeSetupPreview(env: CliEnvironment): HostSetupPrev
           hooks: {
             SessionStart: [
               {
-                command: "context-diet status --no-credentials",
-                description: "Local Context Diet status check"
+                command: "fixel-recall status --no-credentials",
+                description: "Local Fixel Recall status check"
               }
             ]
           }
@@ -507,16 +519,16 @@ export function createClaudeCodeSetupPreview(env: CliEnvironment): HostSetupPrev
       ),
       "```",
       "",
-      "Hooks are optional and must not be required for Context Diet to operate.",
-      "Skill discovery: Claude Code should discover .claude/skills/context-diet and may invoke it for context audits, benchmarks, retrieval and setup troubleshooting.",
+      "Hooks are optional and must not be required for Fixel Recall to operate.",
+      "Skill discovery: Claude Code should discover .claude/skills/fixel-recall and may invoke it for context audits, benchmarks, retrieval and setup troubleshooting.",
       "MCP retrieval preview:",
       "```json",
       JSON.stringify(
         {
           mcpServers: {
-            "context-diet-retrieval": {
+            "fixel-recall-retrieval": {
               args: ["mcp", "retrieval"],
-              command: "context-diet",
+              command: "fixel-recall",
               env: {}
             }
           }
@@ -534,7 +546,7 @@ export function createClaudeCodeSetupPreview(env: CliEnvironment): HostSetupPrev
     restoreInstructions: [
       "Unset ANTHROPIC_BASE_URL to restore direct Anthropic routing.",
       "Remove the optional SessionStart hook if you added it.",
-      "Remove the context-diet-retrieval MCP entry if exact retrieval should be disabled."
+      "Remove the fixel-recall-retrieval MCP entry if exact retrieval should be disabled."
     ],
     target: "claude-code",
     title: "Claude Code setup preview",
@@ -580,7 +592,7 @@ export function createInstallationManifestPlan(options: {
         "codex",
         "~/.codex/config.toml",
         "update",
-        "Add a Context Diet local custom provider route for Codex CLI."
+        "Add a Fixel Recall local custom provider route for Codex CLI."
       ),
       installerTarget(
         "codex-project-config",
@@ -617,7 +629,7 @@ export function createInstallationManifestPlan(options: {
           "claude-code",
           "~/.claude/settings.json hooks.SessionStart",
           "update",
-          "Optionally add a non-destructive Context Diet doctor hook."
+          "Optionally add a non-destructive Fixel Recall doctor hook."
         )
       );
     }
@@ -630,13 +642,13 @@ export function createInstallationManifestPlan(options: {
         "both",
         "host MCP configuration",
         "update",
-        "Register the local context-diet-retrieval MCP server without credentials."
+        "Register the local fixel-recall-retrieval MCP server without credentials."
       )
     );
   }
 
   return {
-    backupRootLabel: "Context Diet local state backup directory recorded in the manifest",
+    backupRootLabel: "Fixel Recall local state backup directory recorded in the manifest",
     createdAt: options.createdAt ?? "2026-07-22T00:00:00.000Z",
     dryRun: options.dryRun ?? true,
     forbiddenWrites: [
@@ -709,30 +721,31 @@ async function cliEnvironment(
 async function runGatewayProcess(argv: readonly string[]): Promise<number> {
   const port = numberAfter(argv, "--port") ?? 4317;
   const bindHost = loopbackHostFromArg(valueAfter(argv, "--host"));
-  const gateway = createLocalGateway({
-    bindHost,
-    mode: "safe",
-    requestTimeoutMs: 30_000,
-    upstreamAllowlist: ["https://api.openai.com", "https://api.anthropic.com"],
-    upstreams: {
-      anthropic: "https://api.anthropic.com/v1/messages",
-      openai: "https://api.openai.com/v1/responses"
-    }
-  });
+  let planned: ReturnType<typeof gatewayStartOptions>;
+  try {
+    planned = gatewayStartOptions(argv);
+  } catch {
+    process.stderr.write("Choose --codex-auth api or --codex-auth subscription\n");
+    return 2;
+  }
+  const gateway = createLocalGateway({ ...planned, bindHost });
 
   return new Promise((resolve) => {
     gateway.server.once("error", (error) => {
-      process.stderr.write(`Context Diet gateway failed to start: ${error.message}\n`);
+      process.stderr.write(`Fixel Recall gateway failed to start: ${error.message}\n`);
       resolve(1);
     });
     gateway.server.listen(port, bindHost, () => {
       process.stdout.write(
         [
-          "Context Diet gateway listening",
+          "Fixel Recall gateway listening",
           "",
           `Gateway URL: http://${bindHost}:${port}`,
           "Safety mode: Safe",
-          "Upstream allowlist: https://api.openai.com, https://api.anthropic.com",
+          `Upstream allowlist: ${planned.upstreamAllowlist?.join(", ")}`,
+          ...(planned.canary
+            ? ["Canary guard enabled: one Safe-mode request is bounded by local budget evidence."]
+            : []),
           "Credentials are kept in memory only and are not printed.",
           "Press Ctrl+C to stop."
         ].join("\n") + "\n"
@@ -765,7 +778,7 @@ async function probeLocalGateway(baseUrl: string): Promise<boolean> {
       body !== null &&
       typeof body === "object" &&
       !Array.isArray(body) &&
-      (body as { readonly gateway?: unknown }).gateway === "context-diet-local"
+      (body as { readonly gateway?: unknown }).gateway === "fixel-recall-local"
     );
   } catch {
     return false;
@@ -800,7 +813,7 @@ function textResult(exitCode: number, output: string): CliCommandResult {
 
 function renderDoctorSummary(env: CliEnvironment): string {
   return [
-    "Context Diet doctor",
+    "Fixel Recall doctor",
     "",
     "Status: ready for local synthetic checks.",
     `Current upstream: ${env.upstreamBaseUrl}`,
@@ -819,7 +832,7 @@ function renderStart(env: CliEnvironment): string {
     ? "http://127.0.0.1:8787/fake-provider"
     : env.upstreamBaseUrl;
   return [
-    "Context Diet gateway start",
+    "Fixel Recall gateway start",
     "",
     `Current upstream: ${upstream}`,
     `Policy preset: ${env.policyPreset}`,
@@ -894,7 +907,7 @@ function renderStop(
   options: { readonly confirm: boolean; readonly dryRun: boolean }
 ): string {
   return [
-    "Context Diet gateway stop",
+    "Fixel Recall gateway stop",
     "",
     `Current upstream: ${env.upstreamBaseUrl}`,
     `Policy preset: ${env.policyPreset}`,
@@ -909,7 +922,7 @@ function renderStop(
 
 function renderStatus(env: CliEnvironment): string {
   return [
-    "Context Diet status",
+    "Fixel Recall status",
     "",
     `Gateway: ${env.gatewayRunning ? "running" : "stopped"}`,
     `Current upstream: ${env.upstreamBaseUrl}`,
@@ -924,9 +937,9 @@ function renderStatus(env: CliEnvironment): string {
 
 function renderExplain(env: CliEnvironment): string {
   return [
-    "Context Diet explain",
+    "Fixel Recall explain",
     "",
-    "Context Diet keeps Safe mode as the default. Current instructions, secrets, exact values, code, commands and active tool state stay native.",
+    "Fixel Recall keeps Safe mode as the default. Current instructions, secrets, exact values, code, commands and active tool state stay native.",
     "When a block is eligible, the policy can render a compact image and keep an exact local sidecar for retrieval.",
     "If parsing, scanning, rendering, storage or rebuilding fails, the original provider request is sent unchanged.",
     "Product presets map to existing internal modes and never weaken the built-in safety floor.",
@@ -948,7 +961,7 @@ function renderPresetSelector(env: CliEnvironment, argv: readonly string[]): str
     syntheticSession: env.syntheticSession
   });
   return [
-    "Context Diet policy preset",
+    "Fixel Recall policy preset",
     "",
     `Requested preset: ${selection.preset}`,
     `Allowed: ${selection.allowed ? "yes" : "no"}`,
@@ -969,7 +982,7 @@ function renderPresetSelector(env: CliEnvironment, argv: readonly string[]): str
 function renderRetrieve(env: CliEnvironment, argv: readonly string[]): string {
   const blockId = valueAfter(argv, "--block-id") ?? "not provided";
   return [
-    "Context Diet retrieve",
+    "Fixel Recall retrieve",
     "",
     `Session: ${env.sessionId ?? "not provided"}`,
     `Block ID: ${blockId}`,
@@ -984,7 +997,7 @@ function renderDeleteSession(
   options: { readonly confirm: boolean; readonly dryRun: boolean }
 ): string {
   return [
-    "Context Diet delete-session",
+    "Fixel Recall delete-session",
     "",
     `Session: ${env.sessionId ?? "not provided"}`,
     options.confirm && !options.dryRun
@@ -1012,7 +1025,7 @@ async function renderUninstall(
           message: "Dry run: no files, sessions or host configuration were changed."
         };
   return [
-    "Context Diet uninstall",
+    "Fixel Recall uninstall",
     "",
     `Current upstream: ${env.upstreamBaseUrl}`,
     `Policy preset: ${env.policyPreset}`,
@@ -1040,7 +1053,7 @@ async function renderRollback(
           message: "Dry run: no files or host configuration were restored."
         };
   return [
-    "Context Diet rollback",
+    "Fixel Recall rollback",
     "",
     result.message,
     `Manifest: ${result.manifestPath}`,
@@ -1089,13 +1102,13 @@ function setupPreviewTarget(hosts: readonly LocalConfigHost[]): HostSetupTarget 
 function configRootFor(options: CliCommandOptions): string {
   return (
     options.configRoot ??
-    process.env["CONTEXT_DIET_CONFIG_ROOT"] ??
-    join(tmpdir(), "context-diet-config-preview")
+    process.env["FIXEL_RECALL_CONFIG_ROOT"] ??
+    join(tmpdir(), "fixel-recall-config-preview")
   );
 }
 
 function localManifestPathForDisplay(configRoot: string): string {
-  return join(configRoot, ".context-diet", "install-manifest.json");
+  return join(configRoot, ".fixel-recall", "install-manifest.json");
 }
 
 function installerTarget(
@@ -1111,7 +1124,7 @@ function installerTarget(
     credentialPolicy: id === "mcp-config" ? "no-credential-material" : "env-reference-only",
     host,
     id,
-    managedFragmentId: `context-diet:${id}`,
+    managedFragmentId: `fixel-recall:${id}`,
     pathLabel,
     requiresConfirmation: action !== "skip",
     summary
@@ -1119,7 +1132,7 @@ function installerTarget(
 }
 
 function restoreDirectRouting(): string {
-  return "Restore direct routing by removing the local Context Diet base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.";
+  return "Restore direct routing by removing the local Fixel Recall base URL from Codex or ANTHROPIC_BASE_URL and setting the provider back to its normal upstream.";
 }
 
 function valueAfter(argv: readonly string[], key: string): string | undefined {
@@ -1214,7 +1227,7 @@ export async function runRendererDoctor(
 
   const status = aggregateStatus(checks);
   return {
-    command: "context-diet renderer doctor",
+    command: "fixel-recall renderer doctor",
     status,
     checks,
     nextActions: checks
@@ -1572,7 +1585,7 @@ async function checkTempDirectory(tempRoot?: string): Promise<RendererDoctorChec
   const root = tempRoot ?? tmpdir();
   let path: string | undefined;
   try {
-    path = await mkdtemp(join(root, "context-diet-renderer-doctor-"));
+    path = await mkdtemp(join(root, "fixel-recall-renderer-doctor-"));
     await writeFile(join(path, "probe.txt"), "safe metadata probe");
     await rm(path, { force: true, recursive: true });
     return healthy(
@@ -1770,7 +1783,7 @@ async function checkCrashCleanup(tempRoot?: string): Promise<RendererDoctorCheck
   const root = tempRoot ?? tmpdir();
   let path: string | undefined;
   try {
-    path = await mkdtemp(join(root, "context-diet-renderer-crash-"));
+    path = await mkdtemp(join(root, "fixel-recall-renderer-crash-"));
     await writeFile(join(path, "partial.tmp"), "safe partial metadata");
     throw new Error("simulated renderer crash");
   } catch {

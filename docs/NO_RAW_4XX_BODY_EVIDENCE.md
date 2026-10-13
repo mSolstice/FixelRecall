@@ -55,7 +55,7 @@ Only privacy-safe metadata is allowed:
 A repository-wide canary scanner is available at:
 
 ```bash
-CONTEXT_DIET_TEST_CANARIES='["synthetic canary"]' pnpm scan:test-canaries -- .
+FIXEL_RECALL_TEST_CANARIES='["synthetic canary"]' pnpm scan:test-canaries -- .
 ```
 
 The automated gateway test uses generated canaries and scans the repository plus the temporary

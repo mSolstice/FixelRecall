@@ -1,4 +1,4 @@
-# @context-diet/test-data
+# @fixel-recall/test-data
 
 Typed synthetic fixtures, seeded factories and loopback-only fake provider simulators for Context
 Diet simulation mode.

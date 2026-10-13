@@ -1,15 +1,15 @@
 # File Placement Map
 
-Copy the downloaded pack into the root of the new `context-diet` repository.
+Copy the downloaded pack into the root of the new `fixel-recall` repository.
 
 ```text
-context-diet/
+fixel-recall/
 ├── 00_START_HERE.md
 ├── README.md
 ├── AGENTS.md
 ├── CLAUDE.md
 ├── docs/
-│   ├── CONTEXT_DIET_BLUEPRINT.md
+│   ├── FIXEL_RECALL_BLUEPRINT.md
 │   ├── ARCHITECTURE.md
 │   ├── BUILD_PLAN.md
 │   ├── ACCEPTANCE_CRITERIA.md
@@ -20,15 +20,15 @@ context-diet/
 │   ├── UPDATED_BUILD_PROMPTS_CODEX_AND_CLAUDE.md
 │   └── FILE_PLACEMENT_MAP.md
 ├── skill-source/
-│   └── context-diet/
+│   └── fixel-recall/
 │       ├── SKILL.md
 │       └── references/
 ├── .agents/
 │   └── skills/
-│       └── context-diet/
+│       └── fixel-recall/
 └── .claude/
     └── skills/
-        └── context-diet/
+        └── fixel-recall/
 ```
 
 The `.agents` and `.claude` folders may be hidden in Finder.

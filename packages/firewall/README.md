@@ -1,4 +1,4 @@
-# @context-diet/firewall
+# @fixel-recall/firewall
 
 Deterministic Exactness Firewall scanning and render-eligibility decisions.
 

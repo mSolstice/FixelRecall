@@ -10,8 +10,8 @@ broad hosted/enterprise production deployment.
 ## Who This Is For
 
 - A local developer using macOS.
-- Codex CLI users testing Context Diet through the local OpenAI Responses-compatible route.
-- Claude Code CLI users testing Context Diet through the local Anthropic Messages-compatible route.
+- Codex CLI users testing Fixel Recall through the local OpenAI Responses-compatible route.
+- Claude Code CLI users testing Fixel Recall through the local Anthropic Messages-compatible route.
 - Operators who are comfortable running Terminal commands and keeping provider credentials outside
   the repository.
 
@@ -43,8 +43,8 @@ broad hosted/enterprise production deployment.
 Run in Terminal:
 
 ```bash
-git clone git@github.com:mSolstice/ContextDiet.git
-cd ContextDiet
+git clone git@github.com:mSolstice/FixelRecall.git
+cd FixelRecall
 corepack enable
 pnpm install
 pnpm build
@@ -111,7 +111,7 @@ Use only synthetic prompts for canaries. Do not use private source code or priva
 Dry-run setup writes nothing:
 
 ```bash
-CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js setup both --mcp
+FIXEL_RECALL_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js setup both --mcp
 ```
 
 Review the listed files before confirming.
@@ -121,17 +121,17 @@ Review the listed files before confirming.
 Use only after reviewing the dry-run output:
 
 ```bash
-CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js setup both --mcp --confirm --replace-existing-manifest
+FIXEL_RECALL_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js setup both --mcp --confirm --replace-existing-manifest
 ```
 
-This writes Context Diet-managed Codex, Claude Code and MCP configuration entries and records a
+This writes Fixel Recall-managed Codex, Claude Code and MCP configuration entries and records a
 manifest with backups. It does not write provider credentials.
 
 For Codex, setup keeps `model_provider` at the TOML root so Codex actually routes through the local
 gateway. For Claude Code, setup writes `ANTHROPIC_BASE_URL` as a settings environment value and
 registers the retrieval MCP server in the user Claude configuration.
 
-Subscription users do not need to add API keys just to route through Context Diet. Keep
+Subscription users do not need to add API keys just to route through Fixel Recall. Keep
 `ANTHROPIC_API_KEY` unset if you want Claude Code to use your subscription. Codex uses
 `requires_openai_auth = true` so it can reuse the Codex auth state you already signed in with.
 
@@ -140,15 +140,15 @@ Subscription users do not need to add API keys just to route through Context Die
 Rollback restores backed-up files recorded in the manifest:
 
 ```bash
-CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js rollback --confirm
+FIXEL_RECALL_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js rollback --confirm
 ```
 
 ## Uninstall
 
-Uninstall removes Context Diet-managed entries according to the manifest:
+Uninstall removes Fixel Recall-managed entries according to the manifest:
 
 ```bash
-CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js uninstall --confirm
+FIXEL_RECALL_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js uninstall --confirm
 ```
 
 ## Safety Defaults
@@ -170,7 +170,7 @@ If port `4317` is already in use:
 lsof -nP -iTCP:4317 -sTCP:LISTEN
 ```
 
-Stop the old process only if you know it is the Context Diet gateway.
+Stop the old process only if you know it is the Fixel Recall gateway.
 
 If the gateway is not reachable:
 

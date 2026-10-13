@@ -12,10 +12,10 @@ Codex support targets the CLI first.
 
 - User config: `~/.codex/config.toml`
 - Project instructions: `AGENTS.md`
-- Generated skill copy: `.agents/skills/context-diet/`
+- Generated skill copy: `.agents/skills/fixel-recall/`
 - Optional project-local metadata: `.codex/` only when explicitly selected
 
-The installer may add a managed custom provider block pointing Codex at the local Context Diet
+The installer may add a managed custom provider block pointing Codex at the local Fixel Recall
 gateway. It must preserve existing model providers, comments where practical, and the user's direct
 provider configuration.
 
@@ -26,7 +26,7 @@ Claude Code support targets the CLI first.
 - User settings: `~/.claude/settings.json`
 - Project settings: `.claude/settings.json` only when explicitly selected
 - Project instructions: `CLAUDE.md`, which imports `AGENTS.md`
-- Generated skill copy: `.claude/skills/context-diet/`
+- Generated skill copy: `.claude/skills/fixel-recall/`
 
 The installer may add or dry-run `ANTHROPIC_BASE_URL` routing to the local gateway. It must not
 remove or rewrite unrelated Claude Code settings.
@@ -35,9 +35,9 @@ remove or rewrite unrelated Claude Code settings.
 
 Exact retrieval is shared through the local MCP server.
 
-- Codex MCP entry: `context-diet-retrieval`
-- Claude Code MCP entry: `context-diet-retrieval`
-- Command: `context-diet`
+- Codex MCP entry: `fixel-recall-retrieval`
+- Claude Code MCP entry: `fixel-recall-retrieval`
+- Command: `fixel-recall`
 - Args: `mcp retrieval`
 - Environment: no credentials
 
@@ -67,7 +67,7 @@ Required fields:
 - `manifest_version`
 - `installation_id`
 - `created_at`
-- `context_diet_version`
+- `fixel_recall_version`
 - `hosts`
 - `targets`
 - `backups`
@@ -99,7 +99,7 @@ Rules:
 
 - Backup before write.
 - Use atomic replacement for changed config files.
-- Store backups under Context Diet local state, not inside the project repository.
+- Store backups under Fixel Recall local state, not inside the project repository.
 - Record content hash and file mode when available.
 - Never back up provider credentials into logs, reports or dashboard output.
 - Do not delete backups until uninstall or rollback has completed and the user confirms cleanup.
@@ -161,7 +161,7 @@ guess how to merge unrelated user edits.
 
 The manifest records `last_completed_step` after each successful atomic write.
 
-On the next installer, rollback or uninstall command, Context Diet checks for incomplete manifests.
+On the next installer, rollback or uninstall command, Fixel Recall checks for incomplete manifests.
 If one exists, it offers:
 
 - resume from the next step
@@ -172,11 +172,11 @@ Interrupted recovery must not perform writes without confirmation.
 
 ## Uninstall Behavior
 
-Uninstall reads the manifest and removes only Context Diet managed fragments.
+Uninstall reads the manifest and removes only Fixel Recall managed fragments.
 
 Uninstall must:
 
-- stop local Context Diet services when requested
+- stop local Fixel Recall services when requested
 - restore backed-up config when safe
 - remove managed custom provider entries
 - remove managed MCP entries
@@ -204,7 +204,7 @@ Credentials must not appear in:
 
 ## What Must Never Be Written
 
-Context Diet install and uninstall must never write:
+Fixel Recall install and uninstall must never write:
 
 - provider API keys
 - bearer tokens

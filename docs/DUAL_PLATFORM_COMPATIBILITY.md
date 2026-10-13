@@ -2,7 +2,7 @@
 
 ## Goal
 
-A Context Diet release is not complete when it merely has two folders named after two platforms.
+A Fixel Recall release is not complete when it merely has two folders named after two platforms.
 
 Both hosts must be able to route requests, use the operator skill, call exact retrieval and complete
 the same benchmark flow.
@@ -25,12 +25,12 @@ the same benchmark flow.
 
 Canonical source:
 
-`skill-source/context-diet/`
+`skill-source/fixel-recall/`
 
 Generated copies:
 
-- `.agents/skills/context-diet/`
-- `.claude/skills/context-diet/`
+- `.agents/skills/fixel-recall/`
+- `.claude/skills/fixel-recall/`
 
 The shared `SKILL.md` should contain only features available on both platforms.
 
@@ -48,10 +48,10 @@ Illustrative only:
 
 ```toml
 model = "YOUR_SUPPORTED_MODEL"
-model_provider = "context_diet"
+model_provider = "fixel_recall"
 
-[model_providers.context_diet]
-name = "Context Diet local gateway"
+[model_providers.fixel_recall]
+name = "Fixel Recall local gateway"
 base_url = "http://127.0.0.1:YOUR_PORT"
 requires_openai_auth = true
 ```
@@ -140,7 +140,7 @@ Platform-only features are allowed when:
 
 Example:
 
-Claude hooks may run `context-diet doctor` at session start. Codex may use a different setup
+Claude hooks may run `fixel-recall doctor` at session start. Codex may use a different setup
 mechanism. The core product must still work without either convenience feature.
 
 ## Compatibility release gate

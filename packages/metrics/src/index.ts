@@ -2,7 +2,7 @@ import {
   createSyntheticUsageHistory,
   type SyntheticUsageDay,
   type SyntheticUsageHistory
-} from "@context-diet/test-data";
+} from "@fixel-recall/test-data";
 
 export interface SafeMetric {
   readonly name: string;
@@ -55,7 +55,7 @@ export interface RecommendationProjection {
   readonly annual: number;
 }
 
-export interface ContextDietRecommendation {
+export interface FixelRecallRecommendation {
   readonly dataOrigin: "synthetic";
   readonly verdict: RecommendationVerdict;
   readonly message: string;
@@ -92,7 +92,7 @@ export interface ProviderPriceInfo {
 export interface ProviderCostRun {
   readonly provider: CostProvider;
   readonly modelVersion: string;
-  readonly cacheTreatment: "none" | "provider_cache" | "context_diet_cache";
+  readonly cacheTreatment: "none" | "provider_cache" | "fixel_recall_cache";
   readonly status: "success" | "failed";
   readonly tokens: ProviderTokenBreakdown;
   readonly price: ProviderPriceInfo;
@@ -293,7 +293,7 @@ export function createProviderCostReport(input: ProviderCostReportInput): Provid
   };
 }
 
-export function recommendContextDiet(input: RecommendationInput): ContextDietRecommendation {
+export function recommendFixelRecall(input: RecommendationInput): FixelRecallRecommendation {
   const evidenceAvailable = input.evidenceAvailable ?? true;
   const profileStatus = input.modelProfileStatus ?? "enabled";
   const weekly = weeklyNetProjection(input);
@@ -316,18 +316,18 @@ export function recommendContextDiet(input: RecommendationInput): ContextDietRec
   if (profileStatus === "unsupported") {
     return recommendation(input, "UNSUPPORTED", projection, [
       "The simulated model profile is unsupported.",
-      "Context Diet should stay disabled until a supported profile is approved."
+      "Fixel Recall should stay disabled until a supported profile is approved."
     ]);
   }
   if (profileStatus === "expired") {
     return recommendation(input, "MISSING_EVIDENCE", projection, [
       "The simulated model profile has expired and needs fresh canaries.",
-      "Re-test the profile before enabling Context Diet."
+      "Re-test the profile before enabling Fixel Recall."
     ]);
   }
   if (protectedRuleBlocked && weekly <= 0) {
     return recommendation(input, "NOT_WORTH_ENABLING", projection, [
-      "Context Diet is not worth enabling for this simulated setup.",
+      "Fixel Recall is not worth enabling for this simulated setup.",
       "The workload has high exactness risk, and projected savings are not positive.",
       "Protected-content rules were not weakened to improve the verdict."
     ]);
@@ -340,13 +340,13 @@ export function recommendContextDiet(input: RecommendationInput): ContextDietRec
   }
   if (weekly <= 0) {
     return recommendation(input, "NOT_WORTH_ENABLING", projection, [
-      "Context Diet is not worth enabling for this simulated setup.",
+      "Fixel Recall is not worth enabling for this simulated setup.",
       "Projected image, retrieval, latency or compute costs exceed text savings."
     ]);
   }
   if (input.cacheIntensity === "high" && weekly < 10) {
     return recommendation(input, "NOT_WORTH_ENABLING", projection, [
-      "Context Diet is not worth enabling for this simulated setup.",
+      "Fixel Recall is not worth enabling for this simulated setup.",
       "The workload is already highly cached, leaving little new saving."
     ]);
   }
@@ -367,13 +367,13 @@ function recommendation(
   verdict: RecommendationVerdict,
   projection: RecommendationProjection,
   reasons: readonly string[]
-): ContextDietRecommendation {
+): FixelRecallRecommendation {
   return {
     breakEvenUsage: breakEvenUsage(input),
     dataOrigin: "synthetic",
     message:
       verdict === "NOT_WORTH_ENABLING"
-        ? "Context Diet is not worth enabling for this simulated setup."
+        ? "Fixel Recall is not worth enabling for this simulated setup."
         : "Synthetic recommendation generated for this simulated setup.",
     netProjection: projection,
     recommendedOperatingMode: operatingMode(input, verdict),

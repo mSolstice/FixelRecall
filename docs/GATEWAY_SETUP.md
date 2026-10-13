@@ -1,6 +1,6 @@
 # Gateway Setup
 
-Context Diet runs as a local loopback gateway. By default it binds to `127.0.0.1`, starts in Safe
+Fixel Recall runs as a local loopback gateway. By default it binds to `127.0.0.1`, starts in Safe
 mode, and only forwards to explicitly allowlisted upstream provider URLs.
 
 ## Starting
@@ -11,8 +11,13 @@ Build the workspace first:
 pnpm build
 ```
 
-Start the gateway from the CLI package once a launcher is added, or from a small local script that
-calls `createLocalGateway` with:
+Start the API gateway in a Terminal and leave that Terminal open:
+
+```bash
+node packages/cli/dist/index.js start --host 127.0.0.1 --port 4317
+```
+
+Library callers can instead call `createLocalGateway` with:
 
 - `upstreams.openai`
 - `upstreams.anthropic`
@@ -30,7 +35,7 @@ curl http://127.0.0.1:PORT/health
 Expected response:
 
 ```json
-{ "status": "ok", "gateway": "context-diet-local", "mode": "safe" }
+{ "status": "ok", "gateway": "fixel-recall-local", "mode": "safe" }
 ```
 
 For route and metric status:
@@ -41,14 +46,20 @@ curl http://127.0.0.1:PORT/status
 
 ## Connecting Codex
 
-Point Codex at the local OpenAI-compatible route:
+For API-key routing, use a Codex custom provider with `wire_api = "responses"`,
+`env_key = "OPENAI_API_KEY"`, `requires_openai_auth = false`, and this base URL:
 
 ```text
-OPENAI_BASE_URL=http://127.0.0.1:PORT/v1
+base_url = "http://127.0.0.1:PORT/v1"
 ```
 
-Requests to `/v1/responses` will go through Context Diet and then to the allowlisted OpenAI
+Requests to `/v1/responses` will go through Fixel Recall and then to the allowlisted OpenAI
 upstream.
+
+ChatGPT subscription routing is a separate opt-in path; an API URL plus a subscription token is not
+sufficient. See [Astra canary readiness](ASTRA_CANARY_READINESS.md) for the new local-tested
+subscription routes, authentication requirements and remaining budget blockers. No real subscription
+test was performed for this change.
 
 ## Connecting Claude Code
 
@@ -58,7 +69,7 @@ Point Claude Code at the local Anthropic-compatible route:
 ANTHROPIC_BASE_URL=http://127.0.0.1:PORT
 ```
 
-Requests to `/v1/messages` will go through Context Diet and then to the allowlisted Anthropic
+Requests to `/v1/messages` will go through Fixel Recall and then to the allowlisted Anthropic
 upstream.
 
 ## Confirming Active Route
@@ -99,7 +110,7 @@ curl -X POST http://127.0.0.1:PORT/runtime/resume
 
 ## Restoring Direct Routing
 
-To bypass Context Diet completely, restore the provider base URL in the host tool:
+To bypass Fixel Recall completely, restore the provider base URL in the host tool:
 
 ```text
 OPENAI_BASE_URL=https://api.openai.com/v1

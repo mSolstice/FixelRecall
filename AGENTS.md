@@ -1,10 +1,10 @@
-# Context Diet Agent Instructions
+# Fixel Recall Agent Instructions
 
 ## Source of truth
 
 Before major planning or implementation, read:
 
-1. `docs/CONTEXT_DIET_BLUEPRINT.md`
+1. `docs/FIXEL_RECALL_BLUEPRINT.md`
 2. `docs/ARCHITECTURE.md`
 3. `docs/DUAL_PLATFORM_COMPATIBILITY.md`
 4. `docs/SECURITY_MODEL.md`
@@ -15,7 +15,7 @@ For a small task, read only the relevant documents and code.
 
 ## Product rule
 
-Context Diet must support both OpenAI Codex and Anthropic Claude Code.
+Fixel Recall must support both OpenAI Codex and Anthropic Claude Code.
 
 Treat both as first-class hosts. Do not build for one and leave the other as a future adapter.
 
@@ -28,7 +28,7 @@ Treat both as first-class hosts. Do not build for one and leave the other as a f
 - Preserve provider-specific fields required for caching, tools, streaming and authentication.
 - Unknown endpoints, content blocks or request shapes must pass through unchanged.
 - The skill operates the engine. The skill alone does not transform its own invoking request.
-- Keep the canonical skill in `skill-source/context-diet/`.
+- Keep the canonical skill in `skill-source/fixel-recall/`.
 - Generate platform copies under `.agents/skills/` and `.claude/skills/`.
 - Fail CI when generated skill copies drift from the canonical source.
 

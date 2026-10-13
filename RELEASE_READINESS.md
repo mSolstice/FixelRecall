@@ -4,7 +4,7 @@ Review date: 2026-08-02
 
 Decision: **GO for macOS CLI-only; NO-GO for broad hosted/enterprise production deployment**
 
-This is **Context Diet for macOS CLI**. Context Diet is available for macOS CLI users of Codex CLI
+This is **Fixel Recall for macOS CLI**. Fixel Recall is available for macOS CLI users of Codex CLI
 and Claude Code CLI. The current repository passes local fake-provider checks, local skill
 validation, limited real-provider route canaries, a generated toy-project real-provider benchmark
 canary, real macOS user-level install/rollback/uninstall canary and Linux CI for the pushed
@@ -87,7 +87,7 @@ Release limitation:
 | `pnpm test`                                                    | PASS with local loopback permission: 17 files, 294 tests.                          |
 | `pnpm test:compatibility`                                      | PASS: 1 file, 3 tests.                                                             |
 | `pnpm check:skills`                                            | PASS                                                                               |
-| `CONTEXT_DIET_TEST_CANARIES='[]' pnpm scan:test-canaries -- .` | PASS                                                                               |
+| `FIXEL_RECALL_TEST_CANARIES='[]' pnpm scan:test-canaries -- .` | PASS                                                                               |
 | `pnpm smoke:openai`                                            | PASS with local loopback permission.                                               |
 | `pnpm smoke:anthropic`                                         | PASS with local loopback permission.                                               |
 | Internal fake-provider validation command                      | PASS with local loopback permission.                                               |
@@ -119,7 +119,7 @@ No real-provider traffic was sent.
   All accepted variants had valid JSON replacement output and deterministic `node --test` success.
 - Real user-level install/uninstall/rollback canary: PASS on macOS CLI.
   `setup both --mcp --confirm --replace-existing-manifest` succeeded, rollback restored backed-up
-  files, and uninstall removed Context Diet-managed entries.
+  files, and uninstall removed Fixel Recall-managed entries.
 
 ## Acceptance Criteria Review
 
@@ -170,7 +170,7 @@ Current review notes:
 ## Known Limitations
 
 - Current evidence is fake-provider, synthetic-data and limited real-provider canary evidence only.
-- This is Context Diet for macOS CLI, not a broad hosted/enterprise production deployment.
+- This is Fixel Recall for macOS CLI, not a broad hosted/enterprise production deployment.
 - Real-provider canaries passed for route checks and one generated toy-project benchmark canary, but
   they do not prove production savings or broad model compatibility.
 - The real-provider benchmark canary used generated public-safe toy code only. It is not a private
@@ -188,7 +188,7 @@ Current review notes:
 
 ## Privacy Statement
 
-Context Diet is designed as a local engine. In Safe mode, current instructions, code, diffs,
+Fixel Recall is designed as a local engine. In Safe mode, current instructions, code, diffs,
 commands, exact values, paths, IDs, hashes, numbers and secret-sensitive values stay native.
 
 Current local fake-provider evidence shows:
@@ -209,7 +209,7 @@ Release caveat:
 
 Install:
 
-- `context-diet setup codex`, `context-diet setup claude-code` and `context-diet setup both` dry-run
+- `fixel-recall setup codex`, `fixel-recall setup claude-code` and `fixel-recall setup both` dry-run
   by default.
 - Writes require explicit `--confirm`.
 - Tests use temporary configuration roots.
@@ -219,13 +219,13 @@ Install:
 
 Uninstall:
 
-- `context-diet uninstall --confirm` removes only Context Diet-managed entries in tested temp roots
+- `fixel-recall uninstall --confirm` removes only Fixel Recall-managed entries in tested temp roots
   and in the macOS CLI real user-level canary.
 - Manual direct-route restoration remains documented for Codex and Claude Code.
 
 Rollback:
 
-- `context-diet rollback --confirm` restores backups in tested temp roots and in the macOS CLI real
+- `fixel-recall rollback --confirm` restores backups in tested temp roots and in the macOS CLI real
   user-level canary.
 - Interrupted install resume and rollback are tested against synthetic manifests in temp roots.
 
@@ -237,7 +237,7 @@ MacOS CLI real user-level canary evidence:
 - Manifest hosts: `codex` and `claude-code`.
 - Backups: 3 backup entries existed.
 - Rollback: restored backed-up files.
-- Uninstall: removed Context Diet-managed entries.
+- Uninstall: removed Fixel Recall-managed entries.
 - Post-uninstall verification: Codex managed block absent, Claude managed object absent and MCP file
   absent.
 - Credential check: no obvious credential markers were found in checked managed files or manifest.
@@ -257,7 +257,7 @@ Real-provider benchmark canary: PASS for the generated toy project.
 Real-provider benchmark canary evidence:
 
 - Date: 2026-08-02.
-- Scope: generated toy project in `/private/tmp/context-diet-real-benchmark-canary-demo`.
+- Scope: generated toy project in `/private/tmp/fixel-recall-real-benchmark-canary-demo`.
 - Provider routes: OpenAI `/v1/responses` and Anthropic `/v1/messages`.
 - Route result: all six benchmark requests returned provider status `200`.
 - Gateway safety result: gateway stayed Safe mode, `rawBodiesPersisted=false` and
@@ -285,11 +285,11 @@ Real-provider benchmark canary evidence:
 Real-provider route canary evidence:
 
 - OpenAI/Codex canary: PASS on 2026-08-02 through `/v1/responses` in Safe mode. The synthetic prompt
-  returned `Context Diet real-provider canary passed.` Earlier failed attempts were caused by
+  returned `Fixel Recall real-provider canary passed.` Earlier failed attempts were caused by
   invalid or stale OpenAI credential/model setup before the successful run.
 - Anthropic/Claude Code canary: PASS on 2026-08-02 through `/v1/messages` in Safe mode with
   `claude-haiku-4-5-20251001`. The synthetic prompt returned
-  `Context Diet real-provider canary passed.` One earlier rejected request used a stale model alias.
+  `Fixel Recall real-provider canary passed.` One earlier rejected request used a stale model alias.
 - This is real-provider canary evidence only. It is not a production benchmark and must not be used
   to claim real-world savings.
 

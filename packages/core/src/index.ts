@@ -1,8 +1,8 @@
 export type ProviderFamily = "openai" | "anthropic" | "unknown";
 
-export type ContextDietMode = "safe" | "balanced" | "max" | "bypass";
+export type FixelRecallMode = "safe" | "balanced" | "max" | "bypass";
 
-export type PolicyMode = ContextDietMode;
+export type PolicyMode = FixelRecallMode;
 
 export type ProductPolicyPreset = "Observe Only" | "Protect First" | "Save More" | "Lab Mode";
 
@@ -397,11 +397,22 @@ export interface ModelProfileRegistry {
   getSummary(profileId: string): ModelProfileSummary | null;
 }
 
+/**
+ * Candidate-only profiles for current external model families.
+ * Synthetic canaries may evaluate these entries, but their status must remain
+ * `canary` until model-specific evidence and human approval are recorded.
+ */
+export const claudeCandidateProfiles: readonly VersionedModelProfile[] = [
+  createClaudeCandidateProfile("claude-opus-5-5", "2026-01-01"),
+  createClaudeCandidateProfile("claude-sonnet-5-5", "2026-01-01"),
+  createClaudeCandidateProfile("claude-haiku-5-5", "2026-01-01")
+];
+
 export interface PolicyBundleSummary {
   readonly policyId: string;
   readonly source: "built_in" | "local_user" | "local_project" | "team" | "organisation";
   readonly version: string;
-  readonly mode: ContextDietMode;
+  readonly mode: FixelRecallMode;
   readonly mandatory: boolean;
   readonly origin: EvidenceOrigin;
   readonly expiresAt?: IsoTimestamp;
@@ -553,7 +564,7 @@ export interface NormalizedMessage {
 export interface NormalizedRequest {
   readonly id: RequestId;
   readonly provider: ProviderFamily;
-  readonly mode: ContextDietMode;
+  readonly mode: FixelRecallMode;
   readonly messages: readonly NormalizedMessage[];
   readonly providerMetadata: ProviderMetadata;
 }
@@ -952,7 +963,7 @@ export function createNormalizedRequest(input: {
   readonly provider: ProviderFamily;
   readonly messages: readonly NormalizedMessage[];
   readonly providerMetadata: ProviderMetadata;
-  readonly mode?: ContextDietMode;
+  readonly mode?: FixelRecallMode;
 }): NormalizedRequest {
   return {
     id: input.id,
@@ -1016,6 +1027,37 @@ export function createModelProfileRegistry(
   };
 }
 
+function createClaudeCandidateProfile(
+  modelFamily: string,
+  modelVersion: string
+): VersionedModelProfile {
+  return {
+    profileId: `anthropic-${modelFamily}-${modelVersion}-candidate`,
+    provider: "anthropic",
+    modelFamily,
+    modelVersion,
+    status: "canary",
+    lastTestedAt: isoTimestamp("2026-10-13T00:00:00.000Z"),
+    expiresAt: isoTimestamp("2026-11-13T00:00:00.000Z"),
+    imageDimensions: { maxWidthPx: 1_568, maxHeightPx: 728, maxPages: 4 },
+    glyphDensity: { maxGlyphsPerPage: 2_400, maxGlyphsPerSquareInch: 220 },
+    languageCoverage: {
+      primaryLanguages: ["en"],
+      partiallySupportedLanguages: ["es", "fr", "de", "hi", "ja", "zh"],
+      unsupportedLanguages: []
+    },
+    imageTokenAccountingRule: { kind: "pixels", baseTokens: 85, tokensPerMegapixel: 170 },
+    scores: { gist: 0, structure: 0, exactString: 0 },
+    thresholds: { minimumGist: 95, minimumStructure: 94, minimumExactString: 94 },
+    origin: "synthetic",
+    approval: {
+      approvedBy: "synthetic_canary",
+      approvedAt: isoTimestamp("2026-10-13T00:00:00.000Z"),
+      notes: "Candidate only. No real-model canary or renderer approval exists."
+    }
+  };
+}
+
 export function createSyntheticCanaryWorkloads(): readonly CanaryWorkload[] {
   return [
     {
@@ -1043,8 +1085,8 @@ export function createSyntheticCanaryWorkloads(): readonly CanaryWorkload[] {
       kind: "paths",
       label: "Synthetic paths",
       syntheticOrigin: true,
-      content: "/tmp/context-diet/synthetic-file.ts and C:\\temp\\synthetic-file.ts",
-      expectedFragments: ["/tmp/context-diet", "C:\\temp"]
+      content: "/tmp/fixel-recall/synthetic-file.ts and C:\\temp\\synthetic-file.ts",
+      expectedFragments: ["/tmp/fixel-recall", "C:\\temp"]
     },
     {
       kind: "uuids",

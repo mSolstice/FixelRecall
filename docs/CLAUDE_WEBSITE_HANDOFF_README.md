@@ -1,10 +1,10 @@
-# Claude Website Handoff: Context Diet On Fixel
+# Claude Website Handoff: Fixel Recall On Fixel
 
-Use this file first when giving Claude Code context for adding Context Diet to the Fixel website.
+Use this file first when giving Claude Code context for adding Fixel Recall to the Fixel website.
 
 ## Goal
 
-Add Context Diet to the Fixel website as a **flagship local tool**, not just another small markdown
+Add Fixel Recall to the Fixel website as a **flagship local tool**, not just another small markdown
 skill.
 
 Fixel site:
@@ -13,10 +13,10 @@ Fixel site:
 https://fixel-skills.vercel.app/index.html
 ```
 
-Main Context Diet repo:
+Main Fixel Recall repo:
 
 ```text
-https://github.com/mSolstice/ContextDiet
+https://github.com/mSolstice/FixelRecall
 ```
 
 Fixel skills/catalog repo:
@@ -27,12 +27,12 @@ https://github.com/mSolstice/Fixel-skills
 
 ## Read These Files In Order
 
-1. `docs/CONTEXT_DIET_WEBSITE_DESIGN_CONTENT.md`
-2. `docs/CONTEXT_DIET_WEBSITE_BLUEPRINT.md`
+1. `docs/FIXEL_RECALL_WEBSITE_DESIGN_CONTENT.md`
+2. `docs/FIXEL_RECALL_WEBSITE_BLUEPRINT.md`
 3. `docs/LANDING_PAGE_COPY_DRAFT.md`
-4. `docs/CONTEXT_DIET_VIDEO_SCRIPT.md`
+4. `docs/FIXEL_RECALL_VIDEO_SCRIPT.md`
 
-If Claude already has the Context Diet `README.md`, use that as the product source of truth for
+If Claude already has the Fixel Recall `README.md`, use that as the product source of truth for
 technical scope and release claims.
 
 ## Non-Negotiable Claims
@@ -40,7 +40,7 @@ technical scope and release claims.
 Say:
 
 ```text
-Context Diet for macOS CLI.
+Fixel Recall for macOS CLI.
 Available for macOS CLI users of Codex CLI and Claude Code CLI.
 Local-first. Safety-first. Evidence-first.
 ```
@@ -82,8 +82,8 @@ motifs, mono labels, evidence-first copy.
 Claude should produce:
 
 - updated homepage section
-- new `context-diet.html`
-- new `docs-context-diet.html`
+- new `fixel-recall.html`
+- new `docs-fixel-recall.html`
 - updated site data in `assets/js/content.js`
 - optional video placeholder if real video files are not yet present
 - no public release or package publish

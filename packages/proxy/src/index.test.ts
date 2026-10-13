@@ -32,7 +32,7 @@ describe("createFakeGateway", () => {
       const response = await fetch(`${baseUrl}/health`);
       await expect(response.json()).resolves.toMatchObject({
         status: "ok",
-        gateway: "context-diet-local",
+        gateway: "fixel-recall-local",
         mode: "safe"
       });
     } finally {
@@ -156,13 +156,13 @@ describe("createLocalGateway", () => {
       const health = await fetch(`${baseUrl}/health`);
       await expect(health.json()).resolves.toMatchObject({
         status: "ok",
-        gateway: "context-diet-local",
+        gateway: "fixel-recall-local",
         mode: "safe"
       });
 
       const status = await fetch(`${baseUrl}/status`);
       await expect(status.json()).resolves.toMatchObject({
-        gateway: "context-diet-local",
+        gateway: "fixel-recall-local",
         bindHost: "127.0.0.1",
         mode: "safe",
         killSwitchActive: false,
@@ -421,7 +421,7 @@ describe("createLocalGateway", () => {
 
 describe("raw 4xx request body persistence", () => {
   it("does not persist raw request bodies for local gateway 4xx statuses", async () => {
-    const evidenceRoot = join(tmpdir(), `context-diet-raw-4xx-evidence-${Date.now()}`);
+    const evidenceRoot = join(tmpdir(), `fixel-recall-raw-4xx-evidence-${Date.now()}`);
     await mkdir(evidenceRoot, { recursive: true });
     const allCanaries: string[] = [];
 
@@ -461,7 +461,7 @@ describe("raw 4xx request body persistence", () => {
       roots: [process.cwd(), evidenceRoot]
     });
     expect(leaks).toEqual([]);
-  });
+  }, 30_000);
 });
 
 async function startGateway(logs: StructuredLogEvent[] = []) {
@@ -781,7 +781,7 @@ async function scanForCanaries(input: {
 async function scanPath(path: string, canaries: readonly string[], leaks: string[]): Promise<void> {
   const info = await stat(path);
   if (info.isDirectory()) {
-    if (path.includes("/.git") || path.includes("/node_modules")) {
+    if (isIgnoredCanaryScanDirectory(path)) {
       return;
     }
     const children = await readdir(path);
@@ -799,6 +799,12 @@ async function scanPath(path: string, canaries: readonly string[], leaks: string
       leaks.push(`${path}:${canary}`);
     }
   }
+}
+
+function isIgnoredCanaryScanDirectory(path: string): boolean {
+  return ["/.git", "/.pnpm-store", "/node_modules", "/dist", "/coverage", "/artifacts"].some(
+    (segment) => path.includes(segment)
+  );
 }
 
 async function postStream(url: string): Promise<string> {

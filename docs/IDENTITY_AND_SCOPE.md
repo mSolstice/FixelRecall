@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Context Diet uses opaque local identifiers for project, session and context block scope. These IDs
+Fixel Recall uses opaque local identifiers for project, session and context block scope. These IDs
 must be safe to show in logs, metrics, dashboard rows and retrieval references without revealing a
 repository path or letting a caller smuggle a filesystem path into the vault.
 

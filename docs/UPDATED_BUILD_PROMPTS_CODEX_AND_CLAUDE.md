@@ -1,4 +1,4 @@
-# Context Diet Updated Build Prompts
+# Fixel Recall Updated Build Prompts
 
 ## Read this first
 
@@ -25,7 +25,7 @@ After every successful prompt, make a Git commit.
 ## Copy and paste
 
 ```text
-We are starting the Context Diet project.
+We are starting the Fixel Recall project.
 
 Do not write production code.
 
@@ -35,7 +35,7 @@ Do not write production code.
    - AGENTS.md
    - CLAUDE.md
    - 00_START_HERE.md
-   - docs/CONTEXT_DIET_BLUEPRINT.md
+   - docs/FIXEL_RECALL_BLUEPRINT.md
    - docs/ARCHITECTURE.md
    - docs/DUAL_PLATFORM_COMPATIBILITY.md
    - docs/SECURITY_MODEL.md
@@ -528,7 +528,7 @@ Run all checks.
 ## Copy and paste
 
 ```text
-Read docs/CONTEXT_DIET_BLUEPRINT.md and docs/SECURITY_MODEL.md.
+Read docs/FIXEL_RECALL_BLUEPRINT.md and docs/SECURITY_MODEL.md.
 
 Inspect the current teamchong/pxpipe repository and its licence before choosing an integration approach.
 
@@ -804,7 +804,7 @@ Run all checks.
 ## Copy and paste
 
 ```text
-Build the Context Diet CLI.
+Build the Fixel Recall CLI.
 
 Commands:
 - doctor
@@ -909,15 +909,15 @@ Run all checks.
 ```text
 Read the current official Codex and Claude Code Agent Skills documentation before implementation.
 
-Create the canonical Context Diet skill at:
-skill-source/context-diet/
+Create the canonical Fixel Recall skill at:
+skill-source/fixel-recall/
 
 Keep SKILL.md concise and action-focused.
 
 The skill should help when a user asks to:
 - audit coding-agent context
 - reduce token or context waste
-- diagnose Context Diet
+- diagnose Fixel Recall
 - start or stop the service
 - explain a policy decision
 - run a benchmark
@@ -955,11 +955,11 @@ Run all checks.
 Implement deterministic skill synchronisation.
 
 Canonical source:
-skill-source/context-diet/
+skill-source/fixel-recall/
 
 Generated targets:
-- .agents/skills/context-diet/
-- .claude/skills/context-diet/
+- .agents/skills/fixel-recall/
+- .claude/skills/fixel-recall/
 
 Create:
 - scripts/sync-skills.ts

@@ -14,7 +14,7 @@ jobs:
   synthetic-benchmark:
     runs-on: ubuntu-latest
     env:
-      CONTEXT_DIET_SYNTHETIC_BENCHMARK_SEED: "1"
+      FIXEL_RECALL_SYNTHETIC_BENCHMARK_SEED: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -33,7 +33,7 @@ jobs:
         run: |
           node -e '
           const fs = require("node:fs");
-          const root = "artifacts/context-diet-synthetic-benchmark";
+          const root = "artifacts/fixel-recall-synthetic-benchmark";
           const text = fs.readdirSync(root, { recursive: true })
             .filter((name) => fs.statSync(`${root}/${name}`).isFile())
             .map((name) => fs.readFileSync(`${root}/${name}`, "utf8"))
@@ -47,6 +47,6 @@ jobs:
           '
       - uses: actions/upload-artifact@v4
         with:
-          name: context-diet-synthetic-benchmark
-          path: artifacts/context-diet-synthetic-benchmark
+          name: fixel-recall-synthetic-benchmark
+          path: artifacts/fixel-recall-synthetic-benchmark
           if-no-files-found: error

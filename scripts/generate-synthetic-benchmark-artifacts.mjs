@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { createSyntheticBenchmarkArtifacts } from "../packages/benchmark/dist/index.js";
 
-const outputDirectory = valueAfter("--output") ?? "artifacts/context-diet-synthetic-benchmark";
+const outputDirectory = valueAfter("--output") ?? "artifacts/fixel-recall-synthetic-benchmark";
 const seed = Number(valueAfter("--seed") ?? "1");
 
 if (!Number.isInteger(seed) || seed < 0) {
@@ -17,17 +17,17 @@ const badgesDirectory = join(outputDirectory, "badges");
 
 await mkdir(badgesDirectory, { recursive: true });
 await writeFile(
-  join(outputDirectory, "context-diet-synthetic-benchmark.evidence.json"),
+  join(outputDirectory, "fixel-recall-synthetic-benchmark.evidence.json"),
   `${JSON.stringify(artifacts.evidence, null, 2)}\n`,
   "utf8"
 );
 await writeFile(
-  join(outputDirectory, "context-diet-synthetic-benchmark.summary.md"),
+  join(outputDirectory, "fixel-recall-synthetic-benchmark.summary.md"),
   `${artifacts.markdownSummary}\n`,
   "utf8"
 );
 await writeFile(
-  join(outputDirectory, "context-diet-synthetic-benchmark.pr-comment.md"),
+  join(outputDirectory, "fixel-recall-synthetic-benchmark.pr-comment.md"),
   `${artifacts.pullRequestCommentText}\n`,
   "utf8"
 );
@@ -37,22 +37,22 @@ await writeFile(
   "utf8"
 );
 await writeFile(
-  join(badgesDirectory, "context-diet-benchmark.svg"),
+  join(badgesDirectory, "fixel-recall-benchmark.svg"),
   `${artifacts.badges.benchmark_passing}\n`,
   "utf8"
 );
 await writeFile(
-  join(badgesDirectory, "context-diet-input-reduction.svg"),
+  join(badgesDirectory, "fixel-recall-input-reduction.svg"),
   `${artifacts.badges.synthetic_input_reduction}\n`,
   "utf8"
 );
 await writeFile(
-  join(badgesDirectory, "context-diet-protected-imaged.svg"),
+  join(badgesDirectory, "fixel-recall-protected-imaged.svg"),
   `${artifacts.badges.protected_values_imaged}\n`,
   "utf8"
 );
 await writeFile(
-  join(badgesDirectory, "context-diet-compatibility.svg"),
+  join(badgesDirectory, "fixel-recall-compatibility.svg"),
   `${artifacts.badges.compatibility_status}\n`,
   "utf8"
 );

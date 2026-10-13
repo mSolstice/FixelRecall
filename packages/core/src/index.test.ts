@@ -9,6 +9,7 @@ import {
   createTextBlock,
   createUnknownBlock,
   createModelProfileRegistry,
+  claudeCandidateProfiles,
   createSyntheticCanaryWorkloads,
   evaluateSyntheticCanaries,
   evaluatePolicyDecision,
@@ -498,6 +499,36 @@ describe("provider-neutral policy engine", () => {
 });
 
 describe("versioned model-profile registry", () => {
+  it("keeps current Claude candidates disabled until real approval exists", () => {
+    const registry = createModelProfileRegistry(claudeCandidateProfiles);
+    const canary = evaluateSyntheticCanaries({
+      profile: claudeCandidateProfiles[0],
+      observedFragmentsByKind: Object.fromEntries(
+        createSyntheticCanaryWorkloads().map((workload) => [
+          workload.kind,
+          workload.expectedFragments
+        ])
+      ) as Record<CanaryWorkloadKind, readonly string[]>,
+      evaluatedAt: isoTimestamp("2026-10-13T00:00:00.000Z")
+    });
+
+    expect(claudeCandidateProfiles.map((profile) => profile.provider)).toEqual([
+      "anthropic",
+      "anthropic",
+      "anthropic"
+    ]);
+    expect(canary.passed).toBe(true);
+    expect(
+      registry.resolveStatus({
+        provider: "anthropic",
+        modelFamily: claudeCandidateProfiles[0].modelFamily,
+        modelVersion: claudeCandidateProfiles[0].modelVersion,
+        at: isoTimestamp("2026-10-13T00:00:00.000Z"),
+        canary
+      })
+    ).toEqual({ kind: "disabled", profileId: claudeCandidateProfiles[0].profileId });
+  });
+
   const now = isoTimestamp("2026-07-16T00:00:00.000Z");
   const future = isoTimestamp("2026-08-16T00:00:00.000Z");
   const past = isoTimestamp("2026-07-01T00:00:00.000Z");

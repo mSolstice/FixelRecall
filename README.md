@@ -1,13 +1,13 @@
-# Context Diet
+# Fixel Recall
 
 **Make coding-agent context cheaper, safer and easier to understand.**
 
-Context Diet is a local safety and efficiency layer for coding agents. It helps Codex CLI and Claude
+Fixel Recall is a local safety and efficiency layer for coding agents. It helps Codex CLI and Claude
 Code CLI carry less wasteful context while protecting the exact details that should never be
 compressed, rendered or guessed.
 
 <p align="center">
-  <img src="docs/assets/context-diet-overview.png" alt="Context Diet overview showing a local loopback gateway that keeps exact code and secrets protected, shrinks safe old context, uses a local vault, and reports savings honestly." width="900">
+  <img src="docs/assets/fixel-recall-overview.png" alt="Fixel Recall overview showing a local loopback gateway that keeps exact code and secrets protected, shrinks safe old context, uses a local vault, and reports savings honestly." width="900">
 </p>
 
 Think of it as a local nutrition label for your agent context:
@@ -24,13 +24,13 @@ Long coding-agent sessions can quietly collect a lot of baggage: old chat, repea
 logs, file snippets, previous attempts and context that no longer matters. That can make requests
 larger, slower, more expensive and harder for the model to reason about.
 
-Context Diet helps by:
+Fixel Recall helps by:
 
 - reducing token and context waste where it is safe
 - keeping code, commands, paths, IDs, hashes, secrets and active tool state protected
 - preserving exact context through local retrieval when recovery is needed
 - explaining why something was transformed or left untouched
-- benchmarking whether Context Diet is worth using for a setup
+- benchmarking whether Fixel Recall is worth using for a setup
 - supporting both Codex CLI and Claude Code CLI through one local engine
 - providing rollback and uninstall commands for local configuration changes
 
@@ -38,10 +38,10 @@ The goal is not to compress everything. The goal is **safe context reduction wit
 
 ## Shrink The Context. Keep The Details.
 
-Context Diet turns safe old context into images, while exact text stays protected and recoverable.
+Fixel Recall turns safe old context into images, while exact text stays protected and recoverable.
 
 It is not just compression. Instead of sending every old message, log and repeated note back to the
-model as text, Context Diet decides what can safely become a compact visual memory.
+model as text, Fixel Recall decides what can safely become a compact visual memory.
 
 - Current instructions, code, commands, paths, IDs, hashes and secrets stay as native text.
 - Secrets are never rendered.
@@ -53,7 +53,7 @@ model as text, Context Diet decides what can safely become a compact visual memo
 
 ## What This Adds Around OpenAI And Anthropic
 
-OpenAI and Anthropic provide the models and coding agents. Context Diet adds a local product layer
+OpenAI and Anthropic provide the models and coding agents. Fixel Recall adds a local product layer
 around them:
 
 - provider-neutral context policy across Codex CLI and Claude Code CLI
@@ -66,27 +66,55 @@ around them:
 - local install, rollback and uninstall safeguards
 - dashboard-ready metrics and context summaries
 
-Context Diet does not replace OpenAI or Anthropic. It helps developers use coding agents with more
+Fixel Recall does not replace OpenAI or Anthropic. It helps developers use coding agents with more
 visibility, safety and cost awareness.
 
-## Works With Your Existing CLI Login
+## Trust And Safety At A Glance
 
-Context Diet does not ask you to paste provider keys into the app, the repository or chat.
+- **Loopback only by default:** the gateway binds to `127.0.0.1`; see
+  [`packages/proxy/src/index.ts`](packages/proxy/src/index.ts).
+- **Credentials stay in memory:** provider headers are forwarded only when needed and are never
+  stored or printed; see [`copyProviderHeaders`](packages/proxy/src/index.ts).
+- **No raw request-body logging:** structured events contain route, status, size and timing, never
+  request bodies; see [`packages/proxy/src/index.ts`](packages/proxy/src/index.ts).
+- **No telemetry service:** the gateway talks only to the configured, allowlisted provider endpoint;
+  it does not send analytics elsewhere.
+- **Rollback and uninstall:** configuration changes are recorded in a local manifest and can be
+  restored; see [`docs/INSTALLER_ROLLBACK_DESIGN.md`](docs/INSTALLER_ROLLBACK_DESIGN.md).
+
+These are repository claims, not a third-party security audit. The self-review is documented in
+[`SECURITY_REVIEW.md`](SECURITY_REVIEW.md), and the regression coverage includes credential and
+raw-body absence checks in
+[`packages/proxy/src/subscription.test.ts`](packages/proxy/src/subscription.test.ts) and
+[`tests/security/`](tests/security/).
+
+## Authentication And Terms
+
+Fixel Recall does not ask you to paste provider keys into the app, the repository or chat.
 
 - Codex CLI uses custom-provider routing with `requires_openai_auth = true`, so Codex can reuse the
   Codex auth state you already signed in with.
-- Claude Code CLI routes through `ANTHROPIC_BASE_URL`. If `ANTHROPIC_API_KEY` is unset, Claude Code
-  can keep using its normal signed-in subscription auth.
-- API keys are optional for users who intentionally want API-key billing.
+- Claude Code CLI can route through `ANTHROPIC_BASE_URL`. API-key mode is the documented default for
+  this gateway because it has the clearest third-party routing and billing boundary.
+- Subscription-based routing is an optional user choice, not a compliance promise. Users must review
+  Anthropic's current Claude Code and consumer terms before enabling it. Fixel Recall does not
+  extract or store subscription tokens.
+- API keys remain in the user's normal secret store or environment and are never written by Context
+  Diet.
 
-Context Diet forwards required authentication headers in memory only. It must not print, log, store
+See Anthropic's [Claude Code setup](https://docs.anthropic.com/en/docs/claude-code/getting-started)
+and [LLM gateway guidance](https://docs.anthropic.com/en/docs/claude-code/llm-gateway), plus
+OpenAI's
+[Codex authentication guidance](https://help.openai.com/en/articles/11381614-api-codex-cli-and-sign-in-with-chatgpt).
+
+Fixel Recall forwards required authentication headers in memory only. It must not print, log, store
 or persist provider credentials.
 
 ## Current Release Status
 
-**Context Diet for macOS CLI**
+**Fixel Recall for macOS CLI**
 
-Context Diet is available for macOS CLI users of Codex CLI and Claude Code CLI.
+Fixel Recall is available for macOS CLI users of Codex CLI and Claude Code CLI.
 
 Supported now:
 
@@ -119,8 +147,8 @@ See [RELEASE_READINESS.md](RELEASE_READINESS.md) and
 Run in Terminal:
 
 ```bash
-git clone git@github.com:mSolstice/ContextDiet.git
-cd ContextDiet
+git clone git@github.com:mSolstice/FixelRecall.git
+cd FixelRecall
 corepack enable
 pnpm install
 pnpm build
@@ -155,7 +183,7 @@ curl -sS http://127.0.0.1:4317/status
 Expected health shape:
 
 ```json
-{ "status": "ok", "gateway": "context-diet-local", "mode": "safe" }
+{ "status": "ok", "gateway": "fixel-recall-local", "mode": "safe" }
 ```
 
 ### 4. Dry-Run Setup
@@ -163,7 +191,7 @@ Expected health shape:
 Dry-run setup writes nothing:
 
 ```bash
-CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js setup both --mcp
+FIXEL_RECALL_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js setup both --mcp
 ```
 
 The dry run shows the Codex, Claude Code and MCP files that would be touched. Provider credentials
@@ -173,7 +201,7 @@ Setup places the Codex `model_provider` key at the TOML root before any table he
 Codex MCP entry inside the managed Codex block, writes Claude Code `ANTHROPIC_BASE_URL` as a
 settings environment value, and registers Claude MCP in the user Claude configuration.
 
-Subscription users do not need to add provider API keys just to route through Context Diet. Codex
+Subscription users do not need to add provider API keys just to route through Fixel Recall. Codex
 uses `requires_openai_auth = true` so Codex can reuse its own signed-in auth state. Claude Code uses
 `ANTHROPIC_BASE_URL`; keep `ANTHROPIC_API_KEY` unset if you want Claude Code to keep using your
 subscription instead of API billing.
@@ -183,7 +211,7 @@ subscription instead of API billing.
 Only after reviewing the dry-run output:
 
 ```bash
-CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js setup both --mcp --confirm --replace-existing-manifest
+FIXEL_RECALL_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js setup both --mcp --confirm --replace-existing-manifest
 ```
 
 This records a local manifest and backups.
@@ -191,11 +219,11 @@ This records a local manifest and backups.
 ### 6. Use Codex CLI Or Claude Code CLI Normally
 
 After configuration, normal coding prompts can continue as normal. Developers do not need to add
-“use Context Diet” to every prompt for gateway behavior.
+“use Fixel Recall” to every prompt for gateway behavior.
 
-The skill is for Context Diet-specific operations, such as:
+The skill is for Fixel Recall-specific operations, such as:
 
-- diagnose Context Diet
+- diagnose Fixel Recall
 - run a benchmark
 - explain a policy decision
 - retrieve exact context
@@ -206,14 +234,14 @@ Simple rule:
 
 ```text
 Gateway = automatic once configured.
-Skill = invoked for Context Diet-specific questions or commands.
+Skill = invoked for Fixel Recall-specific questions or commands.
 ```
 
 ## User Journey: What Happens In Real Use
 
 ### Right After Install
 
-The first win is confidence. The developer starts the local gateway and confirms Context Diet is
+The first win is confidence. The developer starts the local gateway and confirms Fixel Recall is
 running locally in Safe mode:
 
 ```bash
@@ -223,7 +251,7 @@ node packages/cli/dist/index.js start
 They see:
 
 ```text
-Context Diet gateway listening
+Fixel Recall gateway listening
 
 Gateway URL: http://127.0.0.1:4317
 Safety mode: Safe
@@ -239,7 +267,7 @@ node packages/cli/dist/index.js status
 They see:
 
 ```text
-Context Diet status
+Fixel Recall status
 
 Gateway: running
 Safety mode: Safe
@@ -261,7 +289,7 @@ or:
 claude
 ```
 
-They do not need to add “use Context Diet” to every prompt. Once the gateway is configured, routing
+They do not need to add “use Fixel Recall” to every prompt. Once the gateway is configured, routing
 happens in the background.
 
 ### Check Whether It Is Worth Using
@@ -283,7 +311,7 @@ net saving and a verdict. The verdict can be positive, neutral or negative.
 
 ### Understand Why Something Was Protected
 
-When the developer wants to know why Context Diet kept something as text, they run:
+When the developer wants to know why Fixel Recall kept something as text, they run:
 
 ```bash
 node packages/cli/dist/index.js explain
@@ -298,7 +326,7 @@ Safe mode keeps that content unchanged.
 
 ### Recover Exact Context
 
-If Context Diet stored authorised original text in the local vault, exact retrieval can fetch a
+If Fixel Recall stored authorised original text in the local vault, exact retrieval can fetch a
 narrow section later:
 
 ```bash
@@ -318,13 +346,13 @@ node packages/cli/dist/index.js stop
 Restore backed-up config:
 
 ```bash
-CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js rollback --confirm
+FIXEL_RECALL_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js rollback --confirm
 ```
 
 Uninstall managed entries:
 
 ```bash
-CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js uninstall --confirm
+FIXEL_RECALL_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js uninstall --confirm
 ```
 
 ## What Developers See
@@ -332,7 +360,7 @@ CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js uninstall --con
 Gateway health:
 
 ```json
-{ "status": "ok", "gateway": "context-diet-local", "mode": "safe" }
+{ "status": "ok", "gateway": "fixel-recall-local", "mode": "safe" }
 ```
 
 Setup:
@@ -352,7 +380,7 @@ Credentials: not displayed
 Uninstall:
 
 ```text
-Uninstall complete: only Context Diet managed entries were removed.
+Uninstall complete: only Fixel Recall managed entries were removed.
 ```
 
 Policy explanations are plain-language:
@@ -391,13 +419,13 @@ Canaries must use Safe mode, synthetic prompts only, strict cost limits and no p
 Rollback:
 
 ```bash
-CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js rollback --confirm
+FIXEL_RECALL_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js rollback --confirm
 ```
 
 Uninstall:
 
 ```bash
-CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js uninstall --confirm
+FIXEL_RECALL_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js uninstall --confirm
 ```
 
 ## Privacy And Safety Defaults
@@ -415,7 +443,7 @@ Safe mode keeps these as native text:
 - open or incomplete tool calls
 - unknown or incompatible content
 
-Context Diet must not log authentication headers or raw request bodies. Secret-sensitive values are
+Fixel Recall must not log authentication headers or raw request bodies. Secret-sensitive values are
 not render-eligible and must not be stored in the vault.
 
 If parsing, scanning, rendering, vault storage, profile validation or rebuilding fails, the original
@@ -443,13 +471,13 @@ See:
 The editable skill source lives at:
 
 ```text
-skill-source/context-diet/
+skill-source/fixel-recall/
 ```
 
 Generated installation targets:
 
-- `.agents/skills/context-diet/`
-- `.claude/skills/context-diet/`
+- `.agents/skills/fixel-recall/`
+- `.claude/skills/fixel-recall/`
 
 Use:
 
@@ -478,6 +506,6 @@ Do not claim:
 The honest current claim is:
 
 ```text
-Context Diet is available for macOS CLI users of Codex CLI and Claude Code CLI.
+Fixel Recall is available for macOS CLI users of Codex CLI and Claude Code CLI.
 IDE, Windows native, WSL, and broad hosted/enterprise production deployment are not included in this release.
 ```

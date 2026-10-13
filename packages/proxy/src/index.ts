@@ -1,5 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import {
+  codexSubscriptionPaths,
+  resolveCodexSubscriptionRoute,
+  validateCodexSubscriptionBaseUrl
+} from "@fixel-recall/providers-openai";
+import { CanaryAdmissionError, createCanaryAdmission, type CanaryLimits } from "./canary.js";
+
+export { createCanaryAdmission, CanaryAdmissionError, type CanaryLimits } from "./canary.js";
 
 export type ProviderFamily = "openai" | "anthropic";
 export type GatewayMode = "safe" | "bypass";
@@ -43,6 +51,8 @@ export interface LocalGatewayOptions {
   readonly killSwitchActive?: boolean;
   readonly upstreams?: Partial<Record<ProviderFamily, string>>;
   readonly upstreamAllowlist?: readonly string[];
+  readonly codexSubscription?: { readonly baseUrl: string };
+  readonly canary?: CanaryLimits;
   readonly log?: (event: StructuredLogEvent) => void;
 }
 
@@ -56,7 +66,7 @@ export interface LocalGateway {
 }
 
 export interface GatewayStatus {
-  readonly gateway: "context-diet-local";
+  readonly gateway: "fixel-recall-local";
   readonly mode: GatewayMode;
   readonly killSwitchActive: boolean;
   readonly bindHost: "127.0.0.1" | "::1";
@@ -105,6 +115,14 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
   const upstreams = options.upstreams ?? {};
   const upstreamAllowlist = options.upstreamAllowlist ?? [];
   const metrics = createMetrics();
+  const subscriptionBase =
+    options.codexSubscription === undefined
+      ? undefined
+      : validateCodexSubscriptionBaseUrl(options.codexSubscription.baseUrl);
+  const admitCanary =
+    options.canary === undefined ? undefined : createCanaryAdmission(options.canary);
+  const activeRequests = new Set<AbortController>();
+  let canaryModelLookups = 0;
 
   const server = createServer(async (request, response) => {
     const startedAt = Date.now();
@@ -117,8 +135,12 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
     let responseStreamed = false;
 
     const abortController = new AbortController();
+    activeRequests.add(abortController);
     const timeout = setTimeout(() => abortController.abort(), requestTimeoutMs);
     request.on("aborted", () => abortController.abort());
+    response.on("close", () => {
+      if (!response.writableEnded) abortController.abort();
+    });
 
     try {
       const controlResult = await maybeHandleControlRoute({
@@ -132,6 +154,7 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
         },
         setKillSwitch: (enabled) => {
           killSwitchActive = enabled;
+          if (enabled) for (const controller of activeRequests) controller.abort();
         }
       });
       if (controlResult !== null) {
@@ -139,7 +162,11 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
         return;
       }
 
-      if (method !== "POST" || !isProviderRoute(route)) {
+      const subscriptionRoute =
+        subscriptionBase === undefined
+          ? undefined
+          : resolveCodexSubscriptionRoute(method, request.url ?? "/", subscriptionBase);
+      if (subscriptionRoute === undefined && (method !== "POST" || !isProviderRoute(route))) {
         statusCode = 404;
         writeJson(response, statusCode, requestId, {
           error: { type: "not_found", message: "route is not available on the local gateway" }
@@ -147,7 +174,10 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
         return;
       }
 
-      provider = route === openAIResponsesRoute.path ? "openai" : "anthropic";
+      provider =
+        subscriptionRoute !== undefined || route === openAIResponsesRoute.path
+          ? "openai"
+          : "anthropic";
       metrics.providerRequests[provider] += 1;
 
       if (!hasProviderAuth(request, provider)) {
@@ -159,7 +189,7 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
         return;
       }
 
-      if (!hasJsonContentType(request)) {
+      if (method === "POST" && !hasJsonContentType(request)) {
         statusCode = 415;
         metrics.rejectedRequests += 1;
         writeJson(response, statusCode, requestId, {
@@ -175,12 +205,12 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
         statusCode = 503;
         metrics.rejectedRequests += 1;
         writeJson(response, statusCode, requestId, {
-          error: { type: "kill_switch_active", message: "Context Diet gateway is disabled" }
+          error: { type: "kill_switch_active", message: "Fixel Recall gateway is disabled" }
         });
         return;
       }
 
-      const upstreamUrl = upstreams[provider];
+      const upstreamUrl = subscriptionRoute?.upstreamUrl ?? upstreams[provider];
       if (upstreamUrl === undefined || !isAllowedUpstream(upstreamUrl, upstreamAllowlist)) {
         statusCode = 502;
         metrics.rejectedRequests += 1;
@@ -194,13 +224,21 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
         return;
       }
 
-      const body = await readLimitedBody(request, maxRequestBytes);
+      const body = await readLimitedBody(request, method === "GET" ? 0 : maxRequestBytes);
       requestBytes = body.length;
-      validateJsonBody(body);
+      if (method === "POST") {
+        validateJsonBody(body);
+        admitCanary?.(provider, mode, body);
+      } else if (admitCanary !== undefined) {
+        if (mode !== "safe" || canaryModelLookups >= 1) {
+          throw new CanaryAdmissionError("canary_models_limit");
+        }
+        canaryModelLookups += 1;
+      }
       const upstreamResponse = await fetch(upstreamUrl, {
-        method: "POST",
-        headers: forwardHeaders(request, provider),
-        body,
+        method,
+        headers: forwardHeaders(request, provider, subscriptionRoute !== undefined),
+        body: method === "POST" ? body : undefined,
         redirect: "manual",
         signal: abortController.signal
       });
@@ -243,9 +281,12 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
         writeJson(response, statusCode, requestId, {
           error: { type: gatewayError.type, message: gatewayError.message }
         });
+      } else {
+        response.destroy();
       }
     } finally {
       clearTimeout(timeout);
+      activeRequests.delete(abortController);
       metrics.totalRequests += 1;
       options.log?.({
         authRedacted: true,
@@ -273,6 +314,7 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
     bindHost,
     close: () =>
       new Promise((resolve, reject) => {
+        for (const controller of activeRequests) controller.abort();
         server.close((error) => {
           if (error) {
             reject(error);
@@ -286,10 +328,11 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
     },
     setKillSwitch: (enabled) => {
       killSwitchActive = enabled;
+      if (enabled) for (const controller of activeRequests) controller.abort();
     },
     status: () => ({
       bindHost,
-      gateway: "context-diet-local",
+      gateway: "fixel-recall-local",
       killSwitchActive,
       metrics: {
         ...metrics,
@@ -300,7 +343,8 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
         healthRoute.path,
         statusRoute.path,
         openAIResponsesRoute.path,
-        anthropicMessagesRoute.path
+        anthropicMessagesRoute.path,
+        ...(subscriptionBase === undefined ? [] : Object.values(codexSubscriptionPaths))
       ],
       upstreamAllowlist
     })
@@ -354,7 +398,7 @@ export function createFakeGateway(options: FakeGatewayOptions = {}): FakeGateway
         statusCode = 503;
         metrics.rejectedRequests += 1;
         writeJson(response, statusCode, requestId, {
-          error: { type: "kill_switch_active", message: "Context Diet gateway is disabled" }
+          error: { type: "kill_switch_active", message: "Fixel Recall gateway is disabled" }
         });
         return;
       }
@@ -437,7 +481,7 @@ export function createFakeGateway(options: FakeGatewayOptions = {}): FakeGateway
     },
     status: () => ({
       bindHost,
-      gateway: "context-diet-local",
+      gateway: "fixel-recall-local",
       killSwitchActive,
       metrics: { ...metrics, providerRequests: { ...metrics.providerRequests } },
       mode,
@@ -486,7 +530,7 @@ async function maybeHandleControlRoute(input: {
   if (input.method === "GET" && input.route === healthRoute.path) {
     writeJson(input.response, 200, input.requestId, {
       status: "ok",
-      gateway: "context-diet-local",
+      gateway: "fixel-recall-local",
       mode: input.status().mode
     });
     return 200;
@@ -650,13 +694,22 @@ async function streamUpstreamResponse(
   response.end();
 }
 
-function forwardHeaders(request: IncomingMessage, provider: ProviderFamily): Headers {
+function forwardHeaders(
+  request: IncomingMessage,
+  provider: ProviderFamily,
+  subscription = false
+): Headers {
   const headers = new Headers();
   headers.set("content-type", "application/json");
   copyHeader(request, headers, "x-request-id");
   if (provider === "openai") {
     copyHeader(request, headers, "authorization");
     copyHeader(request, headers, "openai-beta");
+    if (subscription) {
+      copyHeader(request, headers, "chatgpt-account-id");
+      copyHeader(request, headers, "originator");
+      copyHeader(request, headers, "version");
+    }
   } else {
     copyHeader(request, headers, "authorization");
     copyHeader(request, headers, "x-api-key");
@@ -757,6 +810,9 @@ function classifyGatewayError(error: unknown): {
 } {
   if (error instanceof GatewayRequestError) {
     return { statusCode: error.statusCode, type: error.type, message: error.message };
+  }
+  if (error instanceof CanaryAdmissionError) {
+    return { statusCode: 409, type: error.code, message: error.message };
   }
   if (error instanceof DOMException && error.name === "AbortError") {
     return {

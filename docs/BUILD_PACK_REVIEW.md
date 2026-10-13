@@ -1,4 +1,4 @@
-# Context Diet Build Pack Review
+# Fixel Recall Build Pack Review
 
 Prepared: 14 July 2026
 
@@ -13,19 +13,19 @@ Prepared: 14 July 2026
 - `docs/ARCHITECTURE.md`
 - `docs/BEGINNER_STEP_BY_STEP_GUIDE.md`
 - `docs/BUILD_PLAN.md`
-- `docs/CONTEXT_DIET_BLUEPRINT.md`
+- `docs/FIXEL_RECALL_BLUEPRINT.md`
 - `docs/DECISIONS.md`
 - `docs/DUAL_PLATFORM_COMPATIBILITY.md`
 - `docs/FILE_PLACEMENT_MAP.md`
 - `docs/SECURITY_MODEL.md`
 - `docs/UPDATED_BUILD_PROMPTS_CODEX_AND_CLAUDE.md`
-- `skill-source/context-diet/SKILL.md`
-- `skill-source/context-diet/references/BENCHMARKING.md`
-- `skill-source/context-diet/references/CLAUDE_CODE_SETUP.md`
-- `skill-source/context-diet/references/CODEX_SETUP.md`
-- `skill-source/context-diet/references/OPERATIONS.md`
-- `skill-source/context-diet/references/SAFETY.md`
-- `skill-source/context-diet/references/TROUBLESHOOTING.md`
+- `skill-source/fixel-recall/SKILL.md`
+- `skill-source/fixel-recall/references/BENCHMARKING.md`
+- `skill-source/fixel-recall/references/CLAUDE_CODE_SETUP.md`
+- `skill-source/fixel-recall/references/CODEX_SETUP.md`
+- `skill-source/fixel-recall/references/OPERATIONS.md`
+- `skill-source/fixel-recall/references/SAFETY.md`
+- `skill-source/fixel-recall/references/TROUBLESHOOTING.md`
 
 ## Project instruction loading
 
@@ -72,7 +72,7 @@ security model, acceptance criteria and decisions:
    could be logged or persisted.
 4. Exactness corruption: compressed or rendered content could cause the model to misread paths,
    commands, IDs, versions, numbers or code.
-5. Skill drift: the canonical skill in `skill-source/context-diet/` could diverge from generated
+5. Skill drift: the canonical skill in `skill-source/fixel-recall/` could diverge from generated
    Codex and Claude Code copies unless sync and drift checks are enforced.
 
 ## Recommended first checkpoint
@@ -84,7 +84,7 @@ Before starting Prompt 1, initialise Git and save the build pack if the user app
 ```bash
 git init
 git add .
-git commit -m "Add Context Diet build pack"
+git commit -m "Add Fixel Recall build pack"
 ```
 
 Prompt 1 should not install tools automatically. It should report the local operating system, Git,

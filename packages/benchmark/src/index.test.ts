@@ -71,7 +71,7 @@ describe("personal benchmark harness", () => {
 
   it("renders local Markdown and JSON reports", async () => {
     const report = createSyntheticBenchmarkReport(7);
-    const outputDirectory = await mkdtemp(join(tmpdir(), "context-diet-benchmark-"));
+    const outputDirectory = await mkdtemp(join(tmpdir(), "fixel-recall-benchmark-"));
     const files = await writeBenchmarkReport(report, outputDirectory);
     const markdown = await readFile(files.markdownPath, "utf8");
     const json = JSON.parse(await readFile(files.jsonPath, "utf8")) as unknown;
@@ -411,7 +411,7 @@ describe("optional share-card generator", () => {
       testsPassed: 24,
       verificationId: "verify_synthetic_001"
     });
-    expect(preview.previewText).toContain("Context Diet share-card preview");
+    expect(preview.previewText).toContain("Fixel Recall share-card preview");
     expect(preview.previewText).toContain("Input reduction: 42%");
     expect(preview.previewText).toContain("Verification ID: verify_synthetic_001");
     expect(preview.previewText).toContain("Evidence origin: SYNTHETIC");
@@ -428,7 +428,7 @@ describe("optional share-card generator", () => {
   });
 
   it("requires explicit confirmation before export", async () => {
-    const outputDirectory = await mkdtemp(join(tmpdir(), "context-diet-share-card-"));
+    const outputDirectory = await mkdtemp(join(tmpdir(), "fixel-recall-share-card-"));
     const result = await exportShareCard(shareInput, { confirm: false, outputDirectory });
 
     expect(result.exported).toBe(false);
@@ -438,13 +438,13 @@ describe("optional share-card generator", () => {
   });
 
   it("exports PNG, SVG and JSON proof metadata after confirmation", async () => {
-    const outputDirectory = await mkdtemp(join(tmpdir(), "context-diet-share-card-"));
+    const outputDirectory = await mkdtemp(join(tmpdir(), "fixel-recall-share-card-"));
     const result = await exportShareCard(shareInput, { confirm: true, outputDirectory });
 
     expect(result.exported).toBe(true);
-    expect(result.pngPath).toContain("context-diet-share-card.png");
-    expect(result.svgPath).toContain("context-diet-share-card.svg");
-    expect(result.proofJsonPath).toContain("context-diet-share-card.proof.json");
+    expect(result.pngPath).toContain("fixel-recall-share-card.png");
+    expect(result.svgPath).toContain("fixel-recall-share-card.svg");
+    expect(result.proofJsonPath).toContain("fixel-recall-share-card.proof.json");
     const png = await readFile(result.pngPath as string);
     const svg = await readFile(result.svgPath as string, "utf8");
     const proof = JSON.parse(await readFile(result.proofJsonPath as string, "utf8")) as {
@@ -460,7 +460,7 @@ describe("optional share-card generator", () => {
     expect(svg).toContain("<svg");
     expect(svg).toContain("SYNTHETIC RESULTS");
     expect(svg).toContain("verify_synthetic_001");
-    expect(proof.artifactKind).toBe("context_diet_share_card_proof");
+    expect(proof.artifactKind).toBe("fixel_recall_share_card_proof");
     expect(proof.fields).toEqual(result.preview.allowedFields);
     expect(proof.allowlist).toEqual(result.preview.allowlist);
     expect(proof.blockedFieldCount).toBe(result.preview.blockedFields.length);
@@ -504,7 +504,7 @@ describe("GitHub Actions synthetic benchmark artifacts", () => {
       [...syntheticBenchmarkEvidenceAllowedFields].sort()
     );
     expect(first.evidence).toMatchObject({
-      artifactKind: "context_diet_synthetic_benchmark_evidence",
+      artifactKind: "fixel_recall_synthetic_benchmark_evidence",
       dataOrigin: "synthetic",
       seed: 7,
       syntheticNotice: "SYNTHETIC TEST DATA"
@@ -584,7 +584,7 @@ describe("GitHub Actions synthetic benchmark artifacts", () => {
     const instructions = renderSyntheticBenchmarkReadmeInstructions();
 
     expect(instructions).toContain("not published to an external badge service");
-    expect(instructions).toContain("context-diet-benchmark.svg");
+    expect(instructions).toContain("fixel-recall-benchmark.svg");
     expect(instructions).toContain("SYNTHETIC");
   });
 });
@@ -597,7 +597,7 @@ function run(
     cacheUsage: {
       cacheHits: variant === "uncompressed_control" ? 0 : 1,
       cacheMisses: variant === "uncompressed_control" ? 0 : 1,
-      treatment: variant === "uncompressed_control" ? "none" : "context_diet_cache"
+      treatment: variant === "uncompressed_control" ? "none" : "fixel_recall_cache"
     },
     errors: [],
     filesChanged: ["src/example.ts", "src/example.test.ts"],

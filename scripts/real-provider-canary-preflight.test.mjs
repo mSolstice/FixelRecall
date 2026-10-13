@@ -7,20 +7,20 @@ import { test } from "node:test";
 import { renderPreflightReport, runPreflight } from "./real-provider-canary-preflight.mjs";
 
 const passingEnv = {
-  CONTEXT_DIET_CANARY_MAX_COST_USD: "0.10",
-  CONTEXT_DIET_CANARY_MAX_INPUT_TOKENS: "200",
-  CONTEXT_DIET_CANARY_MAX_OUTPUT_TOKENS: "50",
-  CONTEXT_DIET_CANARY_MAX_REQUESTS: "2",
-  CONTEXT_DIET_CANARY_MODE: "Safe",
-  CONTEXT_DIET_FAKE_BETA_PASSED: "true",
-  CONTEXT_DIET_GATEWAY_BASE_URL: "http://127.0.0.1:4317",
-  CONTEXT_DIET_KILL_SWITCH_READY: "true",
-  CONTEXT_DIET_RAW_BODY_LOGGING: "false",
-  CONTEXT_DIET_UPSTREAM_ALLOWLIST: "https://api.openai.example,https://api.anthropic.example"
+  FIXEL_RECALL_CANARY_MAX_COST_USD: "0.10",
+  FIXEL_RECALL_CANARY_MAX_INPUT_TOKENS: "200",
+  FIXEL_RECALL_CANARY_MAX_OUTPUT_TOKENS: "50",
+  FIXEL_RECALL_CANARY_MAX_REQUESTS: "2",
+  FIXEL_RECALL_CANARY_MODE: "Safe",
+  FIXEL_RECALL_FAKE_BETA_PASSED: "true",
+  FIXEL_RECALL_GATEWAY_BASE_URL: "http://127.0.0.1:4317",
+  FIXEL_RECALL_KILL_SWITCH_READY: "true",
+  FIXEL_RECALL_RAW_BODY_LOGGING: "false",
+  FIXEL_RECALL_UPSTREAM_ALLOWLIST: "https://api.openai.example,https://api.anthropic.example"
 };
 
 test("real-provider canary preflight passes without provider traffic", async () => {
-  const root = await mkdtemp(join(tmpdir(), "context-diet-preflight-pass-"));
+  const root = await mkdtemp(join(tmpdir(), "fixel-recall-preflight-pass-"));
   try {
     await writeFile(join(root, "README.md"), "safe synthetic fixture\n");
 
@@ -36,14 +36,14 @@ test("real-provider canary preflight passes without provider traffic", async () 
 });
 
 test("real-provider canary preflight fails closed on unsafe mode and missing budgets", async () => {
-  const root = await mkdtemp(join(tmpdir(), "context-diet-preflight-fail-"));
+  const root = await mkdtemp(join(tmpdir(), "fixel-recall-preflight-fail-"));
   try {
     const report = await runPreflight({
       cwd: root,
       env: {
         ...passingEnv,
-        CONTEXT_DIET_CANARY_MAX_COST_USD: "1",
-        CONTEXT_DIET_CANARY_MODE: "Bypass"
+        FIXEL_RECALL_CANARY_MAX_COST_USD: "1",
+        FIXEL_RECALL_CANARY_MODE: "Bypass"
       }
     });
 
@@ -57,7 +57,7 @@ test("real-provider canary preflight fails closed on unsafe mode and missing bud
 });
 
 test("real-provider canary preflight rejects credentials in repository files", async () => {
-  const root = await mkdtemp(join(tmpdir(), "context-diet-preflight-credential-"));
+  const root = await mkdtemp(join(tmpdir(), "fixel-recall-preflight-credential-"));
   try {
     await mkdir(join(root, "config"), { recursive: true });
     const leakedToken = `Authorization: Bearer ${"livecredentialvalue1234567890"}\n`;

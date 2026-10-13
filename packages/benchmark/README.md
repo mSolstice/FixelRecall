@@ -1,4 +1,4 @@
-# @context-diet/benchmark
+# @fixel-recall/benchmark
 
 Benchmark reporting boundary.
 

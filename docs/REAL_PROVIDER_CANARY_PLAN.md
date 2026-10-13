@@ -31,13 +31,13 @@ If any consent item is missing, stop.
 Use this exact prompt for both hosts:
 
 ```text
-SYNTHETIC CANARY ONLY. Reply with exactly: Context Diet real-provider canary passed.
+SYNTHETIC CANARY ONLY. Reply with exactly: Fixel Recall real-provider canary passed.
 ```
 
 Expected answer:
 
 ```text
-Context Diet real-provider canary passed.
+Fixel Recall real-provider canary passed.
 ```
 
 If the model returns extra text, treat the route as reachable but the canary as not strictly passed.
@@ -46,13 +46,13 @@ If the model returns extra text, treat the route as reachable but the canary as 
 
 Codex real-provider canary:
 
-- Host route into Context Diet: `http://127.0.0.1:<gateway-port>/v1/responses`
+- Host route into Fixel Recall: `http://127.0.0.1:<gateway-port>/v1/responses`
 - Gateway upstream: allowlisted OpenAI-compatible Responses origin
 - Provider protocol: OpenAI Responses-shaped request
 
 Claude Code real-provider canary:
 
-- Host route into Context Diet: `http://127.0.0.1:<gateway-port>/v1/messages`
+- Host route into Fixel Recall: `http://127.0.0.1:<gateway-port>/v1/messages`
 - Gateway upstream: allowlisted Anthropic Messages origin
 - Provider protocol: Anthropic Messages-shaped request
 
@@ -93,16 +93,16 @@ sent.
 Example:
 
 ```bash
-CONTEXT_DIET_CANARY_MODE=Safe \
-CONTEXT_DIET_GATEWAY_BASE_URL=http://127.0.0.1:<gateway-port> \
-CONTEXT_DIET_UPSTREAM_ALLOWLIST=https://api.openai.example,https://api.anthropic.example \
-CONTEXT_DIET_KILL_SWITCH_READY=true \
-CONTEXT_DIET_FAKE_BETA_PASSED=true \
-CONTEXT_DIET_RAW_BODY_LOGGING=false \
-CONTEXT_DIET_CANARY_MAX_REQUESTS=2 \
-CONTEXT_DIET_CANARY_MAX_INPUT_TOKENS=200 \
-CONTEXT_DIET_CANARY_MAX_OUTPUT_TOKENS=50 \
-CONTEXT_DIET_CANARY_MAX_COST_USD=0.10 \
+FIXEL_RECALL_CANARY_MODE=Safe \
+FIXEL_RECALL_GATEWAY_BASE_URL=http://127.0.0.1:<gateway-port> \
+FIXEL_RECALL_UPSTREAM_ALLOWLIST=https://api.openai.example,https://api.anthropic.example \
+FIXEL_RECALL_KILL_SWITCH_READY=true \
+FIXEL_RECALL_FAKE_BETA_PASSED=true \
+FIXEL_RECALL_RAW_BODY_LOGGING=false \
+FIXEL_RECALL_CANARY_MAX_REQUESTS=2 \
+FIXEL_RECALL_CANARY_MAX_INPUT_TOKENS=200 \
+FIXEL_RECALL_CANARY_MAX_OUTPUT_TOKENS=50 \
+FIXEL_RECALL_CANARY_MAX_COST_USD=0.10 \
 pnpm canary:preflight
 ```
 
@@ -201,7 +201,7 @@ Immediate pass criteria:
 Before and after each request:
 
 ```bash
-context-diet status --no-credentials
+fixel-recall status --no-credentials
 ```
 
 Confirm:
@@ -255,7 +255,7 @@ Use immediately on any safety, cost, route or logging concern:
 
 ```bash
 curl -X POST http://127.0.0.1:<gateway-port>/runtime/kill-switch
-context-diet status --no-credentials
+fixel-recall status --no-credentials
 ```
 
 Expected result:
@@ -269,7 +269,7 @@ Expected result:
 Codex:
 
 - Restore the previous direct provider configuration.
-- Remove or disable the Context Diet custom provider entry for the test session.
+- Remove or disable the Fixel Recall custom provider entry for the test session.
 - Confirm Codex no longer points at the loopback gateway.
 
 Claude Code:
@@ -288,7 +288,7 @@ If anything fails or the user asks to stop:
 2. Stop the local gateway.
 3. Restore direct routing for Codex and Claude Code.
 4. Remove temporary MCP or host routing entries created for the test.
-5. Delete temporary Context Diet session/vault data created for the canary.
+5. Delete temporary Fixel Recall session/vault data created for the canary.
 6. Keep only safe metadata evidence.
 7. Do not retry until the failure is documented and explicitly approved.
 

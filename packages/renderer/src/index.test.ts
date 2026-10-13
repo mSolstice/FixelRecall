@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isoTimestamp } from "@context-diet/core";
+import { isoTimestamp } from "@fixel-recall/core";
 
 import {
   createDeterministicFakeRenderer,

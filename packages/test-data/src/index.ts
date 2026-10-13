@@ -461,7 +461,7 @@ async function handleProviderRequest(
   if (scenario === "stream") {
     response.writeHead(200, {
       "content-type": "text/event-stream",
-      "x-context-diet-data-origin": "synthetic"
+      "x-fixel-recall-data-origin": "synthetic"
     });
     response.write(
       `data: ${JSON.stringify({ data_origin: "synthetic", seed, delta: "hello" })}\n\n`
@@ -472,7 +472,7 @@ async function handleProviderRequest(
     response.end("data: [DONE]\n\n");
     return;
   }
-  response.setHeader("x-context-diet-data-origin", "synthetic");
+  response.setHeader("x-fixel-recall-data-origin", "synthetic");
   if (scenario === "changed_model") {
     response.setHeader("x-synthetic-model-version", `${provider}-changed-${seed}`);
   }

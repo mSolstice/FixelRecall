@@ -7,12 +7,12 @@ import {
   createAnthropicAdapterRequest,
   parseAnthropicMessagesRequest,
   rebuildAnthropicMessagesRequest
-} from "@context-diet/providers-anthropic";
+} from "@fixel-recall/providers-anthropic";
 import {
   createOpenAIAdapterRequest,
   parseOpenAIResponsesRequest,
   rebuildOpenAIResponsesRequest
-} from "@context-diet/providers-openai";
+} from "@fixel-recall/providers-openai";
 
 describe("platform compatibility scaffold", () => {
   it("keeps Codex/OpenAI and Claude/Anthropic provider families represented", () => {

@@ -1,10 +1,10 @@
 {
-  "name": "@context-diet/cli",
+  "name": "@fixel-recall/cli",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "bin": {
-    "context-diet": "./dist/index.js"
+    "fixel-recall": "./dist/index.js"
   },
   "exports": {
     ".": "./dist/index.js"
@@ -14,9 +14,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@context-diet/benchmark": "workspace:*",
-    "@context-diet/core": "workspace:*",
-    "@context-diet/renderer": "workspace:*",
-    "@context-diet/proxy": "workspace:*"
+    "@fixel-recall/benchmark": "workspace:*",
+    "@fixel-recall/core": "workspace:*",
+    "@fixel-recall/renderer": "workspace:*",
+    "@fixel-recall/proxy": "workspace:*"
   }
 }

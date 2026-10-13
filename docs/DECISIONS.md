@@ -1,4 +1,4 @@
-# Context Diet Architecture Decisions
+# Fixel Recall Architecture Decisions
 
 This file records choices that agents must not casually reverse.
 
@@ -44,8 +44,8 @@ Claude-specific rules.
 
 **Status:** Accepted
 
-**Decision:** Edit `skill-source/context-diet/`. Generate `.agents/skills/context-diet/` and
-`.claude/skills/context-diet/`.
+**Decision:** Edit `skill-source/fixel-recall/`. Generate `.agents/skills/fixel-recall/` and
+`.claude/skills/fixel-recall/`.
 
 **Consequence:** CI must check for drift.
 
@@ -174,6 +174,28 @@ retrieval access patterns.
 **Consequences:** The store is simple and auditable for the MVP. If future retrieval needs require
 querying across many records, add SQLite behind the same vault interface and record a new migration
 decision.
+
+## ADR-021: Explicit subscription routes and fail-closed canary admission
+
+**Status:** Accepted for local fake-provider validation; real subscription support remains unproven.
+
+**Decision:** Add opt-in Codex subscription routes under `/backend-api/codex`, with a separately
+allowlisted ChatGPT backend and account-header forwarding. Never infer the upstream from token
+contents or silently fall back to API billing. Keep provider route logic in the OpenAI adapter.
+
+**Reason:** Forwarding Authorization alone does not implement the documented subscription gateway
+contract. The installed CLI's local fake test also showed substantial added context and no output
+cap, so a short synthetic prompt does not guarantee the approved budget.
+
+**Decision:** An optional canary gate rejects requests without a supplied output cap and reviewed,
+unexpired cost evidence bound to the exact request bytes. Reserve one generation attempt before
+forwarding, with no refund after failures. This admission rule does not transform content or weaken
+normal Safe-mode policy. It applies to both provider-shaped requests and rejects unknown evidence.
+
+**Consequences:** No automatic Astra profile approval, new paid test, user config write, or release
+support claim. CLI canary preparation intentionally remains blocked without verified accounting and
+upstream output-limit support. Budgets are process-local; multiple starts are separate reservations.
+No production dependency was added. See `docs/ASTRA_CANARY_READINESS.md`.
 
 ## ADR template
 

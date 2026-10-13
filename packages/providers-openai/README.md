@@ -1,4 +1,4 @@
-# @context-diet/providers-openai
+# @fixel-recall/providers-openai
 
 OpenAI Responses adapter boundary.
 

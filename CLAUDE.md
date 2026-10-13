@@ -15,7 +15,7 @@ Claude Code must follow the shared project rules imported above.
   is used.
 - Use Claude Code hooks only for optional setup, checks or operator convenience. Hooks are not the
   core request-transformation engine.
-- Put the installable project skill under `.claude/skills/context-diet/`.
+- Put the installable project skill under `.claude/skills/fixel-recall/`.
 - Keep `SKILL.md` concise. Put detailed procedures in one-level reference files.
 - Use `/memory` or equivalent inspection to verify this file loads when diagnosing instruction
   problems.

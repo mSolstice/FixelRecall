@@ -47,7 +47,7 @@ export interface BenchmarkRun {
   readonly status: BenchmarkRunStatus;
   readonly usage: BenchmarkUsage;
   readonly cacheUsage: {
-    readonly treatment: "none" | "provider_cache" | "context_diet_cache";
+    readonly treatment: "none" | "provider_cache" | "fixel_recall_cache";
     readonly cacheHits: number;
     readonly cacheMisses: number;
   };
@@ -145,7 +145,7 @@ export interface ShareCardExportResult {
 }
 
 export interface ShareCardProofObject {
-  readonly artifactKind: "context_diet_share_card_proof";
+  readonly artifactKind: "fixel_recall_share_card_proof";
   readonly exported: boolean;
   readonly allowlist: readonly ShareCardAllowedFieldName[];
   readonly blockedFieldCount: number;
@@ -164,7 +164,7 @@ export type SyntheticBenchmarkBadgeVariant =
   | "compatibility_status";
 
 export interface SyntheticBenchmarkEvidence {
-  readonly artifactKind: "context_diet_synthetic_benchmark_evidence";
+  readonly artifactKind: "fixel_recall_synthetic_benchmark_evidence";
   readonly dataOrigin: "synthetic";
   readonly syntheticNotice: "SYNTHETIC TEST DATA";
   readonly seed: number;
@@ -504,7 +504,7 @@ export function validateComparableRuns(
 
 export function renderBenchmarkMarkdown(report: BenchmarkReport): string {
   const lines = [
-    "# Context Diet Personal Benchmark",
+    "# Fixel Recall Personal Benchmark",
     "",
     "SYNTHETIC DATA",
     "",
@@ -566,8 +566,8 @@ export async function writeBenchmarkReport(
   outputDirectory: string
 ): Promise<BenchmarkReportFiles> {
   await mkdir(outputDirectory, { recursive: true });
-  const jsonPath = join(outputDirectory, "context-diet-personal-benchmark.json");
-  const markdownPath = join(outputDirectory, "context-diet-personal-benchmark.md");
+  const jsonPath = join(outputDirectory, "fixel-recall-personal-benchmark.json");
+  const markdownPath = join(outputDirectory, "fixel-recall-personal-benchmark.md");
   await writeFile(jsonPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
   await writeFile(markdownPath, renderBenchmarkMarkdown(report), "utf8");
   return { jsonPath, markdownPath };
@@ -614,7 +614,7 @@ export function createSyntheticBenchmarkEvidence(
     testsPassed === testsTotal &&
     protectedValuesImagedCount === 0;
   return assertSyntheticEvidenceAllowlist({
-    artifactKind: "context_diet_synthetic_benchmark_evidence",
+    artifactKind: "fixel_recall_synthetic_benchmark_evidence",
     benchmarkDate: report.generatedAt.slice(0, 10),
     benchmarkPassing,
     compatibilityStatus: benchmarkPassing ? "PASSING" : "BLOCKED",
@@ -639,7 +639,7 @@ export function createSyntheticBenchmarkBadges(
   return {
     benchmark_passing: renderBadge({
       color: evidence.benchmarkPassing ? "#2f7d4f" : "#9c2f2f",
-      label: "Context Diet",
+      label: "Fixel Recall",
       message: evidence.benchmarkPassing ? "benchmark passing" : "benchmark blocked"
     }),
     compatibility_status: renderBadge({
@@ -665,7 +665,7 @@ export function createSyntheticBenchmarkBadges(
 
 export function renderSyntheticBenchmarkJobSummary(evidence: SyntheticBenchmarkEvidence): string {
   return [
-    "# Context Diet Synthetic Benchmark",
+    "# Fixel Recall Synthetic Benchmark",
     "",
     "**SYNTHETIC TEST DATA**",
     "",
@@ -687,7 +687,7 @@ export function renderSyntheticBenchmarkPullRequestComment(
   evidence: SyntheticBenchmarkEvidence
 ): string {
   return [
-    "## Context Diet synthetic benchmark",
+    "## Fixel Recall synthetic benchmark",
     "",
     "**SYNTHETIC TEST DATA**",
     "",
@@ -702,17 +702,17 @@ export function renderSyntheticBenchmarkPullRequestComment(
 
 export function renderSyntheticBenchmarkReadmeInstructions(): string {
   return [
-    "# Context Diet Synthetic Benchmark Badge Embeds",
+    "# Fixel Recall Synthetic Benchmark Badge Embeds",
     "",
     "These badges are generated locally by GitHub Actions and uploaded as workflow artifacts. They are not published to an external badge service.",
     "",
-    "After downloading the `context-diet-synthetic-benchmark` artifact, copy the SVG files into a committed docs or assets folder if you choose to display them.",
+    "After downloading the `fixel-recall-synthetic-benchmark` artifact, copy the SVG files into a committed docs or assets folder if you choose to display them.",
     "",
     "```md",
-    "![Context Diet benchmark](docs/badges/context-diet-benchmark.svg)",
-    "![Synthetic input reduction](docs/badges/context-diet-input-reduction.svg)",
-    "![Protected values imaged](docs/badges/context-diet-protected-imaged.svg)",
-    "![Compatibility status](docs/badges/context-diet-compatibility.svg)",
+    "![Fixel Recall benchmark](docs/badges/fixel-recall-benchmark.svg)",
+    "![Synthetic input reduction](docs/badges/fixel-recall-input-reduction.svg)",
+    "![Protected values imaged](docs/badges/fixel-recall-protected-imaged.svg)",
+    "![Compatibility status](docs/badges/fixel-recall-compatibility.svg)",
     "```",
     "",
     "Every numeric badge based on test data includes `SYNTHETIC`. Do not replace these with production claims unless measured evidence is available."
@@ -740,9 +740,9 @@ export async function exportShareCard(
     return { exported: false, pngPath: null, preview, proofJsonPath: null, svgPath: null };
   }
   await mkdir(options.outputDirectory, { recursive: true });
-  const pngPath = join(options.outputDirectory, "context-diet-share-card.png");
-  const svgPath = join(options.outputDirectory, "context-diet-share-card.svg");
-  const proofJsonPath = join(options.outputDirectory, "context-diet-share-card.proof.json");
+  const pngPath = join(options.outputDirectory, "fixel-recall-share-card.png");
+  const svgPath = join(options.outputDirectory, "fixel-recall-share-card.svg");
+  const proofJsonPath = join(options.outputDirectory, "fixel-recall-share-card.proof.json");
   await writeFile(pngPath, createShareCardPng(preview.allowedFields));
   await writeFile(svgPath, createShareCardSvg(preview.allowedFields), "utf8");
   const proof = createShareCardProofObject(preview, true);
@@ -775,7 +775,7 @@ function createShareCardProofObject(
 ): ShareCardProofObject {
   return {
     allowlist: preview.allowlist,
-    artifactKind: "context_diet_share_card_proof",
+    artifactKind: "fixel_recall_share_card_proof",
     blockedFieldCount: preview.blockedFields.length,
     exported,
     fields: preview.allowedFields,
@@ -975,7 +975,7 @@ function renderShareCardPreviewText(
   blockedFields: readonly string[]
 ): string {
   return [
-    "Context Diet share-card preview",
+    "Fixel Recall share-card preview",
     `Input reduction: ${fields.percentageInputReduction === null ? "not comparable" : `${fields.percentageInputReduction}%`}`,
     `Estimated total saving: $${fields.estimatedTotalSaving.toFixed(2)}`,
     `Tests passed: ${fields.testsPassed}`,
@@ -995,7 +995,7 @@ function renderShareCardPreviewText(
 
 function createShareCardSvg(fields: ShareCardAllowedFields): string {
   const lines = [
-    "Context Diet",
+    "Fixel Recall",
     fields.syntheticWatermark,
     `Input reduction: ${fields.percentageInputReduction === null ? "not comparable" : `${fields.percentageInputReduction}%`}`,
     `Monthly projection: ${fields.monthlyProjectionRange}`,
@@ -1005,7 +1005,7 @@ function createShareCardSvg(fields: ShareCardAllowedFields): string {
     `Verification: ${fields.verificationId}`
   ];
   return [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" role="img" aria-label="Context Diet share card ${escapeSvg(fields.syntheticWatermark)}">`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" role="img" aria-label="Fixel Recall share card ${escapeSvg(fields.syntheticWatermark)}">`,
     `<rect width="640" height="360" fill="#f7f8fa"/>`,
     `<rect x="24" y="24" width="592" height="312" rx="8" fill="#ffffff" stroke="#d8dde5"/>`,
     ...lines.map(
@@ -1110,7 +1110,7 @@ function syntheticRun(
     cacheUsage: {
       cacheHits: cachedInputTokens > 0 ? 2 : 0,
       cacheMisses: cachedInputTokens > 0 ? 1 : 0,
-      treatment: variant === "uncompressed_control" ? "none" : "context_diet_cache"
+      treatment: variant === "uncompressed_control" ? "none" : "fixel_recall_cache"
     },
     errors: [],
     filesChanged: ["src/synthetic-format-helper.ts", "src/synthetic-format-helper.test.ts"],

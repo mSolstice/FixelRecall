@@ -4,7 +4,7 @@ import {
   createProviderCostReport,
   createSafeMetric,
   createSavingsProjectionReport,
-  recommendContextDiet,
+  recommendFixelRecall,
   type ProviderCostRun,
   type RecommendationInput
 } from "./index.js";
@@ -15,7 +15,7 @@ describe("createSafeMetric", () => {
   });
 });
 
-describe("recommendContextDiet", () => {
+describe("recommendFixelRecall", () => {
   const base: RecommendationInput = {
     accuracyRiskLevel: "low",
     addedLatencyMs: 100,
@@ -37,7 +37,7 @@ describe("recommendContextDiet", () => {
   };
 
   it("recommends strong positive value", () => {
-    const result = recommendContextDiet(base);
+    const result = recommendFixelRecall(base);
 
     expect(result).toMatchObject({
       dataOrigin: "synthetic",
@@ -48,7 +48,7 @@ describe("recommendContextDiet", () => {
   });
 
   it("handles small positive but high risk with restrictions", () => {
-    const result = recommendContextDiet({
+    const result = recommendFixelRecall({
       ...base,
       accuracyRiskLevel: "high",
       eligibleContextTokens: 5_000,
@@ -60,18 +60,18 @@ describe("recommendContextDiet", () => {
   });
 
   it("rejects highly cached workload with low marginal value", () => {
-    const result = recommendContextDiet({
+    const result = recommendFixelRecall({
       ...base,
       cacheIntensity: "high",
       projectedUsage: { averageEligibleTokensPerRequest: 2_000, requestsPerWeek: 20 }
     });
 
     expect(result.verdict).toBe("NOT_WORTH_ENABLING");
-    expect(result.message).toBe("Context Diet is not worth enabling for this simulated setup.");
+    expect(result.message).toBe("Fixel Recall is not worth enabling for this simulated setup.");
   });
 
   it("keeps code-heavy workload restricted and does not weaken protected-content rules", () => {
-    const result = recommendContextDiet({
+    const result = recommendFixelRecall({
       ...base,
       accuracyRiskLevel: "high",
       codeHeavy: true,
@@ -83,7 +83,7 @@ describe("recommendContextDiet", () => {
   });
 
   it("rejects negative net saving", () => {
-    const result = recommendContextDiet({
+    const result = recommendFixelRecall({
       ...base,
       costAssumptions: {
         imageCostPerRender: 1,
@@ -97,21 +97,21 @@ describe("recommendContextDiet", () => {
   });
 
   it("requires missing evidence to be collected", () => {
-    const result = recommendContextDiet({ ...base, evidenceAvailable: false });
+    const result = recommendFixelRecall({ ...base, evidenceAvailable: false });
 
     expect(result.verdict).toBe("MISSING_EVIDENCE");
     expect(result.recommendedOperatingMode).toBe("safe");
   });
 
   it("rejects unsupported model", () => {
-    const result = recommendContextDiet({ ...base, modelProfileStatus: "unsupported" });
+    const result = recommendFixelRecall({ ...base, modelProfileStatus: "unsupported" });
 
     expect(result.verdict).toBe("UNSUPPORTED");
     expect(result.recommendedOperatingMode).toBe("bypass");
   });
 
   it("requires re-test for expired profile", () => {
-    const result = recommendContextDiet({ ...base, modelProfileStatus: "expired" });
+    const result = recommendFixelRecall({ ...base, modelProfileStatus: "expired" });
 
     expect(result.verdict).toBe("MISSING_EVIDENCE");
     expect(result.retestCondition).toContain("Re-test");
@@ -137,7 +137,7 @@ describe("createProviderCostReport", () => {
   const candidate: ProviderCostRun = {
     ...baseline,
     addedLatencyMs: 250,
-    cacheTreatment: "context_diet_cache",
+    cacheTreatment: "fixel_recall_cache",
     tokens: {
       availability: "available",
       cachedInputTokens: 20_000,
@@ -184,7 +184,7 @@ describe("createProviderCostReport", () => {
 
     expect(report.cacheTreatment).toEqual({
       baseline: "provider_cache",
-      candidate: "context_diet_cache",
+      candidate: "fixel_recall_cache",
       changed: true
     });
   });

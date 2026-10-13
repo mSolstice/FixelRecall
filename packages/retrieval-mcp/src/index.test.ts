@@ -12,7 +12,7 @@ import {
   createVaultNamespace,
   type IdentityClock,
   type RandomSource
-} from "@context-diet/vault";
+} from "@fixel-recall/vault";
 
 import {
   createLocalRetrievalMcpServer,
@@ -35,7 +35,7 @@ function bytes(value: number): RandomSource {
 }
 
 async function fixture() {
-  const rootDir = await mkdtemp(path.join(os.tmpdir(), "context-diet-retrieval-test-"));
+  const rootDir = await mkdtemp(path.join(os.tmpdir(), "fixel-recall-retrieval-test-"));
   const project = createProjectIdentity({ projectPath, localIdentitySecret: localSecret });
   const session = createSessionIdentity({
     projectId: project.projectId,
@@ -183,7 +183,7 @@ describe("get_exact_context retrieval service", () => {
   });
 
   it("returns nothing for expired blocks and deleted sessions", async () => {
-    const rootDir = await mkdtemp(path.join(os.tmpdir(), "context-diet-retrieval-test-"));
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), "fixel-recall-retrieval-test-"));
     const project = createProjectIdentity({ projectPath, localIdentitySecret: localSecret });
     const session = createSessionIdentity({
       projectId: project.projectId,

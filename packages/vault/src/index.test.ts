@@ -193,7 +193,7 @@ describe("context block identity and scope", () => {
 
 describe("local context vault", () => {
   async function fixture() {
-    const rootDir = await mkdtemp(path.join(os.tmpdir(), "context-diet-vault-test-"));
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), "fixel-recall-vault-test-"));
     const project = createProjectIdentity({ projectPath, localIdentitySecret: localSecret });
     const session = createSessionIdentity({
       projectId: project.projectId,
@@ -361,7 +361,7 @@ describe("local context vault", () => {
   });
 
   it("expires blocks and delete-session removes associated content", async () => {
-    const rootDir = await mkdtemp(path.join(os.tmpdir(), "context-diet-vault-test-"));
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), "fixel-recall-vault-test-"));
     const project = createProjectIdentity({ projectPath, localIdentitySecret: localSecret });
     const session = createSessionIdentity({
       projectId: project.projectId,

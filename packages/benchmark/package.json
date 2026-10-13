@@ -1,5 +1,5 @@
 {
-  "name": "@context-diet/benchmark",
+  "name": "@fixel-recall/benchmark",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,6 +11,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@context-diet/metrics": "workspace:*"
+    "@fixel-recall/metrics": "workspace:*"
   }
 }

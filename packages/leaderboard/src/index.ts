@@ -22,7 +22,7 @@ export interface LeaderboardScores {
 }
 
 export interface SyntheticLeaderboardEvidencePayload {
-  readonly evidenceKind: "context_diet_local_leaderboard_evidence";
+  readonly evidenceKind: "fixel_recall_local_leaderboard_evidence";
   readonly dataOrigin: "synthetic";
   readonly simulatorNotice: "LOCAL SIMULATOR";
   readonly resultNotice: "SYNTHETIC RESULTS";
@@ -88,7 +88,7 @@ export interface LocalCompatibilityLeaderboard {
   readonly note: string;
 }
 
-const signingSecret = "context-diet-local-synthetic-leaderboard-fixture-key";
+const signingSecret = "fixel-recall-local-synthetic-leaderboard-fixture-key";
 
 export const leaderboardDimensions = [
   "gist_accuracy",
@@ -160,7 +160,7 @@ export function createLocalCompatibilityLeaderboard(
   return {
     currentRunDate: currentDate,
     expiredEvidenceCount,
-    note: "Dimensions are ranked separately; Context Diet does not combine them into one winner score.",
+    note: "Dimensions are ranked separately; Fixel Recall does not combine them into one winner score.",
     rankings: Object.fromEntries(
       leaderboardDimensions.map((dimension) => [
         dimension,
@@ -312,7 +312,7 @@ function payload(
   return {
     corpusVersion: `synthetic-corpus-v${1 + (seed % 3)}`,
     dataOrigin: "synthetic",
-    evidenceKind: "context_diet_local_leaderboard_evidence",
+    evidenceKind: "fixel_recall_local_leaderboard_evidence",
     expiresAt: "2026-12-31",
     fontProfile: `synthetic-font-profile-${1 + (seed % 2)}`,
     modelSimulatorVersion,

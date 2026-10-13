@@ -3,7 +3,7 @@
 These notes are for the Prompt 3 transport feasibility spike only. They use fake routing and fake
 credentials.
 
-1. Start the local Context Diet fake gateway with the smoke script or a future CLI wrapper.
+1. Start the local Fixel Recall fake gateway with the smoke script or a future CLI wrapper.
 2. Note the loopback base URL, for example `http://127.0.0.1:4317`.
 3. Configure a Codex custom provider to use that base URL for the OpenAI Responses protocol.
 
@@ -11,10 +11,10 @@ Illustrative project-local TOML for fake API-key testing only:
 
 ```toml
 model = "fake-openai-model"
-model_provider = "context_diet_fake"
+model_provider = "fixel_recall_fake"
 
-[model_providers.context_diet_fake]
-name = "Context Diet fake gateway"
+[model_providers.fixel_recall_fake]
+name = "Fixel Recall fake gateway"
 base_url = "http://127.0.0.1:4317"
 env_key = "OPENAI_API_KEY"
 ```

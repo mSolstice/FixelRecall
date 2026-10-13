@@ -144,7 +144,7 @@ export async function collectEnvironmentResults() {
     await checkGitRepository(),
     checkFile("AGENTS.md", "AGENTS.md"),
     checkFile("CLAUDE.md", "CLAUDE.md"),
-    checkFile("docs/CONTEXT_DIET_BLUEPRINT.md", "Blueprint")
+    checkFile("docs/FIXEL_RECALL_BLUEPRINT.md", "Blueprint")
   ];
 
   return results;

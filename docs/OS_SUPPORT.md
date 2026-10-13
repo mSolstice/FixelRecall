@@ -2,7 +2,7 @@
 
 ## Status Summary
 
-Context Diet is currently a local fake-provider beta. OS support is based on repository evidence
+Fixel Recall is currently a local fake-provider beta. OS support is based on repository evidence
 available in this working tree, not on intended future support.
 
 | Platform       | Release status                                     | Evidence                                                                                                          |
@@ -83,8 +83,8 @@ Symlinks are not required for the current skill sync or local installer approach
 
 The canonical skill is copied into generated host-specific directories:
 
-- `.agents/skills/context-diet/`
-- `.claude/skills/context-diet/`
+- `.agents/skills/fixel-recall/`
+- `.claude/skills/fixel-recall/`
 
 This avoids relying on symlink support for Windows, WSL or locked-down filesystems.
 

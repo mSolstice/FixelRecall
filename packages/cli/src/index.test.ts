@@ -28,11 +28,11 @@ const cliDistPath = resolve(dirname(fileURLToPath(import.meta.url)), "..", "dist
 
 describe("describeCli", () => {
   it("names the local operator", () => {
-    expect(describeCli()).toBe("context-diet local operator");
+    expect(describeCli()).toBe("fixel-recall local operator");
   });
 });
 
-describe("context-diet renderer doctor", () => {
+describe("fixel-recall renderer doctor", () => {
   it.each([
     ["healthy", "HEALTHY"],
     ["degraded", "DEGRADED"],
@@ -41,7 +41,7 @@ describe("context-diet renderer doctor", () => {
   ] as const)("produces %s status", async (seed, expectedStatus) => {
     const report = await runRendererDoctor({ seed });
 
-    expect(report.command).toBe("context-diet renderer doctor");
+    expect(report.command).toBe("fixel-recall renderer doctor");
     expect(report.status).toBe(expectedStatus);
     expect(report.checks.map((check) => check.name)).toEqual(
       expect.arrayContaining([
@@ -69,7 +69,7 @@ describe("context-diet renderer doctor", () => {
   });
 });
 
-describe("context-diet compatibility-audit", () => {
+describe("fixel-recall compatibility-audit", () => {
   it.each([
     "RECOMMENDED",
     "RECOMMENDED_WITH_RESTRICTIONS",
@@ -119,18 +119,18 @@ describe("context-diet compatibility-audit", () => {
   });
 });
 
-describe("context-diet CLI commands", () => {
+describe("fixel-recall CLI commands", () => {
   it.each([
-    [["status"], "Context Diet status"],
+    [["status"], "Fixel Recall status"],
     [["benchmark", "--json"], '"dataOrigin": "synthetic"'],
-    [["renderer", "doctor"], '"command": "context-diet renderer doctor"']
+    [["renderer", "doctor"], '"command": "fixel-recall renderer doctor"']
   ] as const)("runs the built executable for %s", async (argv, expectedOutput) => {
     expect(existsSync(cliDistPath), "run pnpm build before the direct CLI test").toBe(true);
 
     const { stdout, stderr } = await execFileAsync(process.execPath, [cliDistPath, ...argv], {
       env: {
         ...process.env,
-        CONTEXT_DIET_FAKE_SECRET: "SECRET_VALUE"
+        FIXEL_RECALL_FAKE_SECRET: "SECRET_VALUE"
       }
     });
 
@@ -206,8 +206,8 @@ describe("context-diet CLI commands", () => {
     expect(preview.writesUserConfig).toBe(false);
     expect(result.stdout).toContain("Codex setup preview");
     expect(result.stdout).toContain("~/.codex/config.toml");
-    expect(result.stdout).toContain(".agents/skills/context-diet");
-    expect(result.stdout).toContain("context-diet-retrieval");
+    expect(result.stdout).toContain(".agents/skills/fixel-recall");
+    expect(result.stdout).toContain("fixel-recall-retrieval");
     expect(result.stdout).toContain("Restore direct routing");
     expect(result.stdout).toContain("Uninstall");
     expect(result.stdout).not.toContain("SECRET_VALUE");
@@ -215,7 +215,7 @@ describe("context-diet CLI commands", () => {
   });
 
   it("generates a safe Claude Code setup preview with optional hooks only", async () => {
-    const root = await mkdtemp(join(tmpdir(), "context-diet-cli-claude-preview-"));
+    const root = await mkdtemp(join(tmpdir(), "fixel-recall-cli-claude-preview-"));
     const result = await runCliCommand(["setup", "claude-code", "--confirm"], {
       configRoot: root
     });
@@ -235,7 +235,7 @@ describe("context-diet CLI commands", () => {
     expect(result.stdout).toContain("Claude Code setup preview");
     expect(result.stdout).toContain("ANTHROPIC_BASE_URL");
     expect(result.stdout).toContain("~/.claude/settings.json");
-    expect(result.stdout).toContain(".claude/skills/context-diet");
+    expect(result.stdout).toContain(".claude/skills/fixel-recall");
     expect(result.stdout).toContain("Hooks are optional");
     expect(result.stdout).toContain("Confirmed: local configuration was written");
     expect(result.stdout).not.toContain("ANTHROPIC_API_KEY=");
@@ -261,7 +261,7 @@ describe("context-diet CLI commands", () => {
     expect(result.stdout).toContain("Codex and Claude Code setup preview");
     expect(result.stdout).toContain("~/.codex/config.toml");
     expect(result.stdout).toContain("~/.claude/settings.json");
-    expect(result.stdout).toContain("context-diet-retrieval");
+    expect(result.stdout).toContain("fixel-recall-retrieval");
     expect(result.stdout).not.toContain("Bearer ");
     expect(result.stdout).not.toContain("sk-");
   });
@@ -335,7 +335,7 @@ describe("context-diet CLI commands", () => {
   });
 
   it("applies setup only with confirmation and writes a local manifest in a temp config root", async () => {
-    const root = await mkdtemp(join(tmpdir(), "context-diet-cli-install-"));
+    const root = await mkdtemp(join(tmpdir(), "fixel-recall-cli-install-"));
     try {
       const codexPath = join(root, ".codex", "config.toml");
       const existingCodexConfig =
@@ -347,24 +347,24 @@ describe("context-diet CLI commands", () => {
 
       const dryRun = await runCliCommand(["setup", "codex", "--mcp"], { configRoot: root });
       expect(dryRun.stdout).toContain("Dry run");
-      expect(existsSync(join(root, ".context-diet", "install-manifest.json"))).toBe(false);
+      expect(existsSync(join(root, ".fixel-recall", "install-manifest.json"))).toBe(false);
       expect(await readFile(codexPath, "utf8")).toBe(existingCodexConfig);
 
       const applied = await runCliCommand(["setup", "codex", "--mcp", "--confirm"], {
         configRoot: root
       });
       const codexConfig = await readFile(codexPath, "utf8");
-      const manifest = await readFile(join(root, ".context-diet", "install-manifest.json"), "utf8");
-      const mcpConfig = await readFile(join(root, ".context-diet", "mcp.json"), "utf8");
+      const manifest = await readFile(join(root, ".fixel-recall", "install-manifest.json"), "utf8");
+      const mcpConfig = await readFile(join(root, ".fixel-recall", "mcp.json"), "utf8");
 
       expect(applied.stdout).toContain("Confirmed");
       expect(codexConfig).toContain('model = "existing-model"');
-      expect(codexConfig).toContain("BEGIN context-diet managed");
+      expect(codexConfig).toContain("BEGIN fixel-recall managed");
       expect(codexConfig).toContain("requires_openai_auth = true");
-      expect(codexConfig.indexOf('model_provider = "context_diet_local"')).toBeLessThan(
+      expect(codexConfig.indexOf('model_provider = "fixel_recall_local"')).toBeLessThan(
         codexConfig.indexOf("[mcp_servers.node_repl.env]")
       );
-      expect(mcpConfig).toContain("context-diet-retrieval");
+      expect(mcpConfig).toContain("fixel-recall-retrieval");
       expect(manifest).toContain('"credentialPolicy": "environment-variable-references-only"');
       expect(`${applied.stdout}\n${codexConfig}\n${mcpConfig}\n${manifest}`).not.toContain(
         "SECRET_VALUE"
@@ -378,7 +378,7 @@ describe("context-diet CLI commands", () => {
   });
 
   it("applies Claude Code setup with optional hook while preserving unknown settings", async () => {
-    const root = await mkdtemp(join(tmpdir(), "context-diet-cli-claude-"));
+    const root = await mkdtemp(join(tmpdir(), "fixel-recall-cli-claude-"));
     try {
       const settingsPath = join(root, ".claude", "settings.json");
       await mkdir(dirname(settingsPath), { recursive: true });
@@ -396,7 +396,7 @@ describe("context-diet CLI commands", () => {
         readonly env?: { readonly ANTHROPIC_BASE_URL?: string };
         readonly existingSetting?: boolean;
         readonly theme?: string;
-        readonly contextDietManaged?: {
+        readonly fixelRecallManaged?: {
           readonly anthropicBaseUrl?: string;
         };
         readonly hooks?: { readonly SessionStart?: readonly unknown[] };
@@ -411,10 +411,10 @@ describe("context-diet CLI commands", () => {
       expect(settings.existingSetting).toBe(true);
       expect(settings.theme).toBe("dark");
       expect(settings.env?.ANTHROPIC_BASE_URL).toBe("http://127.0.0.1:4317");
-      expect(settings.contextDietManaged?.anthropicBaseUrl).toBe("http://127.0.0.1:4317");
+      expect(settings.fixelRecallManaged?.anthropicBaseUrl).toBe("http://127.0.0.1:4317");
       expect(settings.hooks?.SessionStart).toHaveLength(1);
-      expect(claudeMcp.mcpServers?.["context-diet-retrieval"]?.command).toBe("node");
-      expect(claudeMcp.mcpServers?.["context-diet-retrieval"]?.args).toEqual(
+      expect(claudeMcp.mcpServers?.["fixel-recall-retrieval"]?.command).toBe("node");
+      expect(claudeMcp.mcpServers?.["fixel-recall-retrieval"]?.args).toEqual(
         expect.arrayContaining(["mcp", "retrieval"])
       );
       expect(JSON.stringify(settings)).not.toContain("ANTHROPIC_API_KEY=");
@@ -427,7 +427,7 @@ describe("context-diet CLI commands", () => {
   });
 
   it("applies Codex and Claude Code setup in one manifest with no credentials", async () => {
-    const root = await mkdtemp(join(tmpdir(), "context-diet-cli-both-"));
+    const root = await mkdtemp(join(tmpdir(), "fixel-recall-cli-both-"));
     try {
       const codexPath = join(root, ".codex", "config.toml");
       const claudePath = join(root, ".claude", "settings.json");
@@ -447,27 +447,27 @@ describe("context-diet CLI commands", () => {
 
       const codexConfig = await readFile(codexPath, "utf8");
       const claudeSettings = await readFile(claudePath, "utf8");
-      const mcpConfig = await readFile(join(root, ".context-diet", "mcp.json"), "utf8");
+      const mcpConfig = await readFile(join(root, ".fixel-recall", "mcp.json"), "utf8");
       const claudeMcpConfig = await readFile(join(root, ".claude.json"), "utf8");
       const manifest = JSON.parse(
-        await readFile(join(root, ".context-diet", "install-manifest.json"), "utf8")
+        await readFile(join(root, ".fixel-recall", "install-manifest.json"), "utf8")
       ) as {
         readonly backups: readonly { readonly backup: string; readonly target: string }[];
         readonly hosts: readonly string[];
       };
 
       expect(applied.stdout).toContain("Confirmed");
-      expect(codexConfig).toContain("BEGIN context-diet managed");
-      expect(codexConfig).toContain("[mcp_servers.context-diet-retrieval]");
-      expect(claudeSettings).toContain("contextDietManaged");
-      expect(mcpConfig).toContain("context-diet-retrieval");
-      expect(claudeMcpConfig).toContain("context-diet-retrieval");
+      expect(codexConfig).toContain("BEGIN fixel-recall managed");
+      expect(codexConfig).toContain("[mcp_servers.fixel-recall-retrieval]");
+      expect(claudeSettings).toContain("fixelRecallManaged");
+      expect(mcpConfig).toContain("fixel-recall-retrieval");
+      expect(claudeMcpConfig).toContain("fixel-recall-retrieval");
       expect(manifest.hosts).toEqual(["codex", "claude-code"]);
       expect(manifest.backups.map((backup) => backup.target).sort()).toEqual(
         [
           codexPath,
           claudePath,
-          join(root, ".context-diet", "mcp.json"),
+          join(root, ".fixel-recall", "mcp.json"),
           join(root, ".claude.json")
         ].sort()
       );
@@ -483,10 +483,10 @@ describe("context-diet CLI commands", () => {
   });
 
   it("refuses to overwrite an existing install manifest unless explicitly replaced", async () => {
-    const root = await mkdtemp(join(tmpdir(), "context-diet-cli-existing-manifest-"));
+    const root = await mkdtemp(join(tmpdir(), "fixel-recall-cli-existing-manifest-"));
     try {
       const codexPath = join(root, ".codex", "config.toml");
-      const manifestPath = join(root, ".context-diet", "install-manifest.json");
+      const manifestPath = join(root, ".fixel-recall", "install-manifest.json");
       const originalCodex = 'model = "keep-before-refusal"\n';
       await mkdir(dirname(codexPath), { recursive: true });
       await mkdir(dirname(manifestPath), { recursive: true });
@@ -502,7 +502,7 @@ describe("context-diet CLI commands", () => {
           includeClaudeHook: false,
           includeMcp: false,
           installationId: "existing-install",
-          managedMarkers: ["# BEGIN context-diet managed", "# END context-diet managed"],
+          managedMarkers: ["# BEGIN fixel-recall managed", "# END fixel-recall managed"],
           manifestVersion: 1,
           status: "complete"
         })}\n`,
@@ -535,10 +535,10 @@ describe("context-diet CLI commands", () => {
   });
 
   it("rolls back and uninstalls by restoring backed-up files byte-for-byte", async () => {
-    const rollbackRoot = await mkdtemp(join(tmpdir(), "context-diet-cli-rollback-"));
-    const uninstallRoot = await mkdtemp(join(tmpdir(), "context-diet-cli-uninstall-"));
+    const rollbackRoot = await mkdtemp(join(tmpdir(), "fixel-recall-cli-rollback-"));
+    const uninstallRoot = await mkdtemp(join(tmpdir(), "fixel-recall-cli-uninstall-"));
     try {
-      const originalCodex = 'model = "before-context-diet"\n';
+      const originalCodex = 'model = "before-fixel-recall"\n';
       const uninstallCodex = 'model = "before-uninstall"\n# keep exact trailing text';
       const originalClaude = `${JSON.stringify({ keep: "user-value" }, null, 2)}\n`;
       await mkdir(join(rollbackRoot, ".codex"), { recursive: true });
@@ -571,13 +571,13 @@ describe("context-diet CLI commands", () => {
       );
       const uninstalledClaude = JSON.parse(
         await readFile(join(uninstallRoot, ".claude", "settings.json"), "utf8")
-      ) as { readonly keep?: string; readonly contextDietManaged?: unknown };
+      ) as { readonly keep?: string; readonly fixelRecallManaged?: unknown };
       expect(uninstalledClaude.keep).toBe("user-value");
-      expect(uninstalledClaude.contextDietManaged).toBeUndefined();
+      expect(uninstalledClaude.fixelRecallManaged).toBeUndefined();
       expect(await readFile(join(uninstallRoot, ".claude", "settings.json"), "utf8")).toBe(
         originalClaude
       );
-      expect(existsSync(join(uninstallRoot, ".context-diet", "mcp.json"))).toBe(false);
+      expect(existsSync(join(uninstallRoot, ".fixel-recall", "mcp.json"))).toBe(false);
       expect(existsSync(join(uninstallRoot, ".claude.json"))).toBe(false);
     } finally {
       await rm(rollbackRoot, { force: true, recursive: true });
@@ -586,15 +586,15 @@ describe("context-diet CLI commands", () => {
   });
 
   it("recovers an interrupted install by resume or rollback from a temp manifest", async () => {
-    const resumeRoot = await mkdtemp(join(tmpdir(), "context-diet-cli-resume-"));
-    const rollbackRoot = await mkdtemp(join(tmpdir(), "context-diet-cli-interrupted-rollback-"));
+    const resumeRoot = await mkdtemp(join(tmpdir(), "fixel-recall-cli-resume-"));
+    const rollbackRoot = await mkdtemp(join(tmpdir(), "fixel-recall-cli-interrupted-rollback-"));
     try {
-      const resumeManifestPath = join(resumeRoot, ".context-diet", "install-manifest.json");
-      const rollbackManifestPath = join(rollbackRoot, ".context-diet", "install-manifest.json");
+      const resumeManifestPath = join(resumeRoot, ".fixel-recall", "install-manifest.json");
+      const rollbackManifestPath = join(rollbackRoot, ".fixel-recall", "install-manifest.json");
       const rollbackCodexPath = join(rollbackRoot, ".codex", "config.toml");
       const rollbackBackupPath = join(
         rollbackRoot,
-        ".context-diet",
+        ".fixel-recall",
         "backups",
         encodeURIComponent(rollbackCodexPath)
       );
@@ -622,7 +622,7 @@ describe("context-diet CLI commands", () => {
         includeClaudeHook: false,
         includeMcp: false,
         installationId: "install_interrupted_test",
-        managedMarkers: ["# BEGIN context-diet managed", "# END context-diet managed"],
+        managedMarkers: ["# BEGIN fixel-recall managed", "# END fixel-recall managed"],
         manifestVersion: 1,
         status: "interrupted"
       };
@@ -639,7 +639,7 @@ describe("context-diet CLI commands", () => {
       });
       expect(resumed.stdout).toContain("Confirmed: local configuration was written");
       expect(await readFile(join(resumeRoot, ".codex", "config.toml"), "utf8")).toContain(
-        "BEGIN context-diet managed"
+        "BEGIN fixel-recall managed"
       );
 
       await runCliCommand(["rollback", "--confirm"], { configRoot: rollbackRoot });

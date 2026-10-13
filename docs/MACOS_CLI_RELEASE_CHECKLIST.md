@@ -4,7 +4,7 @@ Review date: 2026-08-02
 
 Release commit: `2df94b1`
 
-Status: **Context Diet for macOS CLI**
+Status: **Fixel Recall for macOS CLI**
 
 Broad hosted/enterprise production deployment: **not included in this release**
 
@@ -45,7 +45,7 @@ Broad hosted/enterprise production deployment: **not included in this release**
   - `pnpm test`
   - `pnpm test:compatibility`
   - `pnpm check:skills`
-  - `CONTEXT_DIET_TEST_CANARIES='[]' pnpm scan:test-canaries -- .`
+  - `FIXEL_RECALL_TEST_CANARIES='[]' pnpm scan:test-canaries -- .`
   - `pnpm smoke:openai`
   - `pnpm smoke:anthropic`
 - Fake-provider validation: passed.
@@ -56,7 +56,7 @@ Broad hosted/enterprise production deployment: **not included in this release**
 ## Privacy And Safety Defaults
 
 - Safe mode is default.
-- Provider credentials are not stored by Context Diet setup.
+- Provider credentials are not stored by Fixel Recall setup.
 - Authentication values must stay in user shell environment or normal secret storage.
 - Raw request bodies must not be logged or persisted.
 - Secret-sensitive content must not be rendered.
@@ -70,13 +70,13 @@ Broad hosted/enterprise production deployment: **not included in this release**
 The installer is dry-run by default. Run this first:
 
 ```bash
-CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js setup both --mcp
+FIXEL_RECALL_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js setup both --mcp
 ```
 
 Confirmed macOS CLI canary command used after dry-run review:
 
 ```bash
-CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js setup both --mcp --confirm --replace-existing-manifest
+FIXEL_RECALL_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js setup both --mcp --confirm --replace-existing-manifest
 ```
 
 Credentials are not written by this command.
@@ -84,7 +84,7 @@ Credentials are not written by this command.
 ## Rollback Command
 
 ```bash
-CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js rollback --confirm
+FIXEL_RECALL_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js rollback --confirm
 ```
 
 Rollback restores backed-up files recorded in the install manifest.
@@ -92,10 +92,10 @@ Rollback restores backed-up files recorded in the install manifest.
 ## Uninstall Command
 
 ```bash
-CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js uninstall --confirm
+FIXEL_RECALL_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js uninstall --confirm
 ```
 
-Uninstall removes Context Diet-managed entries and restores/removes managed files according to the
+Uninstall removes Fixel Recall-managed entries and restores/removes managed files according to the
 manifest.
 
 ## What Not To Claim Publicly

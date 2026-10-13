@@ -1,4 +1,4 @@
-# Context Diet Landing Page Copy Draft
+# Fixel Recall Landing Page Copy Draft
 
 Status: draft copy only
 
@@ -10,12 +10,12 @@ Shrink your coding agent's context without losing the details.
 
 ## Hero Subheadline
 
-Context Diet helps Codex CLI and Claude Code CLI carry less wasteful context while protecting code,
+Fixel Recall helps Codex CLI and Claude Code CLI carry less wasteful context while protecting code,
 commands, secrets, paths, IDs and exact facts.
 
 ## One-Sentence Explanation
 
-Context Diet is a local safety and efficiency layer that decides what old context can safely shrink,
+Fixel Recall is a local safety and efficiency layer that decides what old context can safely shrink,
 what must stay exact and whether the result is actually worth using.
 
 ## Three Core Benefits
@@ -36,10 +36,10 @@ benchmark result is positive, neutral or negative.
 
 ## Shrink The Context. Keep The Details.
 
-Context Diet turns safe old context into images, while exact text stays protected and recoverable.
+Fixel Recall turns safe old context into images, while exact text stays protected and recoverable.
 
 It is not just compression. Instead of sending every old message, log and repeated note back to the
-model as text, Context Diet decides what can safely become a compact visual memory.
+model as text, Fixel Recall decides what can safely become a compact visual memory.
 
 - Current instructions, code, commands, paths, IDs, hashes and secrets stay as native text.
 - Secrets are never rendered.
@@ -51,13 +51,13 @@ model as text, Context Diet decides what can safely become a compact visual memo
 
 ## How It Works
 
-1. A Codex CLI or Claude Code CLI request goes through the local Context Diet gateway.
+1. A Codex CLI or Claude Code CLI request goes through the local Fixel Recall gateway.
 2. The Exactness Firewall identifies content that must stay native, such as code, commands, paths,
    IDs, hashes, secrets and active tool state.
 3. The policy engine decides whether old, safe, recoverable context is eligible to shrink.
 4. Approved context can be rendered through the renderer interface, while the original authorised
    text remains recoverable through the local vault and MCP retrieval.
-5. If anything is unsafe, unknown or fails, Context Diet preserves the original provider content.
+5. If anything is unsafe, unknown or fails, Fixel Recall preserves the original provider content.
 
 ## Supported Scope
 
@@ -74,7 +74,7 @@ Current release scope:
 
 ## What Is Not Claimed Yet
 
-Context Diet does not currently claim:
+Fixel Recall does not currently claim:
 
 - Codex IDE support.
 - Claude Code IDE support.
@@ -95,14 +95,14 @@ Context Diet does not currently claim:
 4. Run dry-run setup before changing Codex or Claude Code config.
 5. Confirm setup only after reviewing the files to be touched.
 6. Use Codex CLI or Claude Code CLI normally.
-7. Ask Context Diet-specific questions when you want diagnostics, benchmarks, explanations or exact
+7. Ask Fixel Recall-specific questions when you want diagnostics, benchmarks, explanations or exact
    retrieval.
 8. Roll back or uninstall using the recorded local manifest.
 
 ## Privacy And Safety Defaults
 
 - Safe mode is default.
-- Provider credentials are not stored by Context Diet setup.
+- Provider credentials are not stored by Fixel Recall setup.
 - Raw request bodies and authentication values must not be logged or persisted.
 - Secret-sensitive content is never render-eligible.
 - Exact, current, action-critical and incompatible content stays native.
@@ -120,12 +120,12 @@ Current evidence includes:
 - real macOS user-level setup, rollback and uninstall canary passing
 - GitHub Actions green according to user report for the current macOS CLI release
 
-This evidence supports Context Diet for macOS CLI. It does not prove broad hosted/enterprise
+This evidence supports Fixel Recall for macOS CLI. It does not prove broad hosted/enterprise
 production deployment.
 
 ## Call To Action
 
-Try Context Diet for macOS CLI with Codex CLI or Claude Code CLI.
+Try Fixel Recall for macOS CLI with Codex CLI or Claude Code CLI.
 
 Start with fake-provider validation, review every dry-run setup change, keep credentials out of the
 repository and treat real-provider canaries as explicit-consent tests only.

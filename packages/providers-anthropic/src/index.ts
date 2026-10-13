@@ -18,7 +18,11 @@ import {
   type OriginalPassThroughFragment,
   type ProviderMetadata,
   type SourceCategory
-} from "@context-diet/core";
+} from "@fixel-recall/core";
+
+export function anthropicCanaryOutputLimit(body: Readonly<Record<string, unknown>>): unknown {
+  return body["max_tokens"];
+}
 
 type JsonObject = { readonly [key: string]: JsonValue };
 type MutableJsonObject = { [key: string]: JsonValue };

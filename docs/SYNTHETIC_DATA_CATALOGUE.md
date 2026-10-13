@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`@context-diet/test-data` provides deterministic simulation fixtures for Context Diet development.
+`@fixel-recall/test-data` provides deterministic simulation fixtures for Fixel Recall development.
 Every artifact is invented, records `dataOrigin: "synthetic"` and includes the seed used to create
 it.
 
@@ -67,7 +67,7 @@ non-loopback request before it reaches the network and fails if that guard is by
 ## Test Output
 
 Tests that write generated artifacts create files under the operating system temporary directory
-with a `context-diet-test-data-` prefix.
+with a `fixel-recall-test-data-` prefix.
 
 ## Use Rules
 

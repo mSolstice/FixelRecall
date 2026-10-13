@@ -1,6 +1,6 @@
 # Claude Code MCP Retrieval Setup
 
-This note describes the intended local setup for the Context Diet exact retrieval MCP server in
+This note describes the intended local setup for the Fixel Recall exact retrieval MCP server in
 Claude Code.
 
 ## Tool
@@ -17,19 +17,19 @@ Inputs:
 - `query` or `line_start` plus `line_end`
 - `max_chars`
 
-The tool returns a narrow authorised exact section from the local Context Diet vault. It does not
+The tool returns a narrow authorised exact section from the local Fixel Recall vault. It does not
 accept direct filesystem paths and it does not need Anthropic credentials.
 
 ## Local Configuration Shape
 
-Register a local MCP server for Claude Code using your local Context Diet command once the CLI
+Register a local MCP server for Claude Code using your local Fixel Recall command once the CLI
 wrapper is wired:
 
 ```json
 {
   "mcpServers": {
-    "context-diet-retrieval": {
-      "command": "context-diet",
+    "fixel-recall-retrieval": {
+      "command": "fixel-recall",
       "args": ["mcp", "retrieval"],
       "env": {}
     }
@@ -38,7 +38,7 @@ wrapper is wired:
 ```
 
 Do not place `ANTHROPIC_API_KEY`, provider headers or raw repository paths in this MCP
-configuration. The retrieval server uses opaque Context Diet IDs and local vault authorisation.
+configuration. The retrieval server uses opaque Fixel Recall IDs and local vault authorisation.
 
 ## Safety Expectations
 

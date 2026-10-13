@@ -11,7 +11,7 @@ Scope read:
 - `docs/ACCEPTANCE_CRITERIA.md`
 - `docs/DECISIONS.md`
 
-Reviewer posture: strict application-security review of the current local Context Diet
+Reviewer posture: strict application-security review of the current local Fixel Recall
 implementation.
 
 ## Findings
@@ -121,8 +121,8 @@ without a transactional restore path.
 **Affected files:**
 
 - `packages/cli/src/index.ts`
-- `skill-source/context-diet/references/CODEX_SETUP.md`
-- `skill-source/context-diet/references/CLAUDE_CODE_SETUP.md`
+- `skill-source/fixel-recall/references/CODEX_SETUP.md`
+- `skill-source/fixel-recall/references/CLAUDE_CODE_SETUP.md`
 
 **Recommended fix:** Before enabling writes, require explicit confirmation, write a manifest, make
 operations transactional, and preserve restore/uninstall instructions.

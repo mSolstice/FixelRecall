@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { reasonCatalogue, type JsonValue, type ReasonCode } from "@context-diet/core";
+import { reasonCatalogue, type JsonValue, type ReasonCode } from "@fixel-recall/core";
 import {
   parseAnthropicMessagesRequest,
   rebuildAnthropicMessagesRequest

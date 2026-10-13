@@ -1,4 +1,4 @@
-# @context-diet/retrieval-mcp
+# @fixel-recall/retrieval-mcp
 
 Exact-context retrieval MCP server boundary.
 

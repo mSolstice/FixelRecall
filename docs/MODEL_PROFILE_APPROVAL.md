@@ -1,6 +1,6 @@
 # Model Profile Approval
 
-A model profile is the only way Context Diet may image context for a provider model. Safe mode must
+A model profile is the only way Fixel Recall may image context for a provider model. Safe mode must
 never guess that a new model is compatible.
 
 ## Required Profile Fields
@@ -47,6 +47,14 @@ Imaging is disabled when:
 
 Unknown models must resolve to a disabled profile status. They are not inferred from similar model
 names.
+
+## Claude Candidate Profiles
+
+The repository includes synthetic, candidate-only entries for current Anthropic model families. They
+are intentionally marked `canary`, have zeroed accuracy scores, and cannot enable imaging. Passing
+the synthetic workload matrix does not change that status. A Claude profile may become `enabled`
+only after model-specific canaries, renderer checks, pricing and image-token accounting are reviewed
+and approval is recorded.
 
 ## Reapproval
 

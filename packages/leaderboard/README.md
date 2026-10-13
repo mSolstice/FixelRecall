@@ -1,4 +1,4 @@
-# @context-diet/leaderboard
+# @fixel-recall/leaderboard
 
 Local-only compatibility leaderboard simulator for signed synthetic benchmark evidence.
 

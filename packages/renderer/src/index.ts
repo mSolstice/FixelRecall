@@ -1,4 +1,4 @@
-import type { ModelProfileSummary, ReasonCode } from "@context-diet/core";
+import type { ModelProfileSummary, ReasonCode } from "@fixel-recall/core";
 
 export interface RenderProtectedSpan {
   readonly start: number;

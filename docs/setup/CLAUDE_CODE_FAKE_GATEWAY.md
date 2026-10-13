@@ -3,7 +3,7 @@
 These notes are for the Prompt 3 transport feasibility spike only. They use fake routing and fake
 credentials.
 
-1. Start the local Context Diet fake gateway with the smoke script or a future CLI wrapper.
+1. Start the local Fixel Recall fake gateway with the smoke script or a future CLI wrapper.
 2. Note the loopback base URL, for example `http://127.0.0.1:4317`.
 3. Point Claude Code at the local gateway for Anthropic Messages traffic:
 

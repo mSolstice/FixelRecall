@@ -1,4 +1,4 @@
-# Context Diet Acceptance Criteria
+# Fixel Recall Acceptance Criteria
 
 ## Rule
 
@@ -133,9 +133,9 @@ demonstrated.
 
 # 13. Skills
 
-- [ ] Canonical skill exists under `skill-source/context-diet`.
-- [ ] Codex copy exists under `.agents/skills/context-diet`.
-- [ ] Claude Code copy exists under `.claude/skills/context-diet`.
+- [ ] Canonical skill exists under `skill-source/fixel-recall`.
+- [ ] Codex copy exists under `.agents/skills/fixel-recall`.
+- [ ] Claude Code copy exists under `.claude/skills/fixel-recall`.
 - [ ] Sync script creates both.
 - [ ] Drift check fails CI when copies differ.
 - [ ] Codex can invoke the skill.

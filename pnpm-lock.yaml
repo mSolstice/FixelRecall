@@ -31,34 +31,34 @@ importers:
 
   apps/dashboard:
     dependencies:
-      "@context-diet/core":
+      "@fixel-recall/core":
         specifier: workspace:*
         version: link:../../packages/core
-      "@context-diet/leaderboard":
+      "@fixel-recall/leaderboard":
         specifier: workspace:*
         version: link:../../packages/leaderboard
-      "@context-diet/metrics":
+      "@fixel-recall/metrics":
         specifier: workspace:*
         version: link:../../packages/metrics
 
   packages/benchmark:
     dependencies:
-      "@context-diet/metrics":
+      "@fixel-recall/metrics":
         specifier: workspace:*
         version: link:../metrics
 
   packages/cli:
     dependencies:
-      "@context-diet/benchmark":
+      "@fixel-recall/benchmark":
         specifier: workspace:*
         version: link:../benchmark
-      "@context-diet/core":
+      "@fixel-recall/core":
         specifier: workspace:*
         version: link:../core
-      "@context-diet/proxy":
+      "@fixel-recall/proxy":
         specifier: workspace:*
         version: link:../proxy
-      "@context-diet/renderer":
+      "@fixel-recall/renderer":
         specifier: workspace:*
         version: link:../renderer
 
@@ -66,7 +66,7 @@ importers:
 
   packages/firewall:
     dependencies:
-      "@context-diet/core":
+      "@fixel-recall/core":
         specifier: workspace:*
         version: link:../core
 
@@ -74,43 +74,43 @@ importers:
 
   packages/metrics:
     dependencies:
-      "@context-diet/test-data":
+      "@fixel-recall/test-data":
         specifier: workspace:*
         version: link:../test-data
 
   packages/providers-anthropic:
     dependencies:
-      "@context-diet/core":
+      "@fixel-recall/core":
         specifier: workspace:*
         version: link:../core
 
   packages/providers-openai:
     dependencies:
-      "@context-diet/core":
+      "@fixel-recall/core":
         specifier: workspace:*
         version: link:../core
 
   packages/proxy:
     dependencies:
-      "@context-diet/core":
+      "@fixel-recall/core":
         specifier: workspace:*
         version: link:../core
-      "@context-diet/providers-anthropic":
+      "@fixel-recall/providers-anthropic":
         specifier: workspace:*
         version: link:../providers-anthropic
-      "@context-diet/providers-openai":
+      "@fixel-recall/providers-openai":
         specifier: workspace:*
         version: link:../providers-openai
 
   packages/renderer:
     dependencies:
-      "@context-diet/core":
+      "@fixel-recall/core":
         specifier: workspace:*
         version: link:../core
 
   packages/retrieval-mcp:
     dependencies:
-      "@context-diet/vault":
+      "@fixel-recall/vault":
         specifier: workspace:*
         version: link:../vault
 
@@ -118,7 +118,7 @@ importers:
 
   packages/vault:
     dependencies:
-      "@context-diet/core":
+      "@fixel-recall/core":
         specifier: workspace:*
         version: link:../core
 

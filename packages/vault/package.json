@@ -1,5 +1,5 @@
 {
-  "name": "@context-diet/vault",
+  "name": "@fixel-recall/vault",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,6 +11,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@context-diet/core": "workspace:*"
+    "@fixel-recall/core": "workspace:*"
   }
 }

@@ -1,6 +1,6 @@
 # Blueprint 2 Compatibility Bridge Prompt
 
-We have completed the original Context Diet prompts through Prompt 10.
+We have completed the original Fixel Recall prompts through Prompt 10.
 
 We intend to complete original Prompts 11–29 before implementing the Blueprint 2 extension.
 
@@ -10,8 +10,8 @@ Read:
 
 - `AGENTS.md`
 - `CLAUDE.md`
-- `docs/CONTEXT_DIET_BLUEPRINT.md`
-- `docs/CONTEXT_DIET_BLUEPRINT_2_0_COMPLETION_EXTENSION.md`
+- `docs/FIXEL_RECALL_BLUEPRINT.md`
+- `docs/FIXEL_RECALL_BLUEPRINT_2_0_COMPLETION_EXTENSION.md`
 - `docs/SYNTHETIC_TEST_DATA_SPEC.md`
 - `docs/ARCHITECTURE.md`
 - `docs/SECURITY_MODEL.md`

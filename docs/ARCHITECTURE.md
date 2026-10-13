@@ -1,8 +1,8 @@
-# Context Diet Architecture
+# Fixel Recall Architecture
 
 ## Purpose
 
-This document defines the boundaries that keep Context Diet safe, testable and compatible with both
+This document defines the boundaries that keep Fixel Recall safe, testable and compatible with both
 Codex and Claude Code.
 
 ## Core design
@@ -40,7 +40,7 @@ The response takes the reverse path and is streamed without semantic rewriting.
 ## Monorepo layout
 
 ```text
-context-diet/
+fixel-recall/
 ├── AGENTS.md
 ├── CLAUDE.md
 ├── README.md
@@ -63,11 +63,11 @@ context-diet/
 ├── apps/
 │   └── dashboard/
 ├── skill-source/
-│   └── context-diet/
+│   └── fixel-recall/
 ├── .agents/
-│   └── skills/context-diet/
+│   └── skills/fixel-recall/
 ├── .claude/
-│   └── skills/context-diet/
+│   └── skills/fixel-recall/
 ├── scripts/
 ├── tests/
 │   ├── fixtures/
@@ -160,7 +160,7 @@ assume every client sends only one endpoint.
 Codex uses a custom provider entry in its configuration with:
 
 - A unique provider ID
-- Local Context Diet base URL
+- Local Fixel Recall base URL
 - Responses protocol
 - API key environment variable
 - Optional provider headers
@@ -169,7 +169,7 @@ Never commit a real personal Codex configuration or key.
 
 ## Claude Code transport
 
-Claude Code points at the Context Diet gateway using `ANTHROPIC_BASE_URL`.
+Claude Code points at the Fixel Recall gateway using `ANTHROPIC_BASE_URL`.
 
 The gateway must preserve all required headers, beta capabilities and request fields. Verify
 behaviour with `/status` and a fake upstream before using a real account.

@@ -18,7 +18,14 @@ import {
   type OriginalPassThroughFragment,
   type ProviderMetadata,
   type SourceCategory
-} from "@context-diet/core";
+} from "@fixel-recall/core";
+
+export {
+  codexSubscriptionPaths,
+  validateCodexSubscriptionBaseUrl,
+  resolveCodexSubscriptionRoute,
+  openAICanaryOutputLimit
+} from "./subscription.js";
 
 type JsonObject = { readonly [key: string]: JsonValue };
 type MutableJsonObject = { [key: string]: JsonValue };

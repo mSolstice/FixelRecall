@@ -1,6 +1,6 @@
 # Codex MCP Retrieval Setup
 
-This note describes the intended local setup for the Context Diet exact retrieval MCP server.
+This note describes the intended local setup for the Fixel Recall exact retrieval MCP server.
 
 ## Tool
 
@@ -21,14 +21,14 @@ filesystem paths and it does not require provider credentials.
 
 ## Local Configuration Shape
 
-Add the local Context Diet retrieval MCP server to the Codex MCP configuration using your local
+Add the local Fixel Recall retrieval MCP server to the Codex MCP configuration using your local
 package command once the CLI wrapper is wired:
 
 ```json
 {
   "mcpServers": {
-    "context-diet-retrieval": {
-      "command": "context-diet",
+    "fixel-recall-retrieval": {
+      "command": "fixel-recall",
       "args": ["mcp", "retrieval"],
       "env": {}
     }
@@ -37,7 +37,7 @@ package command once the CLI wrapper is wired:
 ```
 
 Do not place OpenAI API keys, provider headers or raw repository paths in this MCP configuration.
-The retrieval server authorises by opaque Context Diet project/session/block IDs.
+The retrieval server authorises by opaque Fixel Recall project/session/block IDs.
 
 ## Safety Expectations
 

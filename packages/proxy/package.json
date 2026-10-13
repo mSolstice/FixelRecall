@@ -1,5 +1,5 @@
 {
-  "name": "@context-diet/proxy",
+  "name": "@fixel-recall/proxy",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,8 +11,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@context-diet/core": "workspace:*",
-    "@context-diet/providers-anthropic": "workspace:*",
-    "@context-diet/providers-openai": "workspace:*"
+    "@fixel-recall/core": "workspace:*",
+    "@fixel-recall/providers-anthropic": "workspace:*",
+    "@fixel-recall/providers-openai": "workspace:*"
   }
 }

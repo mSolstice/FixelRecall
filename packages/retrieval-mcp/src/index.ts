@@ -5,7 +5,7 @@ import {
   type ContextBlockIdentity,
   type LocalContextVault,
   type StoredContextBlock
-} from "@context-diet/vault";
+} from "@fixel-recall/vault";
 
 export const exactContextToolName = "get_exact_context";
 
@@ -91,7 +91,7 @@ export interface LocalRetrievalMcpServer {
 export function describeExactContextTool(): ExactContextToolDescriptor {
   return {
     name: exactContextToolName,
-    description: "Retrieve a narrow authorised exact section from the local Context Diet vault.",
+    description: "Retrieve a narrow authorised exact section from the local Fixel Recall vault.",
     inputSchema: {
       type: "object",
       required: ["project_id", "session_id", "block_id", "max_chars"],

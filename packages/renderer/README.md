@@ -1,4 +1,4 @@
-# @context-diet/renderer
+# @fixel-recall/renderer
 
 Renderer interface package.
 

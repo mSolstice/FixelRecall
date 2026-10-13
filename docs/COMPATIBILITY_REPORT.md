@@ -4,11 +4,11 @@ Review date: 2026-07-21
 
 Scope:
 
-- Codex CLI path: OpenAI Responses-compatible fake-provider route, `.agents/skills/context-diet`,
+- Codex CLI path: OpenAI Responses-compatible fake-provider route, `.agents/skills/fixel-recall`,
   `AGENTS.md`
 - Codex IDE path: not release-tested; no support claim is made in this report
 - Claude Code CLI path: Anthropic Messages-compatible fake-provider route,
-  `.claude/skills/context-diet`, `CLAUDE.md`
+  `.claude/skills/fixel-recall`, `CLAUDE.md`
 - Claude Code IDE path: not release-tested; no support claim is made in this report
 - Shared engine: provider-neutral core, local gateway, MCP retrieval, CLI, dashboard, benchmark and
   generated skill synchronisation
@@ -20,7 +20,7 @@ Scope:
 | Host surface                | Codex CLI is fake-provider tested; Codex IDE is not release-tested                                  | Claude Code CLI is fake-provider tested; Claude Code IDE is not release-tested      | Equivalent release scope              | README and `RELEASE_READINESS.md`                                                                                  |
 | Installation                | Dry-run by default; confirmed setup writes Codex custom provider without credential values          | Dry-run by default; confirmed setup writes `ANTHROPIC_BASE_URL`; optional hook only | Equivalent                            | `packages/cli/src/index.ts`, `packages/cli/src/index.test.ts`                                                      |
 | Persistent instructions     | `AGENTS.md` is the shared project rule source                                                       | `CLAUDE.md` imports `AGENTS.md` and adds Claude-specific constraints                | Equivalent                            | `AGENTS.md`, `CLAUDE.md`                                                                                           |
-| Skill discovery             | Generated skill at `.agents/skills/context-diet/`                                                   | Generated skill at `.claude/skills/context-diet/`                                   | Equivalent                            | `scripts/check-skill-sync.ts`, `tests/skills/sync-skills.test.ts`                                                  |
+| Skill discovery             | Generated skill at `.agents/skills/fixel-recall/`                                                   | Generated skill at `.claude/skills/fixel-recall/`                                   | Equivalent                            | `scripts/check-skill-sync.ts`, `tests/skills/sync-skills.test.ts`                                                  |
 | Gateway route               | `/v1/responses`                                                                                     | `/v1/messages`                                                                      | Equivalent host-specific routes       | `packages/proxy/src/index.ts`, `scripts/smoke/openai-fake-gateway.mjs`, `scripts/smoke/anthropic-fake-gateway.mjs` |
 | Request parsing             | OpenAI Responses parser in `packages/providers-openai`                                              | Anthropic Messages parser in `packages/providers-anthropic`                         | Equivalent                            | Provider adapter tests plus `tests/compatibility/platforms.test.ts`                                                |
 | Tool state                  | Preserves `function_call` and `function_call_output`; blocks transforms on active/malformed state   | Preserves `tool_use` and `tool_result`; blocks transforms on active/malformed state | Equivalent                            | `packages/providers-openai/src/index.test.ts`, `packages/providers-anthropic/src/index.test.ts`                    |
@@ -32,7 +32,7 @@ Scope:
 | Exact retrieval through MCP | Uses shared `get_exact_context` MCP tool                                                            | Uses shared `get_exact_context` MCP tool                                            | Equivalent                            | `packages/retrieval-mcp/src/index.ts`, `packages/retrieval-mcp/src/index.test.ts`                                  |
 | Benchmark                   | CLI benchmark and compatibility audit accept Codex host fixtures                                    | CLI benchmark and compatibility audit accept Claude Code host fixtures              | Equivalent                            | `packages/cli/src/index.test.ts`                                                                                   |
 | Status and doctor           | CLI status/doctor show route, Safe mode and restore guidance without credentials                    | Same commands and renderer doctor apply                                             | Equivalent                            | `packages/cli/src/index.ts`, CLI snapshots                                                                         |
-| Route restoration           | Setup output explains restoring direct Codex routing                                                | Setup output explains unsetting `ANTHROPIC_BASE_URL` and removing optional hook     | Equivalent                            | `skill-source/context-diet/references/CODEX_SETUP.md`, `skill-source/context-diet/references/CLAUDE_CODE_SETUP.md` |
+| Route restoration           | Setup output explains restoring direct Codex routing                                                | Setup output explains unsetting `ANTHROPIC_BASE_URL` and removing optional hook     | Equivalent                            | `skill-source/fixel-recall/references/CODEX_SETUP.md`, `skill-source/fixel-recall/references/CLAUDE_CODE_SETUP.md` |
 | Uninstall                   | Confirmed uninstall restores/removes Codex managed config from manifest backups                     | Confirmed uninstall restores/removes Claude Code managed config from manifest       | Equivalent                            | CLI setup tests and skill references                                                                               |
 
 ## Fake-Provider End-to-End Results
@@ -84,7 +84,7 @@ one-level references:
 ### No generated skill drift found
 
 `pnpm check:skills` verifies the generated `.agents` and `.claude` skill targets against the
-canonical `skill-source/context-diet/` source.
+canonical `skill-source/fixel-recall/` source.
 
 ## Remaining Risks
 

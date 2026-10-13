@@ -1,6 +1,6 @@
-# Website Copy: Context Diet User Journey
+# Website Copy: Fixel Recall User Journey
 
-Use this to add a clear “how it works in daily life” section to the Context Diet website.
+Use this to add a clear “how it works in daily life” section to the Fixel Recall website.
 
 ## Section Title
 
@@ -11,7 +11,7 @@ What Happens After You Install It?
 ## Short Intro
 
 ```text
-Context Diet does not replace your coding agent. It sits locally between your CLI and the provider route, then gives you a safer, clearer view of what your context is doing.
+Fixel Recall does not replace your coding agent. It sits locally between your CLI and the provider route, then gives you a safer, clearer view of what your context is doing.
 ```
 
 ## Journey Cards
@@ -27,7 +27,7 @@ node packages/cli/dist/index.js start
 What the user sees:
 
 ```text
-Context Diet gateway listening
+Fixel Recall gateway listening
 Gateway URL: http://127.0.0.1:4317
 Safety mode: Safe
 Credentials are kept in memory only and are not printed.
@@ -36,7 +36,7 @@ Credentials are kept in memory only and are not printed.
 Benefit:
 
 ```text
-The user knows Context Diet is local, loopback-only and running in Safe mode.
+The user knows Fixel Recall is local, loopback-only and running in Safe mode.
 ```
 
 ### 2. Keep Using Codex Or Claude Normally
@@ -62,7 +62,7 @@ Their normal coding CLI workflow.
 Benefit:
 
 ```text
-No new prompt habit. No “use Context Diet” phrase needed every time. Once configured, the gateway works in the background.
+No new prompt habit. No “use Fixel Recall” phrase needed every time. Once configured, the gateway works in the background.
 ```
 
 ### 3. Check Status
@@ -76,7 +76,7 @@ node packages/cli/dist/index.js status
 What the user sees:
 
 ```text
-Context Diet status
+Fixel Recall status
 
 Gateway: running
 Safety mode: Safe
@@ -113,7 +113,7 @@ Evidence label
 Benefit:
 
 ```text
-Context Diet does not just claim savings. It reports whether the setup looks worth using, neutral or not worth enabling.
+Fixel Recall does not just claim savings. It reports whether the setup looks worth using, neutral or not worth enabling.
 ```
 
 ### 5. Understand The Safety Decision
@@ -134,7 +134,7 @@ Safe mode keeps that content unchanged.
 Benefit:
 
 ```text
-The user can see why Context Diet shrank something, protected something or passed it through unchanged.
+The user can see why Fixel Recall shrank something, protected something or passed it through unchanged.
 ```
 
 ### 6. Retrieve Exact Context
@@ -163,13 +163,13 @@ Old context can be shrunk without losing authorised exact text. Recovery is narr
 Rollback command:
 
 ```bash
-CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js rollback --confirm
+FIXEL_RECALL_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js rollback --confirm
 ```
 
 Uninstall command:
 
 ```bash
-CONTEXT_DIET_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js uninstall --confirm
+FIXEL_RECALL_CONFIG_ROOT="$HOME" node packages/cli/dist/index.js uninstall --confirm
 ```
 
 What the user sees:
@@ -181,13 +181,13 @@ Rollback complete: backed-up files were restored from the install manifest.
 or:
 
 ```text
-Uninstall complete: only Context Diet managed entries were removed.
+Uninstall complete: only Fixel Recall managed entries were removed.
 ```
 
 Benefit:
 
 ```text
-The user can try Context Diet without feeling trapped.
+The user can try Fixel Recall without feeling trapped.
 ```
 
 ## Website Layout Recommendation
@@ -205,5 +205,5 @@ Recommended visual structure:
 ## Simple Summary Line
 
 ```text
-Use your coding CLI as usual. Context Diet runs locally in the background, then shows what it protected, what it shrank and whether it was actually worth it.
+Use your coding CLI as usual. Fixel Recall runs locally in the background, then shows what it protected, what it shrank and whether it was actually worth it.
 ```

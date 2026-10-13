@@ -1,4 +1,4 @@
-# Context Diet Beginner Build Guide
+# Fixel Recall Beginner Build Guide
 
 This guide assumes you are not a programmer.
 
@@ -34,7 +34,7 @@ A version number means it is installed.
 
 ## 3. Install Node.js 24 LTS or Node.js 26
 
-Node.js runs the Context Diet service.
+Node.js runs the Fixel Recall service.
 
 Install the current Node.js 24 LTS release from the official Node.js website, or use Node.js 26 if
 that is the version already available on your machine.
@@ -93,8 +93,8 @@ tests.
 In Terminal:
 
 ```bash
-mkdir context-diet
-cd context-diet
+mkdir fixel-recall
+cd fixel-recall
 ```
 
 ## 2. Start Git
@@ -141,7 +141,7 @@ You should see the blueprint and build prompt files.
 
 ```bash
 git add .
-git commit -m "Add Context Diet build pack"
+git commit -m "Add Fixel Recall build pack"
 ```
 
 If Git asks for your name or email, follow the message it prints and run the commit again.
@@ -150,7 +150,7 @@ If Git asks for your name or email, follow the message it prints and run the com
 
 ## Codex
 
-Open the `context-diet` folder in the editor that has Codex, or run Codex from the project folder.
+Open the `fixel-recall` folder in the editor that has Codex, or run Codex from the project folder.
 
 Ask:
 
@@ -241,14 +241,14 @@ That creates conflicting changes.
 
 # Part F: The most important early test
 
-Before building the renderer, Context Diet must prove that requests can travel through the local
+Before building the renderer, Fixel Recall must prove that requests can travel through the local
 gateway.
 
 This is Prompt 3.
 
 Why?
 
-Because Context Diet only works when it sits between:
+Because Fixel Recall only works when it sits between:
 
 ```text
 Codex or Claude Code

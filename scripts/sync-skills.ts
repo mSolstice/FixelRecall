@@ -22,8 +22,8 @@ interface SkillFile {
   readonly content: string;
 }
 
-const canonicalRoot = "skill-source/context-diet";
-const generatedRoots = [".agents/skills/context-diet", ".claude/skills/context-diet"] as const;
+const canonicalRoot = "skill-source/fixel-recall";
+const generatedRoots = [".agents/skills/fixel-recall", ".claude/skills/fixel-recall"] as const;
 const requiredReferences = [
   "OPERATIONS.md",
   "SAFETY.md",
@@ -33,9 +33,9 @@ const requiredReferences = [
   "CLAUDE_CODE_SETUP.md"
 ] as const;
 const explicitExamples = [
-  "Use the context-diet skill to diagnose my local gateway.",
-  "Run Context Diet benchmark and explain the result.",
-  "Context Diet retrieve exact context for this block."
+  "Use the fixel-recall skill to diagnose my local gateway.",
+  "Run Fixel Recall benchmark and explain the result.",
+  "Fixel Recall retrieve exact context for this block."
 ] as const;
 const implicitExamples = [
   "Audit coding-agent context waste in this repo.",
@@ -149,8 +149,8 @@ function validateCanonical(files: readonly SkillFile[], failures: string[]): voi
     return;
   }
   const frontmatter = parseFrontmatter(skill.content);
-  if (frontmatter.name !== "context-diet") {
-    failures.push("canonical SKILL.md must declare name: context-diet");
+  if (frontmatter.name !== "fixel-recall") {
+    failures.push("canonical SKILL.md must declare name: fixel-recall");
   }
   if ((frontmatter.description ?? "").length < 80) {
     failures.push("canonical SKILL.md description is missing or too vague");
@@ -188,8 +188,8 @@ function validateTriggerExamples(files: readonly SkillFile[], failures: string[]
   const description = parseFrontmatter(skill.content).description ?? "";
   for (const example of explicitExamples) {
     const lowered = example.toLowerCase();
-    if (!lowered.includes("context diet") && !lowered.includes("context-diet")) {
-      failures.push(`explicit trigger example does not name Context Diet: ${example}`);
+    if (!lowered.includes("fixel recall") && !lowered.includes("fixel-recall")) {
+      failures.push(`explicit trigger example does not name Fixel Recall: ${example}`);
     }
   }
   const descriptionWords = new Set(

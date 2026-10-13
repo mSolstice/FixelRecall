@@ -1,4 +1,4 @@
-# @context-diet/core
+# @fixel-recall/core
 
 Provider-neutral request and block primitives shared by policy, adapters and services.
 

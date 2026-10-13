@@ -1,8 +1,8 @@
-# Context Diet Security Model
+# Fixel Recall Security Model
 
 ## Security objective
 
-Context Diet sits in a sensitive position. It may see prompts, source material, tool output and
+Fixel Recall sits in a sensitive position. It may see prompts, source material, tool output and
 provider credentials while forwarding requests.
 
 The product must reduce context without becoming a credential collector, secret-rendering machine or
@@ -13,7 +13,7 @@ cross-project data leak.
 ```text
 User machine
 ├── Codex or Claude Code
-├── Context Diet gateway
+├── Fixel Recall gateway
 ├── Local vault
 ├── Local dashboard
 └── Local MCP retrieval server

@@ -1,4 +1,4 @@
-# @context-diet/dashboard
+# @fixel-recall/dashboard
 
 Local dashboard boundary.
 

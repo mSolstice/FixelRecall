@@ -1,5 +1,5 @@
 {
-  "name": "@context-diet/dashboard",
+  "name": "@fixel-recall/dashboard",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,8 +11,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@context-diet/core": "workspace:*",
-    "@context-diet/leaderboard": "workspace:*",
-    "@context-diet/metrics": "workspace:*"
+    "@fixel-recall/core": "workspace:*",
+    "@fixel-recall/leaderboard": "workspace:*",
+    "@fixel-recall/metrics": "workspace:*"
   }
 }

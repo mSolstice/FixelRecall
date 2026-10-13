@@ -136,7 +136,7 @@ describe("scanExactnessFirewall", () => {
   });
 
   it("does not modify the source string", () => {
-    const source = "Run pnpm test and keep /tmp/context-diet/file.txt exact.";
+    const source = "Run pnpm test and keep /tmp/fixel-recall/file.txt exact.";
     const before = source.slice();
 
     scanExactnessFirewall(source);

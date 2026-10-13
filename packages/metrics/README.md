@@ -1,4 +1,4 @@
-# @context-diet/metrics
+# @fixel-recall/metrics
 
 Privacy-safe metrics boundary.
 
