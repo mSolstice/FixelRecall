@@ -64,6 +64,12 @@ importers:
       "@fixel-recall/renderer":
         specifier: workspace:*
         version: link:../renderer
+      "@fixel-recall/retrieval-mcp":
+        specifier: workspace:*
+        version: link:../retrieval-mcp
+      "@fixel-recall/vault":
+        specifier: workspace:*
+        version: link:../vault
 
   packages/core: {}
 

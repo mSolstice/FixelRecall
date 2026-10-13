@@ -46,6 +46,8 @@
     "@fixel-recall/benchmark": "workspace:*",
     "@fixel-recall/core": "workspace:*",
     "@fixel-recall/renderer": "workspace:*",
-    "@fixel-recall/proxy": "workspace:*"
+    "@fixel-recall/proxy": "workspace:*",
+    "@fixel-recall/retrieval-mcp": "workspace:*",
+    "@fixel-recall/vault": "workspace:*"
   }
 }

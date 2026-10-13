@@ -2,7 +2,7 @@
 
 import { realpathSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface, type Interface } from "node:readline";
 import { fileURLToPath } from "node:url";
@@ -23,6 +23,8 @@ import {
   type ContextRendererResult
 } from "@fixel-recall/renderer";
 import { createLocalGateway } from "@fixel-recall/proxy";
+import { createLocalRetrievalMcpServer, createRetrievalService } from "@fixel-recall/retrieval-mcp";
+import { createLocalContextVault } from "@fixel-recall/vault";
 import { gatewayStartOptions } from "./gateway-config.js";
 import { runGuidedFlow, wantsGuidedFlow, type InteractiveIo } from "./interactive.js";
 import {
@@ -233,6 +235,9 @@ export async function runCli(
   argv: readonly string[] = process.argv.slice(2),
   io: InteractiveIo & { readonly close?: () => void } = processIo()
 ): Promise<number> {
+  if (argv[0] === "mcp" && argv[1] === "retrieval") {
+    return runRetrievalMcpServer();
+  }
   if (argv[0] === "start" && !argv.includes("--dry-run")) {
     return runGatewayProcess(argv);
   }
@@ -256,6 +261,77 @@ export async function runCli(
     );
   }
   return result.exitCode;
+}
+
+async function runRetrievalMcpServer(): Promise<number> {
+  const vault = createLocalContextVault({
+    maxBlockBytes: 1_000_000,
+    rootDir: process.env["FIXEL_RECALL_VAULT_ROOT"] ?? join(homedir(), ".fixel-recall", "vault")
+  });
+  const server = createLocalRetrievalMcpServer(
+    createRetrievalService({
+      maxLineSpan: 200,
+      maxReturnChars: 20_000,
+      maxSearchChars: 100_000,
+      vault
+    })
+  );
+  const input = createInterface({ input: process.stdin, crlfDelay: Infinity });
+  for await (const line of input) {
+    if (line.trim() === "") continue;
+    let message: unknown;
+    try {
+      message = JSON.parse(line);
+    } catch {
+      writeMcpMessage({ jsonrpc: "2.0", error: { code: -32700, message: "Parse error" } });
+      continue;
+    }
+    if (!isMcpRequest(message)) continue;
+    const result = await handleMcpRequest(server, message);
+    if (result !== null) writeMcpMessage({ jsonrpc: "2.0", id: message.id, result });
+  }
+  return 0;
+}
+
+async function handleMcpRequest(
+  server: ReturnType<typeof createLocalRetrievalMcpServer>,
+  request: McpRequest
+): Promise<Record<string, unknown> | null> {
+  if (request.method === "notifications/initialized") return null;
+  if (request.method === "initialize") {
+    return {
+      protocolVersion: "2024-11-05",
+      capabilities: { tools: {} },
+      serverInfo: { name: "fixel-recall-retrieval", version: cliVersion() }
+    };
+  }
+  if (request.method === "tools/list") return { tools: server.tools };
+  if (request.method === "tools/call") {
+    const params = isRecord(request.params) ? request.params : {};
+    return (await server.callTool({
+      arguments: params.arguments,
+      name: typeof params.name === "string" ? params.name : ""
+    })) as unknown as Record<string, unknown>;
+  }
+  return { error: { code: -32601, message: "Method not found" } };
+}
+
+interface McpRequest {
+  readonly id?: number | string;
+  readonly method: string;
+  readonly params?: unknown;
+}
+
+function isMcpRequest(value: unknown): value is McpRequest {
+  return isRecord(value) && typeof value.method === "string";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function writeMcpMessage(message: Record<string, unknown>): void {
+  process.stdout.write(`${JSON.stringify(message)}\n`);
 }
 
 function isGuidedCommand(argv: readonly string[]): boolean {
