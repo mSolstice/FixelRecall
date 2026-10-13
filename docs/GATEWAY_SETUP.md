@@ -79,8 +79,10 @@ Check `/status` and confirm:
 - `mode` is `safe` unless bypass was intentionally enabled
 - `killSwitchActive` is `false`
 - provider request counts increase when Codex or Claude Code sends traffic
-- `rawBodiesPersisted` is `false`
-- `authValuesRetained` is `false`
+- `metrics.rawBodiesPersisted` is `false`
+- `metrics.authValuesRetained` is `false`
+
+These two safety fields are nested under `metrics`, not at the top level of the `/status` response.
 
 ## Runtime Controls
 

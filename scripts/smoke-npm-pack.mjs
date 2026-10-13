@@ -4,7 +4,15 @@
 // Fails (non-zero exit) if anything a first-time user would hit is broken.
 
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, lstatSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -181,9 +189,80 @@ sys.stdout.write(out.decode("utf8", "replace"))
     accepted.stdout + accepted.stderr
   );
 
+  // 8. what setup writes into Codex and Claude config must keep working after setup exits
+  const written = (home, files) =>
+    files
+      .map((file) => (existsSync(join(home, file)) ? readFileSync(join(home, file), "utf8") : ""))
+      .join("\n");
+  const configFiles = [
+    ".codex/config.toml",
+    ".claude.json",
+    ".fixel-recall/mcp.json",
+    ".claude/settings.json"
+  ];
+
+  const home3 = join(work, "home3");
+  execFileSync("mkdir", ["-p", home3]);
+  const viaNpx = run(
+    "npm",
+    [
+      "exec",
+      "--yes",
+      `--package=${tarball}`,
+      "--",
+      "fixel-recall",
+      "setup",
+      "both",
+      "--mcp",
+      "--yes"
+    ],
+    { env: { ...env, HOME: home3 } }
+  );
+  const npxText = written(home3, configFiles);
+  check("setup through npx exits cleanly", viaNpx.status === 0, viaNpx.stdout + viaNpx.stderr);
+  check(
+    "npx run writes a pinned npx launcher, never a path into the npx cache",
+    npxText.includes('command = "npx"') &&
+      npxText.includes(`fixel-recall@${manifest.version}`) &&
+      !/_npx/.test(npxText),
+    npxText.slice(0, 600)
+  );
+  check(
+    "npx run never writes the bare name that needs a global install",
+    !/command = "fixel-recall"|"command": "fixel-recall"/.test(npxText)
+  );
+
+  const home4 = join(work, "home4");
+  execFileSync("mkdir", ["-p", home4]);
+  const viaBin = run(bin, ["setup", "codex", "--mcp", "--yes"], { env: { ...env, HOME: home4 } });
+  const toml4 = written(home4, [".codex/config.toml"]);
+  const recorded = /args = \["([^"]+)","mcp","retrieval"\]/.exec(toml4)?.[1];
+  check(
+    "a normal install records the real file, not the .bin symlink",
+    viaBin.status === 0 &&
+      recorded !== undefined &&
+      existsSync(recorded) &&
+      realpathSync(recorded) === recorded,
+    `${recorded} | ${viaBin.stdout.slice(0, 200)}`
+  );
+  if (recorded !== undefined && existsSync(recorded)) {
+    const init = JSON.stringify({ id: 1, jsonrpc: "2.0", method: "initialize", params: {} });
+    const server = spawnSync("node", [recorded, "mcp", "retrieval"], {
+      encoding: "utf8",
+      env: { ...env, HOME: home4 },
+      input: `${init}\n`,
+      timeout: 20000
+    });
+    check(
+      "the recorded command starts the MCP server and it answers initialize",
+      server.stdout.includes("fixel-recall-retrieval"),
+      server.stdout + server.stderr
+    );
+  }
+
   check(
     "nothing was written outside the isolated HOME",
-    readdirSync(work).sort().join() === "app,home,home2,npm-cache,pack"
+    readdirSync(work).sort().join() === "app,home,home2,home3,home4,npm-cache,pack"
   );
 } finally {
   rmSync(work, { force: true, recursive: true });

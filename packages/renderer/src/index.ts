@@ -1,4 +1,5 @@
 import type { ModelProfileSummary, ReasonCode } from "@fixel-recall/core";
+import { deflateSync } from "node:zlib";
 
 export interface RenderProtectedSpan {
   readonly start: number;
@@ -43,7 +44,8 @@ export interface RenderedImageOutput {
   readonly pageIndex: number;
   readonly widthPx: number;
   readonly heightPx: number;
-  readonly mimeType: "image/png" | "image/svg+xml";
+  /** Provider-compatible raster format. SVG is not accepted as an image input. */
+  readonly mimeType: "image/png";
   readonly bytes: Uint8Array;
   readonly stableImageId: string;
 }
@@ -271,25 +273,33 @@ function createPxpipeCompatibleImage(
   const stableImageId = `${input.ctxBlockLabel}-pxpipe-page-${pageIndex}`;
   const widthPx = Math.min(input.dimensionLimits.maxWidthPx, 1_568);
   const heightPx = Math.min(input.dimensionLimits.maxHeightPx, 728);
-  const escapedLabel = escapeXml(input.ctxBlockLabel);
-  const escapedSource = escapeXml(sourcePage);
-  const escapedHash = escapeXml(input.exactSidecar.integrityHash);
-  const svg = [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${widthPx}" height="${heightPx}" viewBox="0 0 ${widthPx} ${heightPx}">`,
-    `<rect width="100%" height="100%" fill="#ffffff"/>`,
-    `<text x="16" y="24" font-family="monospace" font-size="14" fill="#111111">${escapedLabel} page ${pageIndex + 1}</text>`,
-    `<text x="16" y="44" font-family="monospace" font-size="10" fill="#555555">sidecar ${escapedHash}</text>`,
-    `<text x="16" y="68" font-family="monospace" font-size="${input.dimensionLimits.minFontSizePx}" fill="#111111">${escapedSource}</text>`,
-    `</svg>`
-  ].join("");
+  // Provider image inputs require raster data. Keep this deterministic adapter
+  // dependency-free; the production pxpipe adapter can replace the pixels.
+  const stripeCount = Math.max(1, Math.min(32, sourcePage.length));
+  const pixels = Buffer.alloc(widthPx * heightPx * 4, 255);
+  for (let stripe = 0; stripe < stripeCount; stripe += 1) {
+    const x = Math.floor((stripe / stripeCount) * widthPx);
+    for (let y = 0; y < Math.min(4, heightPx); y += 1) {
+      const offset = (y * widthPx + x) * 4;
+      pixels[offset] = 17;
+      pixels[offset + 1] = 24;
+      pixels[offset + 2] = 39;
+    }
+  }
 
   return {
     pageIndex,
     widthPx,
     heightPx,
-    mimeType: "image/svg+xml",
+    mimeType: "image/png",
     stableImageId,
-    bytes: new TextEncoder().encode(svg)
+    bytes: createPng(
+      widthPx,
+      heightPx,
+      pixels,
+      input.ctxBlockLabel,
+      input.exactSidecar.integrityHash
+    )
   };
 }
 
@@ -304,11 +314,62 @@ function createGlyphCoverage(sourceText: string): GlyphCoverageReport {
   };
 }
 
-function escapeXml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
+function createPng(
+  width: number,
+  height: number,
+  pixels: Buffer,
+  label: string,
+  sidecarHash: string
+): Uint8Array {
+  const rows = Buffer.alloc((width * 4 + 1) * height);
+  for (let y = 0; y < height; y += 1) {
+    rows[y * (width * 4 + 1)] = 0;
+    pixels.copy(rows, y * (width * 4 + 1) + 1, y * width * 4, (y + 1) * width * 4);
+  }
+  const text = Buffer.from(`label\0${label}\nsidecar\0${sidecarHash}`, "utf8");
+  return Buffer.concat([
+    Buffer.from("\x89PNG\r\n\x1a\n", "binary"),
+    pngChunk(
+      "IHDR",
+      Buffer.from([
+        width >>> 24,
+        width >>> 16,
+        width >>> 8,
+        width,
+        height >>> 24,
+        height >>> 16,
+        height >>> 8,
+        height,
+        8,
+        6,
+        0,
+        0,
+        0
+      ])
+    ),
+    pngChunk("tEXt", text),
+    pngChunk("IDAT", deflateSync(rows)),
+    pngChunk("IEND", Buffer.alloc(0))
+  ]);
+}
+
+function pngChunk(type: string, data: Buffer): Buffer {
+  const typeBytes = Buffer.from(type, "ascii");
+  const body = Buffer.concat([typeBytes, data]);
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length, 0);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(body), 0);
+  return Buffer.concat([length, body, crc]);
+}
+
+function crc32(data: Buffer): number {
+  let crc = 0xffffffff;
+  for (const byte of data) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
 }

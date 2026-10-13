@@ -94,12 +94,13 @@ describe("createPxpipeCompatibleRenderer", () => {
         pageIndex: 0,
         widthPx: 640,
         heightPx: 480,
-        mimeType: "image/svg+xml",
+        mimeType: "image/png",
         stableImageId: "CTX-TEST-BLOCK-pxpipe-page-0"
       });
-      expect(new TextDecoder().decode(result.images[0].bytes)).toMatchInlineSnapshot(
-        `"<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480"><rect width="100%" height="100%" fill="#ffffff"/><text x="16" y="24" font-family="monospace" font-size="14" fill="#111111">CTX-TEST-BLOCK page 1</text><text x="16" y="44" font-family="monospace" font-size="10" fill="#555555">sidecar sha256:synthetic-sidecar-hash</text><text x="16" y="68" font-family="monospace" font-size="12" fill="#111111">Synthetic renderable con</text></svg>"`
-      );
+      expect(Array.from(result.images[0].bytes.slice(0, 8))).toEqual([
+        137, 80, 78, 71, 13, 10, 26, 10
+      ]);
+      expect(new TextDecoder().decode(result.images[0].bytes)).not.toContain("<svg");
     }
     expect(logEvents).toEqual([
       {

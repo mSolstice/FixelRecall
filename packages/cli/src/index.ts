@@ -27,6 +27,8 @@ import { createLocalRetrievalMcpServer, createRetrievalService } from "@fixel-re
 import { createLocalContextVault } from "@fixel-recall/vault";
 import { gatewayStartOptions } from "./gateway-config.js";
 import { runGuidedFlow, wantsGuidedFlow, type InteractiveIo } from "./interactive.js";
+import { cliLauncher, launcherCommandLine, launcherWith } from "./launcher.js";
+import { cliVersion } from "./version.js";
 import {
   installLocalConfig,
   type LocalConfigHost,
@@ -278,42 +280,77 @@ async function runRetrievalMcpServer(): Promise<number> {
   );
   const input = createInterface({ input: process.stdin, crlfDelay: Infinity });
   for await (const line of input) {
-    if (line.trim() === "") continue;
-    let message: unknown;
-    try {
-      message = JSON.parse(line);
-    } catch {
-      writeMcpMessage({ jsonrpc: "2.0", error: { code: -32700, message: "Parse error" } });
-      continue;
-    }
-    if (!isMcpRequest(message)) continue;
-    const result = await handleMcpRequest(server, message);
-    if (result !== null) writeMcpMessage({ jsonrpc: "2.0", id: message.id, result });
+    const reply = await respondToMcpLine(server, line);
+    if (reply !== null) process.stdout.write(`${reply}\n`);
   }
   return 0;
+}
+
+type McpOutcome =
+  | { readonly kind: "result"; readonly result: Record<string, unknown> }
+  | { readonly kind: "error"; readonly code: number; readonly message: string };
+
+/**
+ * One line in, at most one line out, following JSON-RPC 2.0: notifications (no id) never
+ * get a reply, and failures use the top-level `error` member, not a `result` that
+ * contains an error.
+ */
+export async function respondToMcpLine(
+  server: ReturnType<typeof createLocalRetrievalMcpServer>,
+  line: string
+): Promise<string | null> {
+  if (line.trim() === "") return null;
+  let message: unknown;
+  try {
+    message = JSON.parse(line);
+  } catch {
+    return JSON.stringify({
+      jsonrpc: "2.0",
+      id: null,
+      error: { code: -32700, message: "Parse error" }
+    });
+  }
+  if (!isMcpRequest(message)) {
+    return JSON.stringify({
+      jsonrpc: "2.0",
+      id: null,
+      error: { code: -32600, message: "Invalid Request" }
+    });
+  }
+  const outcome = await handleMcpRequest(server, message);
+  if (message.id === undefined) return null;
+  return JSON.stringify(
+    outcome.kind === "result"
+      ? { jsonrpc: "2.0", id: message.id, result: outcome.result }
+      : { jsonrpc: "2.0", id: message.id, error: { code: outcome.code, message: outcome.message } }
+  );
 }
 
 async function handleMcpRequest(
   server: ReturnType<typeof createLocalRetrievalMcpServer>,
   request: McpRequest
-): Promise<Record<string, unknown> | null> {
-  if (request.method === "notifications/initialized") return null;
+): Promise<McpOutcome> {
   if (request.method === "initialize") {
     return {
-      protocolVersion: "2024-11-05",
-      capabilities: { tools: {} },
-      serverInfo: { name: "fixel-recall-retrieval", version: cliVersion() }
+      kind: "result",
+      result: {
+        protocolVersion: "2024-11-05",
+        capabilities: { tools: {} },
+        serverInfo: { name: "fixel-recall-retrieval", version: cliVersion() }
+      }
     };
   }
-  if (request.method === "tools/list") return { tools: server.tools };
+  if (request.method === "ping") return { kind: "result", result: {} };
+  if (request.method === "tools/list") return { kind: "result", result: { tools: server.tools } };
   if (request.method === "tools/call") {
     const params = isRecord(request.params) ? request.params : {};
-    return (await server.callTool({
+    const result = await server.callTool({
       arguments: params.arguments,
       name: typeof params.name === "string" ? params.name : ""
-    })) as unknown as Record<string, unknown>;
+    });
+    return { kind: "result", result: result as unknown as Record<string, unknown> };
   }
-  return { error: { code: -32601, message: "Method not found" } };
+  return { kind: "error", code: -32601, message: "Method not found" };
 }
 
 interface McpRequest {
@@ -328,10 +365,6 @@ function isMcpRequest(value: unknown): value is McpRequest {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function writeMcpMessage(message: Record<string, unknown>): void {
-  process.stdout.write(`${JSON.stringify(message)}\n`);
 }
 
 function isGuidedCommand(argv: readonly string[]): boolean {
@@ -588,8 +621,8 @@ export function createCodexSetupPreview(env: CliEnvironment): HostSetupPreview {
         {
           mcpServers: {
             "fixel-recall-retrieval": {
-              args: ["mcp", "retrieval"],
-              command: "fixel-recall",
+              args: launcherWith(cliLauncher(), "mcp", "retrieval"),
+              command: cliLauncher().command,
               env: {}
             }
           }
@@ -645,7 +678,7 @@ export function createClaudeCodeSetupPreview(env: CliEnvironment): HostSetupPrev
           hooks: {
             SessionStart: [
               {
-                command: "fixel-recall status --no-credentials",
+                command: launcherCommandLine(cliLauncher(), "status", "--no-credentials"),
                 description: "Local Fixel Recall status check"
               }
             ]
@@ -664,8 +697,8 @@ export function createClaudeCodeSetupPreview(env: CliEnvironment): HostSetupPrev
         {
           mcpServers: {
             "fixel-recall-retrieval": {
-              args: ["mcp", "retrieval"],
-              command: "fixel-recall",
+              args: launcherWith(cliLauncher(), "mcp", "retrieval"),
+              command: cliLauncher().command,
               env: {}
             }
           }
@@ -922,12 +955,6 @@ async function probeLocalGateway(baseUrl: string): Promise<boolean> {
   } finally {
     clearTimeout(timeout);
   }
-}
-
-declare const __FIXEL_RECALL_VERSION__: string | undefined;
-
-function cliVersion(): string {
-  return typeof __FIXEL_RECALL_VERSION__ === "string" ? __FIXEL_RECALL_VERSION__ : "development";
 }
 
 function renderHelp(): string {
@@ -1688,7 +1715,7 @@ function seedOptions(options: RendererDoctorOptions): RendererDoctorOptions {
           {
             bytes: new TextEncoder().encode("FAKE_SECRET_CANARY_RENDERER_DOCTOR"),
             heightPx: 728,
-            mimeType: "image/svg+xml",
+            mimeType: "image/png",
             pageIndex: 0,
             stableImageId: "unsafe",
             widthPx: 1_568

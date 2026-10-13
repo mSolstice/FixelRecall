@@ -21,6 +21,7 @@ import {
   runRendererDoctor,
   type CompatibilityAuditVerdict
 } from "./index.js";
+import { cliEntryPath } from "./launcher.js";
 import { installLocalConfig, uninstallLocalConfig } from "./local-config.js";
 
 const execFileAsync = promisify(execFile);
@@ -165,7 +166,9 @@ describe("fixel-recall CLI commands", () => {
 
     expect(result.exitCode).toBeGreaterThanOrEqual(0);
     expect(result.stderr).toBe("");
-    expect(result.stdout.replaceAll(tmpdir(), "<tmp>")).toMatchSnapshot();
+    expect(
+      result.stdout.replaceAll(tmpdir(), "<tmp>").replaceAll(cliEntryPath(), "<cli-entry>")
+    ).toMatchSnapshot();
     expect(result.stdout).not.toContain("SECRET_VALUE");
     expect(result.stdout).not.toContain("token:SECRET");
   });

@@ -263,10 +263,11 @@ MCP retrieval preview:
   "mcpServers": {
     "fixel-recall-retrieval": {
       "args": [
+        "<cli-entry>",
         "mcp",
         "retrieval"
       ],
-      "command": "fixel-recall",
+      "command": "node",
       "env": {}
     }
   }
