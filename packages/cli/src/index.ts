@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
+import { realpathSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createInterface, type Interface } from "node:readline";
 import { fileURLToPath } from "node:url";
 
 import { createSyntheticBenchmarkReport, renderBenchmarkMarkdown } from "@fixel-recall/benchmark";
@@ -22,6 +24,7 @@ import {
 } from "@fixel-recall/renderer";
 import { createLocalGateway } from "@fixel-recall/proxy";
 import { gatewayStartOptions } from "./gateway-config.js";
+import { runGuidedFlow, wantsGuidedFlow, type InteractiveIo } from "./interactive.js";
 import {
   installLocalConfig,
   type LocalConfigHost,
@@ -226,9 +229,19 @@ export function describeCli(): string {
   return `${cliName} local operator`;
 }
 
-export async function runCli(argv: readonly string[] = process.argv.slice(2)): Promise<number> {
+export async function runCli(
+  argv: readonly string[] = process.argv.slice(2),
+  io: InteractiveIo & { readonly close?: () => void } = processIo()
+): Promise<number> {
   if (argv[0] === "start" && !argv.includes("--dry-run")) {
     return runGatewayProcess(argv);
+  }
+  if (wantsGuidedFlow(argv, io)) {
+    try {
+      return await runGuidedFlow(argv, io, (args, options) => runCliCommand(args, options));
+    } finally {
+      io.close?.();
+    }
   }
   const result = await runCliCommand(argv);
   if (result.stdout.length > 0) {
@@ -237,7 +250,49 @@ export async function runCli(argv: readonly string[] = process.argv.slice(2)): P
   if (result.stderr.length > 0) {
     process.stderr.write(result.stderr);
   }
+  if (isGuidedCommand(argv) && result.exitCode === 0) {
+    process.stderr.write(
+      "Dry run only. Run this in a terminal to be asked before applying, or add --yes to apply without a prompt.\n"
+    );
+  }
   return result.exitCode;
+}
+
+function isGuidedCommand(argv: readonly string[]): boolean {
+  return (
+    (argv[0] === "setup" || argv[0] === "rollback" || argv[0] === "uninstall") &&
+    !argv.includes("--confirm") &&
+    !argv.includes("--dry-run")
+  );
+}
+
+function processIo(): InteractiveIo & { readonly close: () => void } {
+  let rl: Interface | undefined;
+  let closed = false;
+  return {
+    ask: (question) => {
+      if (closed) {
+        return Promise.resolve("");
+      }
+      rl ??= createInterface({ input: process.stdin, output: process.stdout });
+      const active = rl;
+      return new Promise<string>((resolve) => {
+        active.once("close", () => {
+          closed = true;
+          resolve("");
+        });
+        active.question(question, resolve);
+      });
+    },
+    close: () => {
+      closed = true;
+      rl?.close();
+    },
+    env: process.env,
+    err: (text) => process.stderr.write(text),
+    interactive: process.stdin.isTTY === true && process.stdout.isTTY === true,
+    out: (text) => process.stdout.write(text)
+  };
 }
 
 export async function runCliCommand(
@@ -253,6 +308,12 @@ export async function runCliCommand(
     };
   }
   const command = argv[0] ?? "help";
+  if (command === "help" || command === "--help" || command === "-h") {
+    return textResult(0, renderHelp());
+  }
+  if (command === "version" || command === "--version" || command === "-v") {
+    return textResult(0, cliVersion());
+  }
   const format = options.format ?? formatFromArgs(argv);
   if (command === "doctor") {
     const env = await cliEnvironment(options.env, true);
@@ -326,7 +387,7 @@ export async function runCliCommand(
   }
   return {
     exitCode: 64,
-    stderr: `Unknown command: ${command}\nRun fixel-recall help to see available commands.\n`,
+    stderr: `Unknown command: ${command}\nRun fixel-recall --help to see available commands.\n`,
     stdout: ""
   };
 }
@@ -785,6 +846,47 @@ async function probeLocalGateway(baseUrl: string): Promise<boolean> {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+declare const __FIXEL_RECALL_VERSION__: string | undefined;
+
+function cliVersion(): string {
+  return typeof __FIXEL_RECALL_VERSION__ === "string" ? __FIXEL_RECALL_VERSION__ : "development";
+}
+
+function renderHelp(): string {
+  return [
+    "Fixel Recall - image memory with exact recovery for Claude Code and Codex CLI.",
+    "",
+    "Usage: fixel-recall <command> [options]",
+    "",
+    "Get started:",
+    "  setup [codex|claude-code|both]   Preview the changes, then ask before applying them",
+    "  status                           Show routing and safety mode (no credentials shown)",
+    "  doctor                           Check the local environment",
+    "",
+    "Day to day:",
+    "  start [--port N]                 Run the local loopback gateway",
+    "  stop                             Stop managed local routing",
+    "  benchmark                        Original vs compressed input cost (synthetic)",
+    "  explain                          Why a block was shrunk, protected or passed through",
+    "  retrieve --block-id BLOCK_ID     Authorised exact recovery from the local vault",
+    "  preset                           Choose a policy preset",
+    "  audit                            Compatibility audit",
+    "",
+    "Undo:",
+    "  rollback                         Restore the files setup changed",
+    "  uninstall                        Remove what setup installed",
+    "",
+    "Options for setup, rollback and uninstall:",
+    "  --yes, -y        Apply without asking",
+    "  --dry-run        Preview only, never ask",
+    "  --confirm        Apply without asking (scripting)",
+    "",
+    "Set FIXEL_RECALL_CONFIG_ROOT to use a different config root than your home directory.",
+    "Available for macOS CLI users of Codex CLI and Claude Code CLI.",
+    `Version: ${cliVersion()}`
+  ].join("\n");
 }
 
 function formatFromArgs(argv: readonly string[]): CliOutputFormat {
@@ -1827,7 +1929,24 @@ function createStaticRenderer(result: ContextRendererResult): ContextRenderer {
   return { render: async () => result };
 }
 
-if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1]) {
+/**
+ * True when this file is the program being run. npm links a package's bin as a symlink,
+ * so process.argv[1] is the symlink while import.meta.url is the real file; compare real
+ * paths or the CLI silently does nothing when installed.
+ */
+function isMainModule(): boolean {
+  const entry = process.argv[1];
+  if (entry === undefined) {
+    return false;
+  }
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (isMainModule()) {
   runCli().then((code) => {
     process.exitCode = code;
   });

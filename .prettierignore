@@ -6,3 +6,5 @@ node_modules/
 dist/
 coverage/
 skill-source/fixel-recall/.git/
+packages/cli/bundle/
+packages/cli/npm-package/
