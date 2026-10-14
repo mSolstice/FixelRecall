@@ -197,6 +197,52 @@ support claim. CLI canary preparation intentionally remains blocked without veri
 upstream output-limit support. Budgets are process-local; multiple starts are separate reservations.
 No production dependency was added. See `docs/ASTRA_CANARY_READINESS.md`.
 
+## ADR-022: Bind context retrieval to host authority
+
+**Status:** Accepted
+
+**Decision:** Bind each retrieval service instance to a host-supplied project and session. Missing
+authority denies reads. Tool arguments select within that scope and cannot grant authority. The CLI
+receives scope through `FIXEL_RECALL_PROJECT_ID` and `FIXEL_RECALL_SESSION_ID` at launch.
+
+**Reason:** Valid identifiers and correct vault paths alone do not authenticate a caller.
+
+**Consequences:** Unscoped MCP configurations must supply host-generated scope before retrieval
+works. The scope is fixed for the process lifetime. This does not isolate processes running as the
+same OS user. Catalogue, discovery and context replacement remain separate development stages; see
+`CONTEXT_CELL_RETRIEVAL_PLAN.md`.
+
+## ADR-023: Host-registered context catalogue
+
+**Status:** Accepted
+
+**Decision:** Catalogue entries come from a bounded host registration list. Revalidate each
+reference through the scoped vault on reads. Return only allowlisted metadata with fixed category
+descriptions. Mark source freshness unknown until independent revision evidence exists.
+
+**Reason:** Automatic filesystem enumeration and content-derived summaries introduce additional
+privacy, discovery and resource-control requirements. Registration matches the host-controlled
+retrieval design and permits a bounded first catalogue implementation.
+
+**Consequences:** Hosts must register stored block references explicitly. The catalogue does not
+automatically discover blocks, remove context or prove savings. MCP discovery is the next stage.
+
+## ADR-024: Retrieval lease before context replacement
+
+**Status:** Accepted
+
+**Decision:** Context replacement requires a typed, short-lived lease bound to one project, one
+session, an explicit `get_exact_context` capability, an expiry time and a bounded block set. The
+gateway preserves original bytes when the lease is missing, expired, over its block limit, or does
+not match the trusted session.
+
+**Reason:** A block ID in a model message is not authorization. A lease makes authority an
+out-of-band host decision and gives the transformation hook a small, testable contract.
+
+**Consequences:** Lease creation and trusted session wiring remain host responsibilities. The
+current implementation is experimental and synthetic-only until the end-to-end gateway test is
+stable and both provider rebuild paths pass the full failure matrix.
+
 ## ADR template
 
 When adding a decision, use:

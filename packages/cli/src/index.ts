@@ -23,7 +23,11 @@ import {
   type ContextRendererResult
 } from "@fixel-recall/renderer";
 import { createLocalGateway } from "@fixel-recall/proxy";
-import { createLocalRetrievalMcpServer, createRetrievalService } from "@fixel-recall/retrieval-mcp";
+import {
+  createContextCatalogue,
+  createLocalRetrievalMcpServer,
+  createRetrievalService
+} from "@fixel-recall/retrieval-mcp";
 import { createLocalContextVault } from "@fixel-recall/vault";
 import { gatewayStartOptions } from "./gateway-config.js";
 import { runGuidedFlow, wantsGuidedFlow, type InteractiveIo } from "./interactive.js";
@@ -266,16 +270,40 @@ export async function runCli(
 }
 
 async function runRetrievalMcpServer(): Promise<number> {
+  const authority = {
+    projectId: process.env["FIXEL_RECALL_PROJECT_ID"] ?? "",
+    sessionId: process.env["FIXEL_RECALL_SESSION_ID"] ?? ""
+  };
+  const registration = process.env["FIXEL_RECALL_CONTEXT_BLOCK_IDS"] ?? "[]";
+  if (registration.length > 16384) throw new Error("invalid context registration");
+  let ids: unknown;
+  try {
+    ids = JSON.parse(registration);
+  } catch {
+    throw new Error("invalid context registration");
+  }
+  if (
+    !Array.isArray(ids) ||
+    ids.length > 100 ||
+    !ids.every((id: unknown) => typeof id === "string")
+  )
+    throw new Error("invalid context registration");
   const vault = createLocalContextVault({
     maxBlockBytes: 1_000_000,
     rootDir: process.env["FIXEL_RECALL_VAULT_ROOT"] ?? join(homedir(), ".fixel-recall", "vault")
   });
   const server = createLocalRetrievalMcpServer(
     createRetrievalService({
+      authority,
       maxLineSpan: 200,
       maxReturnChars: 20_000,
       maxSearchChars: 100_000,
       vault
+    }),
+    createContextCatalogue({
+      vault,
+      authority,
+      references: (ids as string[]).map((blockId) => ({ blockId }))
     })
   );
   const input = createInterface({ input: process.stdin, crlfDelay: Infinity });

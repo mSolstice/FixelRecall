@@ -3,6 +3,7 @@
 .git/
 .pnpm-store/
 node_modules/
+pnpm-lock.yaml
 dist/
 coverage/
 skill-source/fixel-recall/.git/

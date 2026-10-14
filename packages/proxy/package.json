@@ -11,6 +11,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@fixel-recall/firewall": "workspace:*",
+    "@fixel-recall/retrieval-mcp": "workspace:*",
+    "@fixel-recall/vault": "workspace:*",
     "@fixel-recall/core": "workspace:*",
     "@fixel-recall/providers-anthropic": "workspace:*",
     "@fixel-recall/providers-openai": "workspace:*"

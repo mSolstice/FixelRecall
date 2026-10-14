@@ -4,7 +4,11 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { createLocalRetrievalMcpServer, createRetrievalService } from "@fixel-recall/retrieval-mcp";
+import {
+  createContextCatalogue,
+  createLocalRetrievalMcpServer,
+  createRetrievalService
+} from "@fixel-recall/retrieval-mcp";
 import {
   createContextBlockIdentity,
   createLocalContextVault,
@@ -53,7 +57,18 @@ beforeEach(async () => {
     sourceCategory: "documentation"
   });
   server = createLocalRetrievalMcpServer(
-    createRetrievalService({ maxLineSpan: 5, maxReturnChars: 80, maxSearchChars: 500, vault })
+    createRetrievalService({
+      authority: namespace,
+      maxLineSpan: 5,
+      maxReturnChars: 80,
+      maxSearchChars: 500,
+      vault
+    }),
+    createContextCatalogue({
+      vault,
+      authority: namespace,
+      references: [{ blockId: identity.blockId }]
+    })
   );
 });
 
@@ -76,10 +91,10 @@ describe("retrieval MCP server protocol (JSON-RPC 2.0 over stdio)", () => {
     });
   });
 
-  it("lists exactly the exact-context tool", async () => {
+  it("lists exact retrieval and discovery tools", async () => {
     const reply = await ask({ id: 2, jsonrpc: "2.0", method: "tools/list" });
     const tools = (reply?.["result"] as { tools: { name: string }[] }).tools;
-    expect(tools.map((tool) => tool.name)).toEqual(["get_exact_context"]);
+    expect(tools.map((tool) => tool.name)).toEqual(["get_exact_context", "find_context_cells"]);
   });
 
   it("returns the exact stored text for an authorised block (real vault round trip)", async () => {

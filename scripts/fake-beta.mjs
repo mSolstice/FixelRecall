@@ -353,6 +353,7 @@ async function main() {
 
     const retrievalLogs = [];
     const retrieval = createRetrievalService({
+      authority: { projectId: project.projectId, sessionId: session.sessionId },
       vault,
       maxSearchChars: 1_000,
       maxReturnChars: 80,

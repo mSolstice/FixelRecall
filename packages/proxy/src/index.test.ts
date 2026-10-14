@@ -235,6 +235,28 @@ describe("createLocalGateway", () => {
     }
   });
 
+  it("sets outbound content length to the actual forwarded bytes", async () => {
+    const captured: { declared?: string; body: Buffer } = { body: Buffer.alloc(0) };
+    const upstream = await startBodyCaptureUpstream(captured);
+    const gateway = await startProductionGateway([], {
+      openai: `${upstream.baseUrl}/v1/responses`
+    });
+    try {
+      const body = Buffer.from(JSON.stringify({ model: "synthetic", input: "length canary" }));
+      const response = await fetch(`${gateway.baseUrl}/v1/responses`, {
+        method: "POST",
+        headers: { authorization: "Bearer fake", "content-type": "application/json" },
+        body
+      });
+      expect(response.status).toBe(200);
+      expect(captured.declared).toBe(String(captured.body.length));
+      expect(captured.body.equals(body)).toBe(true);
+    } finally {
+      await gateway.close();
+      await upstream.close();
+    }
+  });
+
   it("blocks upstream redirects without forwarding credentials to the redirected host", async () => {
     const redirectedHeaders: Record<string, string> = {};
     const redirected = await startHeaderCaptureUpstream(redirectedHeaders);
@@ -575,6 +597,36 @@ async function startHeaderCaptureUpstream(capturedHeaders: Record<string, string
         server.close((error) => (error ? reject(error) : resolve()));
       })
   };
+}
+
+async function startBodyCaptureUpstream(captured: { declared?: string; body: Buffer }) {
+  const server = createServer(async (request, response) => {
+    captured.declared =
+      typeof request.headers["content-length"] === "string"
+        ? request.headers["content-length"]
+        : undefined;
+    captured.body = await readRequestBytes(request);
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify({ ok: true }));
+  });
+  await listen(server);
+  const address = server.address();
+  if (address === null || typeof address === "string")
+    throw new Error("Expected TCP server address");
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    close: () =>
+      new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve()))
+      )
+  };
+}
+
+async function readRequestBytes(request: IncomingMessage): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of request)
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  return Buffer.concat(chunks);
 }
 
 async function startRedirectUpstream(location: string) {

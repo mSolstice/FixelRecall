@@ -7,6 +7,9 @@
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
   },
   "references": [
+    { "path": "../firewall" },
+    { "path": "../retrieval-mcp" },
+    { "path": "../vault" },
     { "path": "../core" },
     { "path": "../providers-openai" },
     { "path": "../providers-anthropic" }
