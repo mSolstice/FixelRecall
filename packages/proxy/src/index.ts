@@ -6,11 +6,6 @@ import {
   validateCodexSubscriptionBaseUrl
 } from "@fixel-recall/providers-openai";
 import { CanaryAdmissionError, createCanaryAdmission, type CanaryLimits } from "./canary.js";
-import {
-  replaceSyntheticReferences,
-  type ReferenceReplacementOptions
-} from "./reference-replacement.js";
-export { type ReferenceReplacementOptions } from "./reference-replacement.js";
 
 export { createCanaryAdmission, CanaryAdmissionError, type CanaryLimits } from "./canary.js";
 
@@ -23,13 +18,6 @@ export interface ProxyRoute {
 }
 
 export interface StructuredLogEvent {
-  readonly referenceReplacement?: {
-    readonly evidenceOrigin: "synthetic";
-    readonly reasonCodes: readonly string[];
-    readonly blocksTransformed: number;
-    readonly bytesBefore: number;
-    readonly bytesAfter: number;
-  };
   readonly requestId: string;
   readonly route: string;
   readonly method: string;
@@ -56,7 +44,6 @@ export interface GatewayMetrics {
 }
 
 export interface LocalGatewayOptions {
-  readonly experimentalReferenceReplacement?: ReferenceReplacementOptions;
   readonly requestTimeoutMs?: number;
   readonly maxRequestBytes?: number;
   readonly bindHost?: "127.0.0.1" | "::1";
@@ -146,7 +133,6 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
     let provider: ProviderFamily | undefined;
     let requestBytes = 0;
     let responseStreamed = false;
-    let referenceReplacement: StructuredLogEvent["referenceReplacement"];
 
     const abortController = new AbortController();
     activeRequests.add(abortController);
@@ -249,41 +235,15 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
         }
         canaryModelLookups += 1;
       }
-      let forwardedBody = body;
-      if (
-        options.experimentalReferenceReplacement !== undefined &&
-        mode === "safe" &&
-        method === "POST" &&
-        subscriptionRoute === undefined &&
-        admitCanary === undefined
-      ) {
-        const hostname = new URL(upstreamUrl).hostname;
-        if (["127.0.0.1", "[::1]"].includes(hostname)) {
-          const result = await replaceSyntheticReferences(
-            body,
-            provider,
-            options.experimentalReferenceReplacement
-          );
-          if (!killSwitchActive && mode === "safe" && !abortController.signal.aborted)
-            forwardedBody = result.body;
-          referenceReplacement = {
-            evidenceOrigin: "synthetic",
-            reasonCodes: result.reasonCodes,
-            blocksTransformed: forwardedBody === result.body ? result.blocksTransformed : 0,
-            bytesBefore: body.length,
-            bytesAfter: forwardedBody.length
-          };
-        }
-      }
       const upstreamResponse = await fetch(upstreamUrl, {
         method,
         headers: forwardHeaders(
           request,
           provider,
           subscriptionRoute !== undefined,
-          method === "POST" ? forwardedBody.length : undefined
+          method === "POST" ? body.length : undefined
         ),
-        body: method === "POST" ? forwardedBody : undefined,
+        body: method === "POST" ? body : undefined,
         redirect: "manual",
         signal: abortController.signal
       });
@@ -345,7 +305,6 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
         requestBytes,
         requestId,
         responseStreamed,
-        ...(referenceReplacement === undefined ? {} : { referenceReplacement }),
         route,
         statusCode
       });

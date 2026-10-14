@@ -1,6 +1,6 @@
 # Release Readiness
 
-Review date: 2026-08-02
+Review date: 2026-10-14
 
 Decision: **GO for macOS CLI-only; NO-GO for broad hosted/enterprise production deployment**
 
@@ -23,12 +23,11 @@ synthetic and no third-party security review has been completed.
 
 ## Commit And Tree
 
-- Commit reviewed: `1e74a4500429801bc040e45ce02a2d170466f547`
-- Short commit: `1e74a45`
+- Commit reviewed: `e305ada` plus the current uncommitted cleanup changes
+- Short commit: `e305ada`
 - GitHub Actions evidence: user reported Linux CI green for pushed commit
   `1e74a4500429801bc040e45ce02a2d170466f547`.
-- Tree before this report update: clean
-- Tree after this report update: dirty until `RELEASE_READINESS.md` is committed
+- Tree status: dirty while cleanup changes are under review
 
 ## Supported OS
 
@@ -84,7 +83,7 @@ Release limitation:
 | `pnpm lint`                                                    | PASS                                                                               |
 | `pnpm typecheck`                                               | PASS                                                                               |
 | `pnpm build`                                                   | PASS                                                                               |
-| `pnpm test`                                                    | PASS with local loopback permission: 17 files, 294 tests.                          |
+| `pnpm test`                                                    | PASS with local loopback permission: 28 files, 408 tests.                          |
 | `pnpm test:compatibility`                                      | PASS: 1 file, 3 tests.                                                             |
 | `pnpm check:skills`                                            | PASS                                                                               |
 | `FIXEL_RECALL_TEST_CANARIES='[]' pnpm scan:test-canaries -- .` | PASS                                                                               |
@@ -99,7 +98,7 @@ No real-provider traffic was sent.
 
 ## Test Totals
 
-- Full Vitest suite: 17 files, 294 tests passed.
+- Full Vitest suite: 28 files, 408 tests passed.
 - Compatibility suite: 1 file, 3 tests passed.
 - Fake-provider validation: 13 steps passed for gateway, fake Codex client, fake Claude Code client,
   transform, MCP retrieval, benchmark, dashboard smoke, kill switch, direct fake routing,

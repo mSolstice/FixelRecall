@@ -179,7 +179,7 @@ and Session control.
 2. The gateway validates authentication, request size, allowlisting, timeout and kill-switch rules.
 3. Supported live requests are currently forwarded unchanged.
 4. The Exactness Firewall, policy engine, renderer and vault are exercised in isolated and synthetic
-   flows while live transformation wiring remains in development.
+   flows while live gateway transformation remains intentionally disabled.
 5. When live wiring is enabled, supported content will be parsed into provider-neutral blocks,
    scanned, policy-evaluated, stored for recovery when authorised, rendered when eligible and
    rebuilt into the provider request.

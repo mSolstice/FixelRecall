@@ -33,7 +33,9 @@ const env = {
   HOME: home,
   PATH: process.env.PATH,
   npm_config_cache: cache,
-  npm_config_update_notifier: "false"
+  npm_config_update_notifier: "false",
+  FIXEL_RECALL_PROJECT_ID: "prj_00000000000000000000000000000000",
+  FIXEL_RECALL_SESSION_ID: "ses_00000000000000000000000000000000"
 };
 let failures = 0;
 const check = (name, ok, detail = "") => {
