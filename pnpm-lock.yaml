@@ -126,6 +126,27 @@ importers:
 
   packages/test-data: {}
 
+  packages/transformation:
+    dependencies:
+      '@fixel-recall/core':
+        specifier: workspace:*
+        version: link:../core
+      '@fixel-recall/firewall':
+        specifier: workspace:*
+        version: link:../firewall
+      '@fixel-recall/providers-anthropic':
+        specifier: workspace:*
+        version: link:../providers-anthropic
+      '@fixel-recall/providers-openai':
+        specifier: workspace:*
+        version: link:../providers-openai
+      '@fixel-recall/renderer':
+        specifier: workspace:*
+        version: link:../renderer
+      '@fixel-recall/vault':
+        specifier: workspace:*
+        version: link:../vault
+
   packages/vault:
     dependencies:
       '@fixel-recall/core':

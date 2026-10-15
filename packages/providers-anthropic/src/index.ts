@@ -56,6 +56,7 @@ export interface AnthropicParseResult {
 }
 
 export interface AnthropicRebuildOptions {
+  readonly imagesByBlockId?: ReadonlyMap<BlockId, readonly string[]>;
   readonly transformedTextByBlockId?:
     | ReadonlyMap<BlockId, string>
     | Readonly<Record<string, string>>;
@@ -143,6 +144,20 @@ export function rebuildAnthropicMessagesRequest(
       continue;
     }
     patchTextContent(message, messageState.blockIds, replacements);
+    const images = options.imagesByBlockId?.get(messageState.blockIds[0]!);
+    if (
+      images !== undefined &&
+      typeof message["content"] === "string" &&
+      message["role"] === "user"
+    ) {
+      (message as MutableJsonObject)["content"] = [
+        { type: "text", text: message["content"] },
+        ...images.map((data) => ({
+          type: "image",
+          source: { type: "base64", media_type: "image/png", data }
+        }))
+      ];
+    }
   }
   return rebuilt;
 }

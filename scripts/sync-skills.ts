@@ -27,6 +27,7 @@ const generatedRoots = [".agents/skills/fixel-recall", ".claude/skills/fixel-rec
 const requiredReferences = [
   "OPERATIONS.md",
   "SAFETY.md",
+  "STRUCTURED_LOGS.md",
   "BENCHMARKING.md",
   "TROUBLESHOOTING.md",
   "CODEX_SETUP.md",

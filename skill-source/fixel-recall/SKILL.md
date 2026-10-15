@@ -36,6 +36,7 @@ Operate the local Fixel Recall engine for Codex and Claude Code.
 
 - `references/OPERATIONS.md`: start, stop, status, doctor, service routing.
 - `references/SAFETY.md`: policy decisions, protected material, exact retrieval boundaries.
+- `references/STRUCTURED_LOGS.md`: interpret deduplicated logs alongside approved image context.
 - `references/BENCHMARKING.md`: audits, benchmarks, projections, share cards.
 - `references/TROUBLESHOOTING.md`: failures, degraded mode, setup symptoms.
 - `references/CODEX_SETUP.md`: Codex-only setup details.

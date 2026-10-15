@@ -78,6 +78,15 @@ describe("createDeterministicFakeRenderer", () => {
 });
 
 describe("createPxpipeCompatibleRenderer", () => {
+  it("fails instead of silently clipping text beyond image dimensions", async () => {
+    const result = await createPxpipeCompatibleRenderer().render({
+      ...input,
+      sourceText: "Readable prose. ".repeat(1000),
+      pageLimits: { maxPages: 1, maxCharsPerPage: 20000 },
+      dimensionLimits: { maxWidthPx: 100, maxHeightPx: 100, minFontSizePx: 12 }
+    });
+    expect(result).toMatchObject({ status: "failure", failureReason: "unsupported_format" });
+  });
   it("renders deterministic golden pages with stable labels and exact sidecar metadata", async () => {
     const logEvents: RendererLogEvent[] = [];
     const renderer = createPxpipeCompatibleRenderer({

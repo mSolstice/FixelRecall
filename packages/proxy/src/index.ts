@@ -12,6 +12,21 @@ export { createCanaryAdmission, CanaryAdmissionError, type CanaryLimits } from "
 export type ProviderFamily = "openai" | "anthropic";
 export type GatewayMode = "safe" | "bypass";
 
+export interface TransformationAudit {
+  readonly outcome: "transformed" | "original";
+  readonly strategy: "template" | "image" | "mixed" | "native";
+  readonly reasonCodes: readonly string[];
+  readonly blocksConsidered: number;
+  readonly blocksTransformed: number;
+  readonly bytesBefore: number;
+  readonly bytesAfter: number;
+}
+
+export interface RequestTransformationResult {
+  readonly body: Buffer;
+  readonly audit: TransformationAudit;
+}
+
 export interface ProxyRoute {
   readonly method: "GET" | "POST";
   readonly path: string;
@@ -31,6 +46,7 @@ export interface StructuredLogEvent {
   readonly killSwitchActive: boolean;
   readonly requestBytes: number;
   readonly responseStreamed: boolean;
+  readonly transformation?: TransformationAudit;
 }
 
 export interface GatewayMetrics {
@@ -44,6 +60,13 @@ export interface GatewayMetrics {
 }
 
 export interface LocalGatewayOptions {
+  /** Optional host-configured transformation. Absent by default; receives a copy, never the original buffer. */
+  readonly transformRequest?: (
+    body: Buffer,
+    provider: ProviderFamily,
+    signal: AbortSignal
+  ) => Promise<Buffer | RequestTransformationResult>;
+  readonly transformationTimeoutMs?: number;
   readonly requestTimeoutMs?: number;
   readonly maxRequestBytes?: number;
   readonly bindHost?: "127.0.0.1" | "::1";
@@ -133,6 +156,7 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
     let provider: ProviderFamily | undefined;
     let requestBytes = 0;
     let responseStreamed = false;
+    let transformation: TransformationAudit | undefined;
 
     const abortController = new AbortController();
     activeRequests.add(abortController);
@@ -235,15 +259,78 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
         }
         canaryModelLookups += 1;
       }
+      let forwardedBody = body;
+      if (
+        options.transformRequest &&
+        mode === "safe" &&
+        method === "POST" &&
+        !subscriptionRoute &&
+        !admitCanary
+      ) {
+        transformation = {
+          outcome: "original",
+          strategy: "native",
+          reasonCodes: ["transformation_failed_keep_native"],
+          blocksConsidered: 0,
+          blocksTransformed: 0,
+          bytesBefore: body.length,
+          bytesAfter: body.length
+        };
+        const controller = new AbortController();
+        const abort = () => controller.abort();
+        abortController.signal.addEventListener("abort", abort, { once: true });
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          const candidateResult = await Promise.race([
+            options.transformRequest(Buffer.from(body), provider, controller.signal),
+            new Promise<Buffer | RequestTransformationResult>((resolve) => {
+              timer = setTimeout(() => {
+                controller.abort();
+                resolve(body);
+              }, options.transformationTimeoutMs ?? 1000);
+            })
+          ]);
+          const candidate = Buffer.isBuffer(candidateResult)
+            ? candidateResult
+            : candidateResult.body;
+          if (!Buffer.isBuffer(candidateResult)) transformation = candidateResult.audit;
+          if (
+            !controller.signal.aborted &&
+            !abortController.signal.aborted &&
+            !killSwitchActive &&
+            mode === "safe" &&
+            Buffer.isBuffer(candidate) &&
+            candidate.length < body.length
+          ) {
+            validateJsonBody(candidate);
+            forwardedBody = Buffer.from(candidate);
+          } else if (transformation?.outcome === "transformed") {
+            transformation = {
+              ...transformation,
+              outcome: "original",
+              strategy: "native",
+              reasonCodes: [...transformation.reasonCodes, "gateway_candidate_rejected"],
+              blocksTransformed: 0,
+              bytesAfter: body.length
+            };
+          }
+        } catch {
+          /* Transformation failure preserves the original request. */
+        } finally {
+          clearTimeout(timer);
+          controller.abort();
+          abortController.signal.removeEventListener("abort", abort);
+        }
+      }
       const upstreamResponse = await fetch(upstreamUrl, {
         method,
         headers: forwardHeaders(
           request,
           provider,
           subscriptionRoute !== undefined,
-          method === "POST" ? body.length : undefined
+          method === "POST" ? forwardedBody.length : undefined
         ),
-        body: method === "POST" ? body : undefined,
+        body: method === "POST" ? forwardedBody : undefined,
         redirect: "manual",
         signal: abortController.signal
       });
@@ -305,6 +392,7 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
         requestBytes,
         requestId,
         responseStreamed,
+        transformation,
         route,
         statusCode
       });

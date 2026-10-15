@@ -243,6 +243,42 @@ out-of-band host decision and gives the transformation hook a small, testable co
 current implementation is experimental and synthetic-only until the end-to-end gateway test is
 stable and both provider rebuild paths pass the full failure matrix.
 
+## ADR-025: Opt-in combined log and image transformation
+
+**Status:** Accepted for local synthetic validation; real-model approvals remain host
+responsibilities.
+
+**Decision:** Put composition in a separate transformation package and expose a bounded optional
+gateway callback. Preserve original request bytes on failure. Supported historical user blocks may
+use either exact template rows or policy-approved PNG prose, never both for one block. Explicit
+host-approved log templates are the narrow exception allowing protected values to remain literal
+native strings in a reversible representation. Current instructions, code and active tool state
+remain unchanged. Unknown/critical logs remain native. No production dependency is added.
+
+**Consequences:** Hosts must supply provenance, profile approval, scoped MCP recovery and
+model-aware cost estimates; no guessed model or global CLI switch silently enables this path. The
+old deleted reference-only experiment and its incomplete lease are not restored. The gateway remains
+independent of the composition package. Tests prove transport and reconstruction, not model
+comprehension.
+
+## ADR-026: Deterministic transformation fallback
+
+**Status:** Accepted
+
+**Decision:** Choose one strategy per block from trusted host classification. Approved repetitive
+historical logs use template deduplication or native text. Approved gist-only historical prose uses
+PNG rendering or native text. Never cross-fallback between those strategies. A request may contain
+both strategies only when they apply to separate eligible blocks. Emit content-free route, reason,
+block-count and byte-count metadata.
+
+**Reason:** Exact log values cannot safely become image-only evidence, while arbitrary prose cannot
+become a verified log template after a rendering failure. Cross-fallback would turn a component
+failure into new transformation authority.
+
+**Consequences:** The pipeline is less aggressive but deterministic. Missing interpretation
+instructions, absent vision capability, parser failure, renderer failure or recovery failure ends at
+native content without a retry loop.
+
 ## ADR template
 
 When adding a decision, use:

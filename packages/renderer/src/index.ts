@@ -242,6 +242,25 @@ function firstPxpipeFailure(
   ) {
     return "unsupported_format";
   }
+  const scale = Math.max(1, Math.min(4, Math.floor(input.dimensionLimits.minFontSizePx / 4)));
+  const width = Math.min(input.dimensionLimits.maxWidthPx, 1568);
+  const height = Math.min(input.dimensionLimits.maxHeightPx, 728);
+  for (let start = 0; start < input.sourceText.length; start += input.pageLimits.maxCharsPerPage) {
+    let x = scale,
+      y = scale;
+    for (const character of input.sourceText.slice(
+      start,
+      start + input.pageLimits.maxCharsPerPage
+    )) {
+      if (character === "\n" || x + 6 * scale > width) {
+        x = scale;
+        y += 8 * scale;
+        if (character === "\n") continue;
+      }
+      if (y + 7 * scale > height || x + 5 * scale > width) return "unsupported_format";
+      x += 6 * scale;
+    }
+  }
   return null;
 }
 

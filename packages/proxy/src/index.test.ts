@@ -257,6 +257,51 @@ describe("createLocalGateway", () => {
     }
   });
 
+  it.each(["timeout", "throw", "invalid-json", "mutation"])(
+    "preserves original bytes on transformation %s",
+    async (failure) => {
+      const captured: { declared?: string; body: Buffer } = { body: Buffer.alloc(0) };
+      const logs: StructuredLogEvent[] = [];
+      const upstream = await startBodyCaptureUpstream(captured);
+      const gateway = createLocalGateway({
+        log: (event) => logs.push(event),
+        upstreams: { openai: upstream.baseUrl },
+        upstreamAllowlist: [upstream.baseUrl],
+        transformationTimeoutMs: 5,
+        transformRequest: async (copy) => {
+          if (failure === "timeout") return new Promise<Buffer>(() => {});
+          if (failure === "invalid-json") return Buffer.from("{");
+          if (failure === "mutation") copy.fill(0);
+          throw new Error("synthetic failure");
+        }
+      });
+      await listen(gateway.server);
+      const address = gateway.server.address();
+      if (!address || typeof address === "string") throw new Error("missing address");
+      try {
+        const body = Buffer.from('{ "model": "synthetic", "input": "unchanged" }');
+        const response = await fetch(`http://127.0.0.1:${address.port}/v1/responses`, {
+          method: "POST",
+          headers: { authorization: "Bearer fake", "content-type": "application/json" },
+          body
+        });
+        await response.text();
+        expect(response.status).toBe(200);
+        expect(captured.body.equals(body)).toBe(true);
+        expect(logs[0]?.transformation).toMatchObject({
+          outcome: "original",
+          strategy: "native",
+          reasonCodes: ["transformation_failed_keep_native"],
+          bytesBefore: body.length,
+          bytesAfter: body.length
+        });
+      } finally {
+        await gateway.close();
+        await upstream.close();
+      }
+    }
+  );
+
   it("blocks upstream redirects without forwarding credentials to the redirected host", async () => {
     const redirectedHeaders: Record<string, string> = {};
     const redirected = await startHeaderCaptureUpstream(redirectedHeaders);
