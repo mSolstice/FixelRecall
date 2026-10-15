@@ -122,10 +122,10 @@ function resolveCodexCommand() {
 
 async function run(command, args, extraEnvironment) {
   return await new Promise((resolveRun, reject) => {
-    const child = spawn(command, args, {
+    const invocation = createInvocation(command, args);
+    const child = spawn(invocation.command, invocation.args, {
       cwd: repositoryRoot,
       env: { ...process.env, ...extraEnvironment },
-      shell: process.platform === "win32",
       stdio: ["ignore", "pipe", "pipe"]
     });
     let stdout = "";
@@ -144,6 +144,19 @@ async function run(command, args, extraEnvironment) {
       resolveRun({ code, stderr, stdout, timedOut });
     });
   });
+}
+
+function createInvocation(command, args) {
+  if (process.platform !== "win32") return { command, args };
+  const commandLine = [command, ...args].map(quoteWindowsArgument).join(" ");
+  return {
+    command: process.env["ComSpec"] ?? "cmd.exe",
+    args: ["/d", "/s", "/c", commandLine]
+  };
+}
+
+function quoteWindowsArgument(value) {
+  return `"${value.replaceAll('"', '""').replaceAll("%", "%%")}"`;
 }
 
 function assertSafeOutput(result) {
