@@ -15,6 +15,7 @@
     "lint": "eslint .",
     "scan:test-canaries": "node scripts/scan-test-output-canaries.mjs",
     "smoke:anthropic": "node scripts/smoke/anthropic-fake-gateway.mjs",
+    "smoke:official-hosts": "node scripts/smoke-official-hosts.mjs",
     "smoke:openai": "node scripts/smoke/openai-fake-gateway.mjs",
     "sync:skills": "node scripts/sync-skills.ts",
     "test": "vitest run",

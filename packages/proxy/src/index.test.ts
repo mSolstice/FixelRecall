@@ -125,8 +125,25 @@ describe("createFakeGateway", () => {
     const { baseUrl, close } = await startGateway();
     try {
       const openAI = await postStream(`${baseUrl}/v1/responses`);
-      expect(openAI).toContain("response.output_text.delta");
-      expect(openAI).toContain("[DONE]");
+      const openAIEvents = parseServerSentEvents(openAI);
+      expect(openAIEvents.map((event) => event.type)).toEqual([
+        "response.created",
+        "response.in_progress",
+        "response.output_item.added",
+        "response.content_part.added",
+        "response.output_text.delta",
+        "response.output_text.done",
+        "response.content_part.done",
+        "response.output_item.done",
+        "response.completed"
+      ]);
+      expect(openAIEvents.at(-1)).toMatchObject({
+        type: "response.completed",
+        response: {
+          status: "completed",
+          output: [{ type: "message", status: "completed" }]
+        }
+      });
 
       const anthropic = await postStream(`${baseUrl}/v1/messages`);
       expect(anthropic).toContain("message_start");
@@ -155,6 +172,13 @@ describe("createFakeGateway", () => {
     }
   });
 });
+
+function parseServerSentEvents(stream: string): Record<string, unknown>[] {
+  return stream
+    .split("\n\n")
+    .filter((entry) => entry.startsWith("data: "))
+    .map((entry) => JSON.parse(entry.slice("data: ".length)) as Record<string, unknown>);
+}
 
 describe("createLocalGateway", () => {
   it("defaults to loopback and Safe mode with privacy-safe status", async () => {

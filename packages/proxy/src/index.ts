@@ -715,11 +715,7 @@ async function handleOpenAIResponses(
   }
 
   if (body["stream"] === true) {
-    writeStream(response, requestId, [
-      'data: {"type":"response.output_text.delta","delta":"Fake OpenAI stream chunk 1"}\n\n',
-      'data: {"type":"response.output_text.done","text":"Fake OpenAI stream done"}\n\n',
-      "data: [DONE]\n\n"
-    ]);
+    writeStream(response, requestId, createOpenAIResponseStream(requestId, body));
     return 200;
   }
 
@@ -735,6 +731,129 @@ async function handleOpenAIResponses(
     ]
   });
   return 200;
+}
+
+function createOpenAIResponseStream(
+  requestId: string,
+  body: Record<string, unknown>
+): readonly string[] {
+  const responseId = `resp_${requestId}`;
+  const itemId = `msg_${requestId}`;
+  const text = "Fake OpenAI response";
+  const model = typeof body["model"] === "string" ? body["model"] : "fake-openai-model";
+  const outputText = { type: "output_text", annotations: [], logprobs: [], text };
+  const completedItem = {
+    id: itemId,
+    type: "message",
+    status: "completed",
+    role: "assistant",
+    content: [outputText]
+  };
+  const responseBase = {
+    id: responseId,
+    object: "response",
+    created_at: Math.floor(Date.now() / 1000),
+    error: null,
+    incomplete_details: null,
+    instructions: null,
+    max_output_tokens: null,
+    model,
+    output: [],
+    parallel_tool_calls: true,
+    previous_response_id: null,
+    reasoning: { effort: null, summary: null },
+    store: false,
+    temperature: 1,
+    text: { format: { type: "text" }, verbosity: "medium" },
+    tool_choice: "auto",
+    tools: [],
+    top_p: 1,
+    truncation: "disabled",
+    usage: null,
+    metadata: {}
+  };
+  const events = [
+    {
+      type: "response.created",
+      sequence_number: 0,
+      response: { ...responseBase, status: "in_progress" }
+    },
+    {
+      type: "response.in_progress",
+      sequence_number: 1,
+      response: { ...responseBase, status: "in_progress" }
+    },
+    {
+      type: "response.output_item.added",
+      sequence_number: 2,
+      output_index: 0,
+      item: {
+        id: itemId,
+        type: "message",
+        status: "in_progress",
+        role: "assistant",
+        content: []
+      }
+    },
+    {
+      type: "response.content_part.added",
+      sequence_number: 3,
+      item_id: itemId,
+      output_index: 0,
+      content_index: 0,
+      part: { type: "output_text", annotations: [], logprobs: [], text: "" }
+    },
+    {
+      type: "response.output_text.delta",
+      sequence_number: 4,
+      item_id: itemId,
+      output_index: 0,
+      content_index: 0,
+      delta: text,
+      logprobs: []
+    },
+    {
+      type: "response.output_text.done",
+      sequence_number: 5,
+      item_id: itemId,
+      output_index: 0,
+      content_index: 0,
+      text,
+      logprobs: []
+    },
+    {
+      type: "response.content_part.done",
+      sequence_number: 6,
+      item_id: itemId,
+      output_index: 0,
+      content_index: 0,
+      part: outputText
+    },
+    {
+      type: "response.output_item.done",
+      sequence_number: 7,
+      output_index: 0,
+      item: completedItem
+    },
+    {
+      type: "response.completed",
+      sequence_number: 8,
+      response: {
+        ...responseBase,
+        status: "completed",
+        output: [completedItem],
+        usage: {
+          input_tokens: 8,
+          input_tokens_details: { cached_tokens: 0 },
+          output_tokens: 4,
+          output_tokens_details: { reasoning_tokens: 0 },
+          total_tokens: 12
+        }
+      }
+    }
+  ];
+
+  return events.map((event) => `data: ${JSON.stringify(event)}\n\n`);
 }
 
 async function handleAnthropicMessages(

@@ -39,3 +39,28 @@ jobs:
       - run: pnpm build
       - run: pnpm test:compatibility
       - run: pnpm check:skills
+
+  official-host-smoke:
+    name: Official hosts / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.13.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Install pinned official host CLIs
+        run: npm install --global @openai/codex@0.162.1 @anthropic-ai/claude-code@2.1.300
+      - run: pnpm smoke:official-hosts
