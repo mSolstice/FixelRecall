@@ -21,6 +21,10 @@ the same benchmark flow.
 | Tool state preservation         |       Function calls and outputs |      `tool_use` and `tool_result` |
 | Optional platform automation    |    Codex configuration or plugin |            Claude hooks or plugin |
 
+The Codex IDE extension shares Codex CLI configuration. Claude Code's VS Code integration shares the
+Claude Code runtime and settings. See `docs/PLATFORM_AND_IDE_SUPPORT.md` for the operating-system
+and editor release gates.
+
 ## Shared skill policy
 
 Canonical source:

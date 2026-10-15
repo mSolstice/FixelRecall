@@ -41,3 +41,4 @@ Operate the local Fixel Recall engine for Codex and Claude Code.
 - `references/TROUBLESHOOTING.md`: failures, degraded mode, setup symptoms.
 - `references/CODEX_SETUP.md`: Codex-only setup details.
 - `references/CLAUDE_CODE_SETUP.md`: Claude Code-only setup details.
+- `references/PLATFORMS.md`: OS, IDE and Cursor support boundaries.

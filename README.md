@@ -121,7 +121,7 @@ or persist provider credentials.
 
 ## Current Release Status
 
-**Fixel Recall for macOS CLI**
+**Fixel Recall across CLI and supported IDE integrations**
 
 Fixel Recall is available for macOS CLI users of Codex CLI and Claude Code CLI.
 
@@ -136,12 +136,20 @@ Supported now:
 - local MCP retrieval in tested flows
 - dry-run setup, confirmed setup, rollback and uninstall on macOS CLI
 
-Not included in this release:
+Additional configuration support is implemented for:
 
-- Codex IDE
-- Claude Code IDE
-- Windows native
-- WSL
+- Codex IDE in VS Code and Cursor, through the same Codex configuration as the CLI
+- Claude Code in VS Code, through the same Claude Code runtime and settings as the CLI
+- Linux, Windows native and WSL 2
+
+Run `fixel-recall platform doctor` for the current machine. Windows, Linux and WSL public release
+claims remain gated on the current commit's OS-specific CI and canary evidence. Cursor's native AI
+features are not routed through Fixel Recall.
+
+Not yet claimed:
+
+- Windows, Linux or WSL release validation for this exact commit
+- Cursor native AI routing
 - broad hosted or enterprise production deployment
 - proven real-world savings across private repositories
 - third-party security review
@@ -501,10 +509,8 @@ Do not manually maintain three different skill versions.
 Do not claim:
 
 - broad hosted/enterprise deployment
-- Codex IDE support
-- Claude Code IDE support
-- Windows native support
-- WSL support
+- native Cursor AI routing
+- Windows, Linux or WSL release validation before the matching CI and canary pass
 - hosted or multi-user deployment support
 - proven real-world savings across private repositories
 - approved real model profiles
@@ -514,6 +520,6 @@ Do not claim:
 The honest current claim is:
 
 ```text
-Fixel Recall is available for macOS CLI users of Codex CLI and Claude Code CLI.
-IDE, Windows native, WSL, and broad hosted/enterprise production deployment are not included in this release.
+Fixel Recall supports Codex CLI/IDE and Claude Code CLI/VS Code configuration on macOS, Linux, Windows and WSL.
+macOS remains the release-validated scope until the new OS-specific CI and canaries pass; Cursor support is through the Codex extension only.
 ```

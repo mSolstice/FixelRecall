@@ -15,6 +15,16 @@ export interface CliLauncher {
   readonly args: readonly string[];
 }
 
+export function mcpLauncherForPlatform(
+  launcher: CliLauncher,
+  platform: NodeJS.Platform
+): CliLauncher {
+  if (platform !== "win32" || (launcher.command !== "npx" && launcher.command !== "npx.cmd")) {
+    return launcher;
+  }
+  return { args: ["/d", "/s", "/c", "npx", ...launcher.args], command: "cmd" };
+}
+
 /** True for a path inside a package-runner cache (npx, pnpm dlx, bunx). */
 export function isEphemeralCliPath(path: string): boolean {
   return /[\\/]_npx[\\/]|[\\/]dlx-[^\\/]+[\\/]|[\\/]\.?bunx-[^\\/]*[\\/]/.test(path);
@@ -50,11 +60,24 @@ export function launcherWith(
   return [...launcher.args, ...extra];
 }
 
-function shellQuote(value: string): string {
-  return /^[\w@%+=:,./-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`;
+function shellQuote(value: string, platform: NodeJS.Platform): string {
+  if (/^[\w@%+=:,./\\-]+$/.test(value)) return value;
+  return platform === "win32"
+    ? `"${value.replaceAll('"', '""')}"`
+    : `'${value.replaceAll("'", "'\\''")}'`;
 }
 
 /** A single command line, quoted, for places that take one string (hook commands). */
 export function launcherCommandLine(launcher: CliLauncher, ...extra: readonly string[]): string {
-  return [launcher.command, ...launcher.args, ...extra].map(shellQuote).join(" ");
+  return launcherCommandLineForPlatform(launcher, process.platform, ...extra);
+}
+
+export function launcherCommandLineForPlatform(
+  launcher: CliLauncher,
+  platform: NodeJS.Platform,
+  ...extra: readonly string[]
+): string {
+  return [launcher.command, ...launcher.args, ...extra]
+    .map((value) => shellQuote(value, platform))
+    .join(" ");
 }

@@ -8,6 +8,8 @@ import {
   cliLauncher,
   isEphemeralCliPath,
   launcherCommandLine,
+  launcherCommandLineForPlatform,
+  mcpLauncherForPlatform,
   type CliLauncher
 } from "./launcher.js";
 import { installLocalConfig } from "./local-config.js";
@@ -62,6 +64,35 @@ describe("launcherCommandLine", () => {
     expect(
       launcherCommandLine({ args: ["-y", "fixel-recall@0.1.0"], command: "npx" }, "status")
     ).toBe("npx -y fixel-recall@0.1.0 status");
+  });
+
+  it("quotes native Windows hook paths without duplicating path separators", () => {
+    expect(
+      launcherCommandLineForPlatform(
+        { args: ["C:\\Program Files\\Fixel Recall\\index.js"], command: "node" },
+        "win32",
+        "status"
+      )
+    ).toBe('node "C:\\Program Files\\Fixel Recall\\index.js" status');
+  });
+});
+
+describe("mcpLauncherForPlatform", () => {
+  it("wraps npx with cmd on native Windows", () => {
+    expect(
+      mcpLauncherForPlatform({ args: ["-y", "fixel-recall@0.1.0"], command: "npx" }, "win32")
+    ).toEqual({
+      args: ["/d", "/s", "/c", "npx", "-y", "fixel-recall@0.1.0"],
+      command: "cmd"
+    });
+  });
+
+  it("leaves macOS, Linux, WSL and stable node launchers unchanged", () => {
+    const npx = { args: ["-y", "fixel-recall@0.1.0"], command: "npx" } as const;
+    const node = { args: ["C:\\tools\\fixel-recall\\index.js"], command: "node" } as const;
+    expect(mcpLauncherForPlatform(npx, "linux")).toEqual(npx);
+    expect(mcpLauncherForPlatform(npx, "darwin")).toEqual(npx);
+    expect(mcpLauncherForPlatform(node, "win32")).toEqual(node);
   });
 });
 
@@ -127,5 +158,33 @@ describe("setup writes a launcher that works without fixel-recall on PATH", () =
       expect(text, file).not.toMatch(/"command": "fixel-recall"|command = "fixel-recall"/);
       expect(text, file).toContain("/stable/path/index.js");
     }
+  });
+
+  it("writes native Windows MCP launchers through cmd without changing the hook secret policy", async () => {
+    await installLocalConfig({
+      confirm: true,
+      hosts: ["codex", "claude-code"],
+      includeClaudeHook: true,
+      includeMcp: true,
+      launcher: { args: ["-y", "fixel-recall@0.1.0"], command: "npx" },
+      platform: "win32",
+      rootDir: root
+    });
+
+    const toml = await readFile(join(root, ".codex", "config.toml"), "utf8");
+    expect(toml).toContain('command = "cmd"');
+    expect(toml).toContain('args = ["/d","/s","/c","npx","-y","fixel-recall@0.1.0"');
+
+    const claudeMcp = JSON.parse(await readFile(join(root, ".claude.json"), "utf8")) as {
+      mcpServers: Record<string, { command: string; args: string[] }>;
+    };
+    expect(claudeMcp.mcpServers["fixel-recall-retrieval"]).toMatchObject({
+      command: "cmd",
+      args: ["/d", "/s", "/c", "npx", "-y", "fixel-recall@0.1.0", "mcp", "retrieval"]
+    });
+    const manifest = JSON.parse(
+      await readFile(join(root, ".fixel-recall", "install-manifest.json"), "utf8")
+    ) as { runtimePlatform?: string };
+    expect(manifest.runtimePlatform).toBe("win32");
   });
 });

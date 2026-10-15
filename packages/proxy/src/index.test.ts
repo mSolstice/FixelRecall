@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import {
   createFakeGateway,
   createLocalGateway,
+  dashboardRoute,
   healthRoute,
   type ProviderFamily,
   type StructuredLogEvent
@@ -22,6 +23,12 @@ const rawBodyPersistenceProviders = [
 describe("healthRoute", () => {
   it("declares the local health endpoint", () => {
     expect(healthRoute).toEqual({ method: "GET", path: "/health" });
+  });
+});
+
+describe("dashboardRoute", () => {
+  it("declares the local dashboard endpoint", () => {
+    expect(dashboardRoute).toEqual({ method: "GET", path: "/dashboard" });
   });
 });
 
@@ -173,6 +180,55 @@ describe("createLocalGateway", () => {
       });
     } finally {
       await close();
+    }
+  });
+
+  it("serves a local dashboard and retains only safe transformation metadata", async () => {
+    const captured: { declared?: string; body: Buffer } = { body: Buffer.alloc(0) };
+    const upstream = await startBodyCaptureUpstream(captured);
+    const audit = {
+      outcome: "transformed" as const,
+      strategy: "mixed" as const,
+      reasonCodes: ["transformed_mixed"],
+      blocksConsidered: 8,
+      blocksTransformed: 3,
+      bytesBefore: 100,
+      bytesAfter: 2
+    };
+    const gateway = createLocalGateway({
+      upstreams: { openai: upstream.baseUrl },
+      upstreamAllowlist: [upstream.baseUrl],
+      exactRecoveryAvailable: true,
+      dashboardRenderer: (status) =>
+        `<main>${status.compression.state}:${status.compression.lastRequest?.strategy ?? "none"}</main>`,
+      transformRequest: async () => ({ body: Buffer.from("{}"), audit })
+    });
+    await listen(gateway.server);
+    const address = gateway.server.address();
+    if (!address || typeof address === "string") throw new Error("missing address");
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    try {
+      const before = await fetch(`${baseUrl}/dashboard`);
+      expect(before.headers.get("content-security-policy")).toContain("default-src 'none'");
+      expect(await before.text()).toBe("<main>active:none</main>");
+
+      await fetch(`${baseUrl}/v1/responses`, {
+        method: "POST",
+        headers: { authorization: "Bearer fake", "content-type": "application/json" },
+        body: JSON.stringify({ model: "synthetic", input: "safe synthetic history" })
+      });
+      await expect((await fetch(`${baseUrl}/status`)).json()).resolves.toMatchObject({
+        compression: {
+          state: "active",
+          exactRecoveryAvailable: true,
+          secretsRendered: 0,
+          lastRequest: audit
+        }
+      });
+      expect(await (await fetch(`${baseUrl}/dashboard`)).text()).toBe("<main>active:mixed</main>");
+    } finally {
+      await gateway.close();
+      await upstream.close();
     }
   });
 

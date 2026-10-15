@@ -42,7 +42,7 @@ await build({
   target: "node24"
 });
 
-await chmod(outfile, 0o755);
+if (process.platform !== "win32") await chmod(outfile, 0o755);
 const { size } = await stat(outfile);
 console.log(
   `bundled ${Object.keys(alias).length} workspace packages -> ${outfile} (${(size / 1024).toFixed(0)} KB, v${version})`

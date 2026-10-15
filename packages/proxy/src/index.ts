@@ -67,6 +67,8 @@ export interface LocalGatewayOptions {
     signal: AbortSignal
   ) => Promise<Buffer | RequestTransformationResult>;
   readonly transformationTimeoutMs?: number;
+  readonly exactRecoveryAvailable?: boolean;
+  readonly dashboardRenderer?: (status: GatewayStatus) => string;
   readonly requestTimeoutMs?: number;
   readonly maxRequestBytes?: number;
   readonly bindHost?: "127.0.0.1" | "::1";
@@ -96,6 +98,12 @@ export interface GatewayStatus {
   readonly routes: readonly string[];
   readonly upstreamAllowlist: readonly string[];
   readonly metrics: GatewayMetrics;
+  readonly compression: {
+    readonly state: "active" | "pass-through";
+    readonly lastRequest: TransformationAudit | null;
+    readonly exactRecoveryAvailable: boolean;
+    readonly secretsRendered: 0;
+  };
 }
 
 export interface FakeGatewayOptions {
@@ -113,6 +121,11 @@ export const healthRoute: ProxyRoute = {
 export const statusRoute: ProxyRoute = {
   method: "GET",
   path: "/status"
+};
+
+export const dashboardRoute: ProxyRoute = {
+  method: "GET",
+  path: "/dashboard"
 };
 
 export const openAIResponsesRoute: ProxyRoute = {
@@ -146,6 +159,7 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
     options.canary === undefined ? undefined : createCanaryAdmission(options.canary);
   const activeRequests = new Set<AbortController>();
   let canaryModelLookups = 0;
+  let lastTransformation: TransformationAudit | null = null;
 
   const server = createServer(async (request, response) => {
     const startedAt = Date.now();
@@ -179,7 +193,8 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
         setKillSwitch: (enabled) => {
           killSwitchActive = enabled;
           if (enabled) for (const controller of activeRequests) controller.abort();
-        }
+        },
+        renderDashboard: options.dashboardRenderer
       });
       if (controlResult !== null) {
         statusCode = controlResult;
@@ -380,6 +395,7 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
       clearTimeout(timeout);
       activeRequests.delete(abortController);
       metrics.totalRequests += 1;
+      if (transformation !== undefined) lastTransformation = transformation;
       options.log?.({
         authRedacted: true,
         bodyLogged: false,
@@ -431,10 +447,20 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
         ...metrics,
         providerRequests: { ...metrics.providerRequests }
       },
+      compression: {
+        state:
+          options.transformRequest !== undefined && mode === "safe" && !killSwitchActive
+            ? "active"
+            : "pass-through",
+        lastRequest: lastTransformation,
+        exactRecoveryAvailable: options.exactRecoveryAvailable === true,
+        secretsRendered: 0
+      },
       mode,
       routes: [
         healthRoute.path,
         statusRoute.path,
+        ...(options.dashboardRenderer === undefined ? [] : [dashboardRoute.path]),
         openAIResponsesRoute.path,
         anthropicMessagesRoute.path,
         ...(subscriptionBase === undefined ? [] : Object.values(codexSubscriptionPaths))
@@ -574,6 +600,12 @@ export function createFakeGateway(options: FakeGatewayOptions = {}): FakeGateway
     },
     status: () => ({
       bindHost,
+      compression: {
+        state: "pass-through",
+        lastRequest: null,
+        exactRecoveryAvailable: false,
+        secretsRendered: 0
+      },
       gateway: "fixel-recall-local",
       killSwitchActive,
       metrics: { ...metrics, providerRequests: { ...metrics.providerRequests } },
@@ -619,6 +651,7 @@ async function maybeHandleControlRoute(input: {
   readonly status: () => GatewayStatus;
   readonly setBypass: (enabled: boolean) => void;
   readonly setKillSwitch: (enabled: boolean) => void;
+  readonly renderDashboard?: (status: GatewayStatus) => string;
 }): Promise<number | null> {
   if (input.method === "GET" && input.route === healthRoute.path) {
     writeJson(input.response, 200, input.requestId, {
@@ -635,6 +668,14 @@ async function maybeHandleControlRoute(input: {
       input.requestId,
       input.status() as unknown as Record<string, unknown>
     );
+    return 200;
+  }
+  if (
+    input.method === "GET" &&
+    input.route === dashboardRoute.path &&
+    input.renderDashboard !== undefined
+  ) {
+    writeHtml(input.response, 200, input.requestId, input.renderDashboard(input.status()));
     return 200;
   }
   if (input.method === "POST" && input.route === "/runtime/bypass") {
@@ -855,6 +896,24 @@ function writeJson(
     "x-request-id": requestId
   });
   response.end(JSON.stringify(payload));
+}
+
+function writeHtml(
+  response: ServerResponse,
+  statusCode: number,
+  requestId: string,
+  html: string
+): void {
+  response.writeHead(statusCode, {
+    "cache-control": "no-store",
+    "content-security-policy":
+      "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
+    "content-type": "text/html; charset=utf-8",
+    "referrer-policy": "no-referrer",
+    "x-content-type-options": "nosniff",
+    "x-request-id": requestId
+  });
+  response.end(html);
 }
 
 function writeStream(response: ServerResponse, requestId: string, chunks: readonly string[]): void {

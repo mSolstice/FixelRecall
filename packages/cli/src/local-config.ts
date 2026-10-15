@@ -1,7 +1,13 @@
 import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { cliLauncher, launcherCommandLine, launcherWith, type CliLauncher } from "./launcher.js";
+import {
+  cliLauncher,
+  launcherCommandLineForPlatform,
+  launcherWith,
+  mcpLauncherForPlatform,
+  type CliLauncher
+} from "./launcher.js";
 
 export type LocalConfigHost = "codex" | "claude-code";
 
@@ -15,6 +21,7 @@ export interface LocalConfigInstallOptions {
   readonly installationId?: string;
   readonly createdAt?: string;
   readonly replaceExistingManifest?: boolean;
+  readonly platform?: NodeJS.Platform;
   /** Overrides how agents start this CLI; defaults to the one this process is running from. */
   readonly launcher?: CliLauncher;
 }
@@ -37,6 +44,7 @@ export interface LocalInstallManifest {
   readonly backups: readonly ManagedFileBackup[];
   readonly credentialPolicy: "environment-variable-references-only";
   readonly status: "complete" | "interrupted";
+  readonly runtimePlatform?: NodeJS.Platform;
 }
 
 export interface LocalConfigOperationResult {
@@ -60,6 +68,8 @@ export async function installLocalConfig(
 ): Promise<LocalConfigOperationResult> {
   const gatewayBaseUrl = options.gatewayBaseUrl ?? "http://127.0.0.1:4317";
   const launcher = options.launcher ?? cliLauncher();
+  const platform = options.platform ?? process.platform;
+  const mcpLauncher = mcpLauncherForPlatform(launcher, platform);
   const manifestPath = localManifestPath(options.rootDir);
   const changedFiles = targetFiles(options);
   const installationId = options.installationId ?? "fixel-recall-local-install";
@@ -95,7 +105,7 @@ export async function installLocalConfig(
   if (options.hosts.includes("codex")) {
     await writeCodexManagedConfig(
       join(options.rootDir, ".codex", "config.toml"),
-      renderCodexManagedBlock(gatewayBaseUrl, options.includeMcp, launcher)
+      renderCodexManagedBlock(gatewayBaseUrl, options.includeMcp, mcpLauncher)
     );
   }
 
@@ -104,7 +114,8 @@ export async function installLocalConfig(
       join(options.rootDir, ".claude", "settings.json"),
       gatewayBaseUrl,
       options.includeClaudeHook,
-      launcher
+      launcher,
+      platform
     );
   }
 
@@ -112,15 +123,15 @@ export async function installLocalConfig(
     await writeManagedJsonObject(join(options.rootDir, ".fixel-recall", "mcp.json"), {
       mcpServers: {
         "fixel-recall-retrieval": {
-          args: launcherWith(launcher, "mcp", "retrieval"),
-          command: launcher.command,
+          args: launcherWith(mcpLauncher, "mcp", "retrieval"),
+          command: mcpLauncher.command,
           env: {},
           managedBy: "fixel-recall"
         }
       }
     });
     if (options.hosts.includes("claude-code")) {
-      await writeClaudeMcpConfig(join(options.rootDir, ".claude.json"), launcher);
+      await writeClaudeMcpConfig(join(options.rootDir, ".claude.json"), mcpLauncher);
     }
   }
 
@@ -135,6 +146,7 @@ export async function installLocalConfig(
     installationId,
     managedMarkers,
     manifestVersion: 1,
+    runtimePlatform: platform,
     status: "complete"
   };
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 });
@@ -171,6 +183,7 @@ export async function resumeInterruptedLocalConfig(
     includeMcp: manifest.includeMcp,
     installationId: manifest.installationId,
     replaceExistingManifest: true,
+    platform: manifest.runtimePlatform,
     rootDir
   });
 }
@@ -342,7 +355,8 @@ async function writeClaudeSettings(
   path: string,
   gatewayBaseUrl: string,
   includeClaudeHook: boolean,
-  launcher: CliLauncher
+  launcher: CliLauncher,
+  platform: NodeJS.Platform
 ): Promise<void> {
   const existing = await readOptional(path);
   const parsed = parseJsonObject(existing, path);
@@ -370,7 +384,7 @@ async function writeClaudeSettings(
       SessionStart: [
         ...sessionStart.filter((hook) => !isFixelRecallHook(hook)),
         {
-          command: launcherCommandLine(launcher, "status", "--no-credentials"),
+          command: launcherCommandLineForPlatform(launcher, platform, "status", "--no-credentials"),
           description: "Fixel Recall local status check",
           managedBy: "fixel-recall"
         }

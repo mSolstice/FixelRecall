@@ -36,6 +36,7 @@ Operate the local Fixel Recall engine for Codex and Claude Code.
 - \`references/TROUBLESHOOTING.md\`
 - \`references/CODEX_SETUP.md\`
 - \`references/CLAUDE_CODE_SETUP.md\`
+- \`references/PLATFORMS.md\`
 `;
 
 const references = [
@@ -45,7 +46,8 @@ const references = [
   "BENCHMARKING.md",
   "TROUBLESHOOTING.md",
   "CODEX_SETUP.md",
-  "CLAUDE_CODE_SETUP.md"
+  "CLAUDE_CODE_SETUP.md",
+  "PLATFORMS.md"
 ] as const;
 
 describe("deterministic skill sync", () => {

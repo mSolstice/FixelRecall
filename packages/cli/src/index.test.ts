@@ -180,6 +180,14 @@ describe("fixel-recall CLI commands", () => {
     expect(result.stderr).toContain("Unknown command");
   });
 
+  it("reports platform and editor support without credentials", async () => {
+    const result = await runCliCommand(["platform", "doctor"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Fixel Recall platform doctor");
+    expect(result.stdout).toContain("Cursor native AI: unsupported");
+    expect(result.stdout).toContain("Credentials: not read or displayed");
+  });
+
   it("requires confirmation before destructive actions", async () => {
     const dryRun = await runCliCommand(["delete-session"], { env: { sessionId: "session_safe" } });
     const confirmed = await runCliCommand(["delete-session", "--confirm"], {

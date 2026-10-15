@@ -45,6 +45,7 @@
   "devDependencies": {
     "@fixel-recall/benchmark": "workspace:*",
     "@fixel-recall/core": "workspace:*",
+    "@fixel-recall/dashboard": "workspace:*",
     "@fixel-recall/renderer": "workspace:*",
     "@fixel-recall/proxy": "workspace:*",
     "@fixel-recall/retrieval-mcp": "workspace:*",

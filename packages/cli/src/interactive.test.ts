@@ -166,7 +166,7 @@ describe("help and version", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("Usage: fixel-recall <command>");
     expect(result.stdout).toContain(
-      "Available for macOS CLI users of Codex CLI and Claude Code CLI."
+      "Configured surfaces: Codex CLI/IDE and Claude Code CLI/VS Code"
     );
   });
 

@@ -2,12 +2,13 @@
 
 import { realpathSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
+import { homedir, release, tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface, type Interface } from "node:readline";
 import { fileURLToPath } from "node:url";
 
 import { createSyntheticBenchmarkReport, renderBenchmarkMarkdown } from "@fixel-recall/benchmark";
+import { renderGatewayActivityDashboard } from "@fixel-recall/dashboard";
 import {
   defaultProductPolicyPreset,
   isoTimestamp,
@@ -33,6 +34,7 @@ import { gatewayStartOptions } from "./gateway-config.js";
 import { runGuidedFlow, wantsGuidedFlow, type InteractiveIo } from "./interactive.js";
 import { cliLauncher, launcherCommandLine, launcherWith } from "./launcher.js";
 import { cliVersion } from "./version.js";
+import { platformSupportReport, renderPlatformSupportReport } from "./platform-support.js";
 import {
   installLocalConfig,
   type LocalConfigHost,
@@ -456,6 +458,14 @@ export async function runCliCommand(
     const env = await cliEnvironment(options.env, true);
     return textResult(0, renderDoctorSummary(env));
   }
+  if (command === "platform" && argv[1] === "doctor") {
+    return textResult(
+      0,
+      renderPlatformSupportReport(
+        platformSupportReport({ env: process.env, platform: process.platform, release: release() })
+      )
+    );
+  }
   if (command === "audit" || command === "compatibility-audit") {
     const report = runCompatibilityAudit();
     return textResult(
@@ -642,6 +652,7 @@ export function createCodexSetupPreview(env: CliEnvironment): HostSetupPreview {
       "```",
       "",
       "Subscription authentication through this custom provider is unproven and is not supported by the default setup.",
+      "Codex CLI and the Codex IDE extension share this user-level config.toml, including when the extension runs in VS Code or Cursor.",
       "",
       "Skill discovery: Codex should discover .agents/skills/fixel-recall and may invoke it for context audits, benchmarks, retrieval and setup troubleshooting.",
       "MCP retrieval preview:",
@@ -719,6 +730,7 @@ export function createClaudeCodeSetupPreview(env: CliEnvironment): HostSetupPrev
       "```",
       "",
       "Hooks are optional and must not be required for Fixel Recall to operate.",
+      "Claude Code CLI and its VS Code integration use the same Claude Code runtime and settings.",
       "Skill discovery: Claude Code should discover .claude/skills/fixel-recall and may invoke it for context audits, benchmarks, retrieval and setup troubleshooting.",
       "MCP retrieval preview:",
       "```json",
@@ -927,7 +939,20 @@ async function runGatewayProcess(argv: readonly string[]): Promise<number> {
     process.stderr.write("Choose --codex-auth api or --codex-auth subscription\n");
     return 2;
   }
-  const gateway = createLocalGateway({ ...planned, bindHost });
+  const gateway = createLocalGateway({
+    ...planned,
+    bindHost,
+    dashboardRenderer: (status) =>
+      renderGatewayActivityDashboard({
+        gatewayRunning: true,
+        mode: status.mode,
+        killSwitchActive: status.killSwitchActive,
+        compressionState: status.compression.state,
+        lastTransformation: status.compression.lastRequest,
+        exactRecoveryAvailable: status.compression.exactRecoveryAvailable,
+        secretsRendered: status.compression.secretsRendered
+      })
+  });
 
   return new Promise((resolve) => {
     gateway.server.once("error", (error) => {
@@ -940,6 +965,7 @@ async function runGatewayProcess(argv: readonly string[]): Promise<number> {
           "Fixel Recall gateway listening",
           "",
           `Gateway URL: http://${bindHost}:${port}`,
+          `Dashboard: http://${bindHost}:${port}/dashboard`,
           "Safety mode: Safe",
           `Upstream allowlist: ${planned.upstreamAllowlist?.join(", ")}`,
           ...(planned.canary
@@ -996,6 +1022,7 @@ function renderHelp(): string {
     "  setup [codex|claude-code|both]   Preview the changes, then ask before applying them",
     "  status                           Show routing and safety mode (no credentials shown)",
     "  doctor                           Check the local environment",
+    "  platform doctor                  Show OS and editor compatibility without reading credentials",
     "",
     "Day to day:",
     "  start [--port N]                 Run the local loopback gateway",
@@ -1016,7 +1043,8 @@ function renderHelp(): string {
     "  --confirm        Apply without asking (scripting)",
     "",
     "Set FIXEL_RECALL_CONFIG_ROOT to use a different config root than your home directory.",
-    "Available for macOS CLI users of Codex CLI and Claude Code CLI.",
+    "Configured surfaces: Codex CLI/IDE and Claude Code CLI/VS Code on macOS, Linux, WSL and Windows.",
+    "Run `fixel-recall platform doctor`; non-macOS release claims require a green platform canary.",
     `Version: ${cliVersion()}`
   ].join("\n");
 }

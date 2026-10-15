@@ -59,6 +59,9 @@ importers:
       '@fixel-recall/core':
         specifier: workspace:*
         version: link:../core
+      '@fixel-recall/dashboard':
+        specifier: workspace:*
+        version: link:../../apps/dashboard
       '@fixel-recall/proxy':
         specifier: workspace:*
         version: link:../proxy

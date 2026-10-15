@@ -9,6 +9,7 @@
   "references": [
     { "path": "../benchmark" },
     { "path": "../core" },
+    { "path": "../../apps/dashboard" },
     { "path": "../renderer" },
     { "path": "../proxy" },
     { "path": "../retrieval-mcp" },

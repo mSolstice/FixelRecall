@@ -256,6 +256,7 @@ env_key = "OPENAI_API_KEY"
 \`\`\`
 
 Subscription authentication through this custom provider is unproven and is not supported by the default setup.
+Codex CLI and the Codex IDE extension share this user-level config.toml, including when the extension runs in VS Code or Cursor.
 
 Skill discovery: Codex should discover .agents/skills/fixel-recall and may invoke it for context audits, benchmarks, retrieval and setup troubleshooting.
 MCP retrieval preview:
