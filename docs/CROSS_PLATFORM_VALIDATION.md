@@ -1,20 +1,20 @@
 # Cross-Platform Validation
 
-Date: 2026-10-15
+Date: 2026-10-16
 
 This report separates executed evidence from configuration simulation. A generated configuration is
 not equivalent to running the product on that operating system.
 
 ## Evidence Summary
 
-| Platform       | Configuration generation               | Runtime gateway                                                    | Install and rollback               | IDE contract                                  | Release status             |
-| -------------- | -------------------------------------- | ------------------------------------------------------------------ | ---------------------------------- | --------------------------------------------- | -------------------------- |
-| macOS          | Executed                               | Executed with loopback fake providers                              | Executed                           | Codex and Claude shared-config paths reviewed | Validated local scope      |
-| Linux          | Simulated locally                      | Official Codex and Claude Code fake-host smoke added to Ubuntu CI  | Simulated; Ubuntu CI pending       | Same Codex/Claude config contracts            | CI execution required      |
-| WSL 2          | Linux/WSL detection tested             | Not executed inside WSL                                            | Linux-compatible generation tested | Same config contracts inside WSL              | Manual WSL canary required |
-| Windows native | Windows generation tested              | Official Codex and Claude Code fake-host smoke added to Windows CI | Transaction and rollback simulated | Shared config paths reviewed                  | CI execution required      |
-| VS Code        | Host configuration reviewed            | Uses the matching Codex or Claude runtime                          | No separate credential writer      | Official shared-host integration              | Host OS gate applies       |
-| Cursor         | Codex extension configuration reviewed | Codex extension route only                                         | Uses Codex config                  | Native Cursor AI is excluded                  | Host OS gate applies       |
+| Platform       | Configuration generation               | Runtime gateway                                       | Install and rollback               | IDE contract                                  | Release status             |
+| -------------- | -------------------------------------- | ----------------------------------------------------- | ---------------------------------- | --------------------------------------------- | -------------------------- |
+| macOS          | Executed                               | Executed with loopback fake providers                 | Executed                           | Codex and Claude shared-config paths reviewed | Validated local scope      |
+| Linux          | Executed in Ubuntu CI                  | Official Codex and Claude Code fake-host smoke passed | Transaction tests passed in CI     | Same Codex/Claude config contracts            | Validated CLI scope        |
+| WSL 2          | Linux/WSL detection tested             | Not executed inside WSL                               | Linux-compatible generation tested | Same config contracts inside WSL              | Manual WSL canary required |
+| Windows native | Executed in Windows CI                 | Official Codex and Claude Code fake-host smoke passed | Transaction tests passed in CI     | Shared config paths reviewed                  | Validated CLI scope        |
+| VS Code        | Host configuration reviewed            | Uses the matching Codex or Claude runtime             | No separate credential writer      | Official shared-host integration              | Host OS gate applies       |
+| Cursor         | Codex extension configuration reviewed | Codex extension route only                            | Uses Codex config                  | Native Cursor AI is excluded                  | Host OS gate applies       |
 
 ## Actions Reviewed
 
@@ -51,11 +51,12 @@ The following passed on macOS arm64 with Node.js 26 and pnpm 11:
 
 ## Remaining Runtime Gates
 
-1. Open a pull request and require green Ubuntu, macOS and Windows GitHub Actions jobs, including
-   the `Official hosts` matrix.
-2. Run setup, gateway, MCP retrieval, rollback and uninstall once inside WSL 2.
-3. Run one fake-provider request from Codex IDE and Claude Code in VS Code on each claimed OS.
-4. Run the Codex extension in Cursor; do not test or claim Cursor's native AI route.
-5. Keep public support wording at `validation-required` until the matching evidence is recorded.
+GitHub Actions run `38789129158` passed the full suite and official-host smoke on Ubuntu, macOS and
+native Windows for commit `1ba1b19`.
+
+1. Run setup, gateway, MCP retrieval, rollback and uninstall once inside a genuine WSL 2 runtime.
+2. Run one fake-provider request from Codex IDE and Claude Code in VS Code on each claimed OS.
+3. Run the Codex extension in Cursor; do not test or claim Cursor's native AI route.
+4. Keep WSL and IDE public support wording at `validation-required` until matching evidence exists.
 
 No real-provider traffic was sent during this validation.
