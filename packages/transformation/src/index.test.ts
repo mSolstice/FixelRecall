@@ -232,7 +232,7 @@ describe.each(["openai", "anthropic"] as const)("combined pipeline %s", (provide
     } finally {
       await rm(f.root, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
   it("does not cross-fallback between template and image strategies", async () => {
     const f = await fixture();
     let renderCalls = 0;

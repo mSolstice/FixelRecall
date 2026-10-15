@@ -148,7 +148,8 @@ async function run(command, args, extraEnvironment) {
 
 function createInvocation(command, args) {
   if (process.platform !== "win32") return { command, args };
-  const commandLine = [command, ...args].map(quoteWindowsArgument).join(" ");
+  const executable = /\s/.test(command) ? quoteWindowsArgument(command) : command;
+  const commandLine = [executable, ...args.map(quoteWindowsArgument)].join(" ");
   return {
     command: process.env["ComSpec"] ?? "cmd.exe",
     args: ["/d", "/s", "/c", commandLine]

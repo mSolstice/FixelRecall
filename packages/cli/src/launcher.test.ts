@@ -52,8 +52,9 @@ describe("cliLauncher", () => {
 describe("launcherCommandLine", () => {
   it("quotes a path with spaces so a hook command still parses", () => {
     expect(
-      launcherCommandLine(
+      launcherCommandLineForPlatform(
         { args: ["/Users/dev/Documents/Context Diet/index.js"], command: "node" },
+        "linux",
         "status",
         "--no-credentials"
       )
@@ -112,6 +113,7 @@ describe("setup writes a launcher that works without fixel-recall on PATH", () =
       includeClaudeHook: true,
       includeMcp: true,
       launcher,
+      platform: "linux",
       rootDir: root
     });
 
