@@ -166,10 +166,13 @@ describe("fixel-recall CLI commands", () => {
 
     expect(result.exitCode).toBeGreaterThanOrEqual(0);
     expect(result.stderr).toBe("");
+    const entryPath = cliEntryPath();
+    const jsonEntryPath = JSON.stringify(entryPath).slice(1, -1);
     const normalisedOutput = result.stdout
+      .replaceAll(jsonEntryPath, "<cli-entry>")
+      .replaceAll(entryPath, "<cli-entry>")
       .replaceAll("\\", "/")
-      .replaceAll(tmpdir().replaceAll("\\", "/"), "<tmp>")
-      .replaceAll(cliEntryPath().replaceAll("\\", "/"), "<cli-entry>");
+      .replaceAll(tmpdir().replaceAll("\\", "/"), "<tmp>");
     expect(normalisedOutput).toMatchSnapshot();
     expect(result.stdout).not.toContain("SECRET_VALUE");
     expect(result.stdout).not.toContain("token:SECRET");
