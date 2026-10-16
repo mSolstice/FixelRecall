@@ -5,18 +5,18 @@ engine is identical across operating systems and editors.
 
 ## Compatibility Matrix
 
-| Surface                             | Integration                                                 | Current evidence                                                         |
-| ----------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------ |
-| macOS Codex CLI                     | `~/.codex/config.toml`                                      | Release-tested                                                           |
-| macOS Claude Code CLI               | `~/.claude/settings.json`                                   | Release-tested                                                           |
-| Linux Codex CLI and Claude Code CLI | Same user configuration under `$HOME`                       | GitHub Actions target; release claim requires the current commit to pass |
-| WSL 2 Codex CLI and Claude Code CLI | Linux installation inside WSL; gateway binds inside WSL     | Implemented; separate WSL canary required                                |
-| Windows native Codex CLI            | `%USERPROFILE%\.codex\config.toml`                          | Windows CI target; release claim requires the current commit to pass     |
-| Windows native Claude Code CLI      | `%USERPROFILE%\.claude\settings.json`                       | Windows CI target; local MCP uses `cmd /c npx`                           |
-| Codex IDE in VS Code                | Shares Codex CLI `config.toml` and MCP configuration        | Same configuration path as Codex CLI                                     |
-| Claude Code in VS Code              | Uses the installed Claude Code runtime and settings         | Same configuration path as Claude Code CLI                               |
-| Codex IDE in Cursor                 | Uses the Codex IDE extension and shared Codex configuration | Supported configuration path                                             |
-| Cursor native AI                    | No Fixel Recall route                                       | Unsupported: no verified local base-URL contract                         |
+| Surface                             | Integration                                                 | Current evidence                                                     |
+| ----------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------- |
+| macOS Codex CLI                     | `~/.codex/config.toml`                                      | Release-tested                                                       |
+| macOS Claude Code CLI               | `~/.claude/settings.json`                                   | Release-tested                                                       |
+| Linux Codex CLI and Claude Code CLI | Same user configuration under `$HOME`                       | Validated in Ubuntu CI with official-host fake-provider smoke tests  |
+| WSL 2 Codex CLI and Claude Code CLI | Linux installation inside WSL; gateway binds inside WSL     | Implemented; separate WSL canary required                            |
+| Windows native Codex CLI            | `%USERPROFILE%\.codex\config.toml`                          | Validated in Windows CI with official-host fake-provider smoke tests |
+| Windows native Claude Code CLI      | `%USERPROFILE%\.claude\settings.json`                       | Validated in Windows CI; local MCP uses `cmd /c npx`                 |
+| Codex IDE in VS Code                | Shares Codex CLI `config.toml` and MCP configuration        | Same configuration path as Codex CLI                                 |
+| Claude Code in VS Code              | Uses the installed Claude Code runtime and settings         | Same configuration path as Claude Code CLI                           |
+| Codex IDE in Cursor                 | Uses the Codex IDE extension and shared Codex configuration | Supported configuration path                                         |
+| Cursor native AI                    | No Fixel Recall route                                       | Unsupported: no verified local base-URL contract                     |
 
 ## Install And Check
 
@@ -83,4 +83,5 @@ A platform is publicly supported only after all of these pass on that platform:
 5. MCP exact retrieval
 6. no credential or raw-body persistence checks
 
-The platform doctor reports `validation-required` until that evidence exists.
+The platform doctor reports `validation-required` for WSL and IDE surfaces until matching runtime
+evidence exists. CLI validation evidence is recorded in `docs/CROSS_PLATFORM_VALIDATION.md`.

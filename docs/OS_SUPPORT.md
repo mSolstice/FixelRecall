@@ -5,17 +5,16 @@
 Fixel Recall now includes cross-platform configuration and test targets. Release support remains
 evidence-based: implementation alone does not turn a platform into a public support claim.
 
-| Platform       | Release status                                     | Evidence                                                                                       |
-| -------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| macOS          | Supported for local fake-provider beta             | Local checks have run on Darwin arm64 with Node.js 26 and pnpm 11.                             |
-| Linux          | Implemented; current-commit CI validation required | GitHub Actions targets Ubuntu with Node.js 24 and 26.                                          |
-| Windows native | Implemented; current-commit CI validation required | Windows CI, OS-aware paths and `cmd /c npx` MCP launchers are included.                        |
-| WSL            | Implemented; separate canary required              | Linux-compatible setup and WSL detection exist; a real WSL 2 release canary is still required. |
+| Platform       | Release status                        | Evidence                                                                                       |
+| -------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| macOS          | Validated CLI scope                   | Local checks and official-host fake-provider smoke passed on Darwin arm64.                     |
+| Linux          | Validated CLI scope                   | Ubuntu CI passed the full suite and official Codex/Claude Code fake-host smoke.                |
+| Windows native | Validated CLI scope                   | Windows CI passed the full suite and official Codex/Claude Code fake-host smoke.               |
+| WSL            | Implemented; separate canary required | Linux-compatible setup and WSL detection exist; a real WSL 2 release canary is still required. |
 
 ## macOS Tested Status
 
-macOS is the only locally exercised operating system in the current evidence set. The local review
-ran with:
+The local macOS review ran with:
 
 - Darwin arm64
 - Node.js 26
@@ -23,15 +22,15 @@ ran with:
 - local fake-provider loopback tests
 - temporary-directory install, uninstall and rollback tests
 
-This proves local beta behavior on the tested macOS environment only. It does not prove every macOS
-version, shell, filesystem or host-app configuration.
+This proves behavior on the tested macOS environment. It does not prove every macOS version, shell,
+filesystem or IDE configuration.
 
 ## Linux CI Status
 
-The repository declares Linux coverage through GitHub Actions on Ubuntu with Node.js 24 and
-Node.js 26. That is CI-targeted support, not a completed release claim from this local review.
+GitHub Actions passed Linux coverage on Ubuntu with Node.js 24 and Node.js 26, including the full
+suite and official Codex CLI and Claude Code CLI fake-provider smoke tests.
 
-Before release, a clean Linux CI run should verify:
+The Linux CI evidence verifies:
 
 - dependency installation
 - TypeScript build
@@ -43,18 +42,15 @@ Before release, a clean Linux CI run should verify:
 
 ## Windows Native Status
 
-Windows native support is implemented and test-targeted. Do not publish the support claim until the
-Windows job for the release commit is green and the native setup/rollback canary passes.
+Windows native CLI support passed the full CI suite and official Codex CLI and Claude Code CLI
+fake-provider smoke tests. Platform configuration and transaction tests use isolated temporary roots
+and fake credentials.
 
-Known unproven areas:
+Known limitations:
 
-- path parsing and drive-letter behavior
-- file permissions and backup mode handling
 - executable bin behavior through npm/pnpm shims
-- local gateway loopback binding
-- temp directory cleanup
-- Codex and Claude Code config locations
-- shell environment handling for provider base URLs
+- real user-home setup, rollback and uninstall outside isolated CI roots
+- IDE extension workflows
 
 ## WSL Status
 
@@ -96,8 +92,8 @@ Tests and fake-provider evidence use the operating system temporary directory th
 APIs. Install, uninstall and rollback integration tests inject a temporary config root and clean it
 up after the test.
 
-Current evidence proves temp-root behavior on macOS. Linux, Windows native and WSL temp cleanup
-still need their own release evidence.
+Current evidence proves temp-root behavior on macOS, Linux CI and Windows CI. WSL still needs its
+own runtime evidence.
 
 ## Local Gateway Loopback Behavior
 
@@ -108,7 +104,7 @@ permission they fail with `listen EPERM: operation not permitted 127.0.0.1`.
 This sandbox permission issue is not the same as real provider traffic. The passing local evidence
 uses fake providers and loopback only.
 
-Before broad OS support is claimed, each OS must verify:
+The macOS, Linux and Windows native CLI evidence verifies:
 
 - gateway binds only to loopback by default
 - OpenAI Responses-shaped fake route passes
@@ -116,3 +112,5 @@ Before broad OS support is claimed, each OS must verify:
 - streaming fake responses pass without full buffering
 - kill switch and clean shutdown work
 - no authentication values or raw request bodies are logged
+
+Executed evidence and exact remaining gates are recorded in `docs/CROSS_PLATFORM_VALIDATION.md`.

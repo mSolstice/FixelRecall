@@ -121,41 +121,42 @@ or persist provider credentials.
 
 ## Current Release Status
 
-**Fixel Recall across CLI and supported IDE integrations**
+**Fixel Recall for Codex CLI and Claude Code CLI**
 
-Fixel Recall is available for macOS CLI users of Codex CLI and Claude Code CLI.
+Fixel Recall is validated for Codex CLI and Claude Code CLI on macOS, Linux and Windows native.
 
 Supported now:
 
-- macOS
+- macOS, Linux and Windows native
 - Codex CLI
 - Claude Code CLI
 - local loopback gateway
 - Safe mode default
 - fake-provider development mode
 - local MCP retrieval in tested flows
-- dry-run setup, confirmed setup, rollback and uninstall on macOS CLI
+- dry-run setup, confirmed setup, rollback and uninstall in platform validation
 
 Additional configuration support is implemented for:
 
 - Codex IDE in VS Code and Cursor, through the same Codex configuration as the CLI
 - Claude Code in VS Code, through the same Claude Code runtime and settings as the CLI
-- Linux, Windows native and WSL 2
+- WSL 2
 
-Run `fixel-recall platform doctor` for the current machine. Windows, Linux and WSL public release
-claims remain gated on the current commit's OS-specific CI and canary evidence. Cursor's native AI
-features are not routed through Fixel Recall.
+Run `fixel-recall platform doctor` for the current machine. WSL and IDE public release claims remain
+gated on platform-specific canary evidence. Cursor's native AI features are not routed through Fixel
+Recall.
 
 Not yet claimed:
 
-- Windows, Linux or WSL release validation for this exact commit
+- WSL 2 runtime validation
+- Codex IDE, Claude Code IDE and Cursor extension workflow validation
 - Cursor native AI routing
 - broad hosted or enterprise production deployment
 - proven real-world savings across private repositories
 - third-party security review
 
 See [RELEASE_READINESS.md](RELEASE_READINESS.md) and
-[docs/MACOS_CLI_RELEASE_CHECKLIST.md](docs/MACOS_CLI_RELEASE_CHECKLIST.md).
+[docs/CROSS_PLATFORM_VALIDATION.md](docs/CROSS_PLATFORM_VALIDATION.md).
 
 ## How A Developer Uses It
 
@@ -510,7 +511,7 @@ Do not claim:
 
 - broad hosted/enterprise deployment
 - native Cursor AI routing
-- Windows, Linux or WSL release validation before the matching CI and canary pass
+- WSL or IDE release validation before the matching runtime canary passes
 - hosted or multi-user deployment support
 - proven real-world savings across private repositories
 - approved real model profiles
@@ -520,6 +521,6 @@ Do not claim:
 The honest current claim is:
 
 ```text
-Fixel Recall supports Codex CLI/IDE and Claude Code CLI/VS Code configuration on macOS, Linux, Windows and WSL.
-macOS remains the release-validated scope until the new OS-specific CI and canaries pass; Cursor support is through the Codex extension only.
+Fixel Recall supports validated Codex CLI and Claude Code CLI workflows on macOS, Ubuntu Linux and Windows native.
+WSL and IDE workflows remain validation-required; Cursor support is limited to the Codex extension configuration path and does not include Cursor's native AI.
 ```

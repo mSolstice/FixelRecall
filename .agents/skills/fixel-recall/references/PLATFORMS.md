@@ -8,7 +8,10 @@ Use `fixel-recall platform doctor` before changing host configuration.
 - On WSL, run the gateway and coding host inside the same distribution for the initial canary.
 - Cursor is supported only through the Codex IDE extension. Do not claim that Fixel Recall routes
   Cursor's native AI traffic.
+- Codex CLI and Claude Code CLI have fake-provider validation on macOS, Ubuntu Linux and Windows
+  native. WSL 2 and IDE workflows still require separate runtime canaries.
 - A configured platform is not release-supported until its CI and local canary evidence pass.
 - Never request, print or write credentials during platform diagnosis.
 
-Detailed operator guidance lives in `docs/PLATFORM_AND_IDE_SUPPORT.md`.
+Detailed operator guidance lives in `docs/PLATFORM_AND_IDE_SUPPORT.md`; executed evidence is in
+`docs/CROSS_PLATFORM_VALIDATION.md`.
