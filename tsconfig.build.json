@@ -1,6 +1,7 @@
 {
   "files": [],
   "references": [
+    { "path": "packages/transformation" },
     { "path": "packages/core" },
     { "path": "packages/firewall" },
     { "path": "packages/renderer" },

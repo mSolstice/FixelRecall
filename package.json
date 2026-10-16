@@ -15,11 +15,14 @@
     "lint": "eslint .",
     "scan:test-canaries": "node scripts/scan-test-output-canaries.mjs",
     "smoke:anthropic": "node scripts/smoke/anthropic-fake-gateway.mjs",
+    "smoke:official-hosts": "node scripts/smoke-official-hosts.mjs",
     "smoke:openai": "node scripts/smoke/openai-fake-gateway.mjs",
     "sync:skills": "node scripts/sync-skills.ts",
     "test": "vitest run",
     "test:compatibility": "vitest run tests/compatibility",
-    "typecheck": "tsc -b tsconfig.build.json --pretty false"
+    "typecheck": "tsc -b tsconfig.build.json --pretty false",
+    "stage:npm": "node scripts/stage-npm-package.mjs",
+    "smoke:npm": "node scripts/smoke-npm-pack.mjs"
   },
   "engines": {
     "node": ">=24 <27",
@@ -29,6 +32,7 @@
   "devDependencies": {
     "@eslint/js": "9.31.0",
     "@types/node": "24.0.14",
+    "esbuild": "^0.28.2",
     "eslint": "9.31.0",
     "prettier": "3.6.2",
     "typescript": "5.8.3",

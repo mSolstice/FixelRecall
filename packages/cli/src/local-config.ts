@@ -1,6 +1,13 @@
 import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+
+import {
+  cliLauncher,
+  launcherCommandLineForPlatform,
+  launcherWith,
+  mcpLauncherForPlatform,
+  type CliLauncher
+} from "./launcher.js";
 
 export type LocalConfigHost = "codex" | "claude-code";
 
@@ -14,6 +21,9 @@ export interface LocalConfigInstallOptions {
   readonly installationId?: string;
   readonly createdAt?: string;
   readonly replaceExistingManifest?: boolean;
+  readonly platform?: NodeJS.Platform;
+  /** Overrides how agents start this CLI; defaults to the one this process is running from. */
+  readonly launcher?: CliLauncher;
 }
 
 export interface ManagedFileBackup {
@@ -34,6 +44,7 @@ export interface LocalInstallManifest {
   readonly backups: readonly ManagedFileBackup[];
   readonly credentialPolicy: "environment-variable-references-only";
   readonly status: "complete" | "interrupted";
+  readonly runtimePlatform?: NodeJS.Platform;
 }
 
 export interface LocalConfigOperationResult {
@@ -56,6 +67,9 @@ export async function installLocalConfig(
   options: LocalConfigInstallOptions
 ): Promise<LocalConfigOperationResult> {
   const gatewayBaseUrl = options.gatewayBaseUrl ?? "http://127.0.0.1:4317";
+  const launcher = options.launcher ?? cliLauncher();
+  const platform = options.platform ?? process.platform;
+  const mcpLauncher = mcpLauncherForPlatform(launcher, platform);
   const manifestPath = localManifestPath(options.rootDir);
   const changedFiles = targetFiles(options);
   const installationId = options.installationId ?? "fixel-recall-local-install";
@@ -91,7 +105,7 @@ export async function installLocalConfig(
   if (options.hosts.includes("codex")) {
     await writeCodexManagedConfig(
       join(options.rootDir, ".codex", "config.toml"),
-      renderCodexManagedBlock(gatewayBaseUrl, options.includeMcp)
+      renderCodexManagedBlock(gatewayBaseUrl, options.includeMcp, mcpLauncher)
     );
   }
 
@@ -99,7 +113,9 @@ export async function installLocalConfig(
     await writeClaudeSettings(
       join(options.rootDir, ".claude", "settings.json"),
       gatewayBaseUrl,
-      options.includeClaudeHook
+      options.includeClaudeHook,
+      launcher,
+      platform
     );
   }
 
@@ -107,15 +123,15 @@ export async function installLocalConfig(
     await writeManagedJsonObject(join(options.rootDir, ".fixel-recall", "mcp.json"), {
       mcpServers: {
         "fixel-recall-retrieval": {
-          args: ["mcp", "retrieval"],
-          command: "fixel-recall",
+          args: launcherWith(mcpLauncher, "mcp", "retrieval"),
+          command: mcpLauncher.command,
           env: {},
           managedBy: "fixel-recall"
         }
       }
     });
     if (options.hosts.includes("claude-code")) {
-      await writeClaudeMcpConfig(join(options.rootDir, ".claude.json"));
+      await writeClaudeMcpConfig(join(options.rootDir, ".claude.json"), mcpLauncher);
     }
   }
 
@@ -130,6 +146,7 @@ export async function installLocalConfig(
     installationId,
     managedMarkers,
     manifestVersion: 1,
+    runtimePlatform: platform,
     status: "complete"
   };
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 });
@@ -166,6 +183,7 @@ export async function resumeInterruptedLocalConfig(
     includeMcp: manifest.includeMcp,
     installationId: manifest.installationId,
     replaceExistingManifest: true,
+    platform: manifest.runtimePlatform,
     rootDir
   });
 }
@@ -283,22 +301,27 @@ function targetFiles(options: LocalConfigInstallOptions): readonly string[] {
   return files;
 }
 
-function renderCodexManagedBlock(gatewayBaseUrl: string, includeMcp: boolean): string {
+function renderCodexManagedBlock(
+  gatewayBaseUrl: string,
+  includeMcp: boolean,
+  launcher: CliLauncher
+): string {
   const lines = [
     'model_provider = "fixel_recall_local"',
     "",
     "[model_providers.fixel_recall_local]",
     'name = "Fixel Recall local gateway"',
     `base_url = "${gatewayBaseUrl}"`,
-    "requires_openai_auth = true"
+    "requires_openai_auth = false",
+    'env_key = "OPENAI_API_KEY"'
   ];
 
   if (includeMcp) {
     lines.push(
       "",
       "[mcp_servers.fixel-recall-retrieval]",
-      'command = "node"',
-      `args = ${JSON.stringify(fixelRecallCliArgs())}`
+      `command = ${JSON.stringify(launcher.command)}`,
+      `args = ${JSON.stringify(launcherWith(launcher, "mcp", "retrieval"))}`
     );
   }
 
@@ -331,7 +354,9 @@ function firstTomlTableIndex(text: string): number {
 async function writeClaudeSettings(
   path: string,
   gatewayBaseUrl: string,
-  includeClaudeHook: boolean
+  includeClaudeHook: boolean,
+  launcher: CliLauncher,
+  platform: NodeJS.Platform
 ): Promise<void> {
   const existing = await readOptional(path);
   const parsed = parseJsonObject(existing, path);
@@ -359,7 +384,7 @@ async function writeClaudeSettings(
       SessionStart: [
         ...sessionStart.filter((hook) => !isFixelRecallHook(hook)),
         {
-          command: `${fixelRecallCliCommandForDisplay()} status --no-credentials`,
+          command: launcherCommandLineForPlatform(launcher, platform, "status", "--no-credentials"),
           description: "Fixel Recall local status check",
           managedBy: "fixel-recall"
         }
@@ -370,7 +395,7 @@ async function writeClaudeSettings(
   await writeFile(path, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 });
 }
 
-async function writeClaudeMcpConfig(path: string): Promise<void> {
+async function writeClaudeMcpConfig(path: string, launcher: CliLauncher): Promise<void> {
   const existing = await readOptional(path);
   const parsed = parseJsonObject(existing, path);
   const existingServers = recordFrom(parsed["mcpServers"]);
@@ -379,8 +404,8 @@ async function writeClaudeMcpConfig(path: string): Promise<void> {
     mcpServers: {
       ...existingServers,
       "fixel-recall-retrieval": {
-        args: fixelRecallCliArgs(),
-        command: "node",
+        args: launcherWith(launcher, "mcp", "retrieval"),
+        command: launcher.command,
         env: {},
         managedBy: "fixel-recall",
         type: "stdio"
@@ -463,14 +488,6 @@ function isFixelRecallHook(value: unknown): boolean {
     !Array.isArray(value) &&
     (value as { readonly managedBy?: unknown }).managedBy === "fixel-recall"
   );
-}
-
-function fixelRecallCliArgs(): readonly string[] {
-  return [join(dirname(fileURLToPath(import.meta.url)), "index.js"), "mcp", "retrieval"];
-}
-
-function fixelRecallCliCommandForDisplay(): string {
-  return "fixel-recall";
 }
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {

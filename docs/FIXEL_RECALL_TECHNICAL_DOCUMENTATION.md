@@ -176,16 +176,14 @@ and Session control.
 ## Request Flow
 
 1. A Codex CLI or Claude Code CLI request is routed through the local gateway.
-2. The matching provider adapter parses supported request/content items into provider-neutral
-   blocks.
-3. Unknown or incompatible shapes remain pass-through.
-4. The Exactness Firewall scans blocks for protected and secret-sensitive spans.
-5. The policy engine creates a `DecisionRecord` with decision, reasons, mode and recovery status.
-6. If allowed and worthwhile, old safe recoverable context can be rendered through the renderer
-   interface.
-7. Authorised exact originals can be stored in the local vault for narrow retrieval.
-8. The adapter rebuilds a valid provider-shaped request.
-9. If anything fails, the original provider content is preserved.
+2. The gateway validates authentication, request size, allowlisting, timeout and kill-switch rules.
+3. Supported live requests are currently forwarded unchanged.
+4. The Exactness Firewall, policy engine, renderer and vault are exercised in isolated and synthetic
+   flows while live gateway transformation remains intentionally disabled.
+5. When live wiring is enabled, supported content will be parsed into provider-neutral blocks,
+   scanned, policy-evaluated, stored for recovery when authorised, rendered when eligible and
+   rebuilt into the provider request.
+6. Unknown shapes and any failed transformation pass through unchanged.
 
 ## Safety Model
 
@@ -224,7 +222,8 @@ Fixel Recall sends the original content unchanged and records a safe reason code
 
 ## Image Compression And pxpipe
 
-Fixel Recall can use image rendering only for old, safe, recoverable context.
+Fixel Recall is designed to use image rendering only for old, safe, recoverable context. The live
+gateway does not currently claim to perform this conversion on ordinary provider traffic.
 
 Simple model:
 

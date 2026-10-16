@@ -11,7 +11,15 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    ignores: ["**/dist/**", "coverage/**", ".pnpm-store/**", "node_modules/**", "**/*.d.ts"]
+    ignores: [
+      "**/dist/**",
+      "**/bundle/**",
+      "**/npm-package/**",
+      "coverage/**",
+      ".pnpm-store/**",
+      "node_modules/**",
+      "**/*.d.ts"
+    ]
   },
   {
     languageOptions: {

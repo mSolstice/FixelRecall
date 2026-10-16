@@ -9,8 +9,11 @@
   "references": [
     { "path": "../benchmark" },
     { "path": "../core" },
+    { "path": "../../apps/dashboard" },
     { "path": "../renderer" },
-    { "path": "../proxy" }
+    { "path": "../proxy" },
+    { "path": "../retrieval-mcp" },
+    { "path": "../vault" }
   ],
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/*.test.ts"]

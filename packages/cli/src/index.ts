@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 
+import { realpathSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, release, tmpdir } from "node:os";
 import { join } from "node:path";
+import { createInterface, type Interface } from "node:readline";
 import { fileURLToPath } from "node:url";
 
 import { createSyntheticBenchmarkReport, renderBenchmarkMarkdown } from "@fixel-recall/benchmark";
+import { renderGatewayActivityDashboard } from "@fixel-recall/dashboard";
 import {
   defaultProductPolicyPreset,
   isoTimestamp,
@@ -21,7 +24,17 @@ import {
   type ContextRendererResult
 } from "@fixel-recall/renderer";
 import { createLocalGateway } from "@fixel-recall/proxy";
+import {
+  createContextCatalogue,
+  createLocalRetrievalMcpServer,
+  createRetrievalService
+} from "@fixel-recall/retrieval-mcp";
+import { createLocalContextVault } from "@fixel-recall/vault";
 import { gatewayStartOptions } from "./gateway-config.js";
+import { runGuidedFlow, wantsGuidedFlow, type InteractiveIo } from "./interactive.js";
+import { cliLauncher, launcherCommandLine, launcherWith } from "./launcher.js";
+import { cliVersion } from "./version.js";
+import { platformSupportReport, renderPlatformSupportReport } from "./platform-support.js";
 import {
   installLocalConfig,
   type LocalConfigHost,
@@ -226,9 +239,22 @@ export function describeCli(): string {
   return `${cliName} local operator`;
 }
 
-export async function runCli(argv: readonly string[] = process.argv.slice(2)): Promise<number> {
+export async function runCli(
+  argv: readonly string[] = process.argv.slice(2),
+  io: InteractiveIo & { readonly close?: () => void } = processIo()
+): Promise<number> {
+  if (argv[0] === "mcp" && argv[1] === "retrieval") {
+    return runRetrievalMcpServer();
+  }
   if (argv[0] === "start" && !argv.includes("--dry-run")) {
     return runGatewayProcess(argv);
+  }
+  if (wantsGuidedFlow(argv, io)) {
+    try {
+      return await runGuidedFlow(argv, io, (args, options) => runCliCommand(args, options));
+    } finally {
+      io.close?.();
+    }
   }
   const result = await runCliCommand(argv);
   if (result.stdout.length > 0) {
@@ -237,7 +263,175 @@ export async function runCli(argv: readonly string[] = process.argv.slice(2)): P
   if (result.stderr.length > 0) {
     process.stderr.write(result.stderr);
   }
+  if (isGuidedCommand(argv) && result.exitCode === 0) {
+    process.stderr.write(
+      "Dry run only. Run this in a terminal to be asked before applying, or add --yes to apply without a prompt.\n"
+    );
+  }
   return result.exitCode;
+}
+
+async function runRetrievalMcpServer(): Promise<number> {
+  const authority = {
+    projectId: process.env["FIXEL_RECALL_PROJECT_ID"] ?? "",
+    sessionId: process.env["FIXEL_RECALL_SESSION_ID"] ?? ""
+  };
+  const registration = process.env["FIXEL_RECALL_CONTEXT_BLOCK_IDS"] ?? "[]";
+  if (registration.length > 16384) throw new Error("invalid context registration");
+  let ids: unknown;
+  try {
+    ids = JSON.parse(registration);
+  } catch {
+    throw new Error("invalid context registration");
+  }
+  if (
+    !Array.isArray(ids) ||
+    ids.length > 100 ||
+    !ids.every((id: unknown) => typeof id === "string")
+  )
+    throw new Error("invalid context registration");
+  const vault = createLocalContextVault({
+    maxBlockBytes: 1_000_000,
+    rootDir: process.env["FIXEL_RECALL_VAULT_ROOT"] ?? join(homedir(), ".fixel-recall", "vault")
+  });
+  const server = createLocalRetrievalMcpServer(
+    createRetrievalService({
+      authority,
+      maxLineSpan: 200,
+      maxReturnChars: 20_000,
+      maxSearchChars: 100_000,
+      vault
+    }),
+    createContextCatalogue({
+      vault,
+      authority,
+      references: (ids as string[]).map((blockId) => ({ blockId }))
+    })
+  );
+  const input = createInterface({ input: process.stdin, crlfDelay: Infinity });
+  for await (const line of input) {
+    const reply = await respondToMcpLine(server, line);
+    if (reply !== null) process.stdout.write(`${reply}\n`);
+  }
+  return 0;
+}
+
+type McpOutcome =
+  | { readonly kind: "result"; readonly result: Record<string, unknown> }
+  | { readonly kind: "error"; readonly code: number; readonly message: string };
+
+/**
+ * One line in, at most one line out, following JSON-RPC 2.0: notifications (no id) never
+ * get a reply, and failures use the top-level `error` member, not a `result` that
+ * contains an error.
+ */
+export async function respondToMcpLine(
+  server: ReturnType<typeof createLocalRetrievalMcpServer>,
+  line: string
+): Promise<string | null> {
+  if (line.trim() === "") return null;
+  let message: unknown;
+  try {
+    message = JSON.parse(line);
+  } catch {
+    return JSON.stringify({
+      jsonrpc: "2.0",
+      id: null,
+      error: { code: -32700, message: "Parse error" }
+    });
+  }
+  if (!isMcpRequest(message)) {
+    return JSON.stringify({
+      jsonrpc: "2.0",
+      id: null,
+      error: { code: -32600, message: "Invalid Request" }
+    });
+  }
+  const outcome = await handleMcpRequest(server, message);
+  if (message.id === undefined) return null;
+  return JSON.stringify(
+    outcome.kind === "result"
+      ? { jsonrpc: "2.0", id: message.id, result: outcome.result }
+      : { jsonrpc: "2.0", id: message.id, error: { code: outcome.code, message: outcome.message } }
+  );
+}
+
+async function handleMcpRequest(
+  server: ReturnType<typeof createLocalRetrievalMcpServer>,
+  request: McpRequest
+): Promise<McpOutcome> {
+  if (request.method === "initialize") {
+    return {
+      kind: "result",
+      result: {
+        protocolVersion: "2024-11-05",
+        capabilities: { tools: {} },
+        serverInfo: { name: "fixel-recall-retrieval", version: cliVersion() }
+      }
+    };
+  }
+  if (request.method === "ping") return { kind: "result", result: {} };
+  if (request.method === "tools/list") return { kind: "result", result: { tools: server.tools } };
+  if (request.method === "tools/call") {
+    const params = isRecord(request.params) ? request.params : {};
+    const result = await server.callTool({
+      arguments: params.arguments,
+      name: typeof params.name === "string" ? params.name : ""
+    });
+    return { kind: "result", result: result as unknown as Record<string, unknown> };
+  }
+  return { kind: "error", code: -32601, message: "Method not found" };
+}
+
+interface McpRequest {
+  readonly id?: number | string;
+  readonly method: string;
+  readonly params?: unknown;
+}
+
+function isMcpRequest(value: unknown): value is McpRequest {
+  return isRecord(value) && typeof value.method === "string";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isGuidedCommand(argv: readonly string[]): boolean {
+  return (
+    (argv[0] === "setup" || argv[0] === "rollback" || argv[0] === "uninstall") &&
+    !argv.includes("--confirm") &&
+    !argv.includes("--dry-run")
+  );
+}
+
+function processIo(): InteractiveIo & { readonly close: () => void } {
+  let rl: Interface | undefined;
+  let closed = false;
+  return {
+    ask: (question) => {
+      if (closed) {
+        return Promise.resolve("");
+      }
+      rl ??= createInterface({ input: process.stdin, output: process.stdout });
+      const active = rl;
+      return new Promise<string>((resolve) => {
+        active.once("close", () => {
+          closed = true;
+          resolve("");
+        });
+        active.question(question, resolve);
+      });
+    },
+    close: () => {
+      closed = true;
+      rl?.close();
+    },
+    env: process.env,
+    err: (text) => process.stderr.write(text),
+    interactive: process.stdin.isTTY === true && process.stdout.isTTY === true,
+    out: (text) => process.stdout.write(text)
+  };
 }
 
 export async function runCliCommand(
@@ -253,10 +447,24 @@ export async function runCliCommand(
     };
   }
   const command = argv[0] ?? "help";
+  if (command === "help" || command === "--help" || command === "-h") {
+    return textResult(0, renderHelp());
+  }
+  if (command === "version" || command === "--version" || command === "-v") {
+    return textResult(0, cliVersion());
+  }
   const format = options.format ?? formatFromArgs(argv);
   if (command === "doctor") {
     const env = await cliEnvironment(options.env, true);
     return textResult(0, renderDoctorSummary(env));
+  }
+  if (command === "platform" && argv[1] === "doctor") {
+    return textResult(
+      0,
+      renderPlatformSupportReport(
+        platformSupportReport({ env: process.env, platform: process.platform, release: release() })
+      )
+    );
   }
   if (command === "audit" || command === "compatibility-audit") {
     const report = runCompatibilityAudit();
@@ -326,7 +534,7 @@ export async function runCliCommand(
   }
   return {
     exitCode: 64,
-    stderr: `Unknown command: ${command}\nRun fixel-recall help to see available commands.\n`,
+    stderr: `Unknown command: ${command}\nRun fixel-recall --help to see available commands.\n`,
     stdout: ""
   };
 }
@@ -431,7 +639,7 @@ export function createCodexSetupPreview(env: CliEnvironment): HostSetupPreview {
     preview: [
       "# Preview only: Codex custom provider",
       "",
-      "No credentials are included. Codex reuses your existing Codex auth state for this provider.",
+      "No credentials are included. API-key authentication must remain in your normal Codex setup.",
       "",
       "```toml",
       'model_provider = "fixel_recall_local"',
@@ -439,10 +647,12 @@ export function createCodexSetupPreview(env: CliEnvironment): HostSetupPreview {
       "[model_providers.fixel_recall_local]",
       'name = "Fixel Recall local gateway"',
       `base_url = "${gatewayBaseUrl}"`,
-      "requires_openai_auth = true",
+      "requires_openai_auth = false",
+      'env_key = "OPENAI_API_KEY"',
       "```",
       "",
-      "API-key users can still sign in to Codex with an API key; subscription users should stay signed in normally.",
+      "Subscription authentication through this custom provider is unproven and is not supported by the default setup.",
+      "Codex CLI and the Codex IDE extension share this user-level config.toml, including when the extension runs in VS Code or Cursor.",
       "",
       "Skill discovery: Codex should discover .agents/skills/fixel-recall and may invoke it for context audits, benchmarks, retrieval and setup troubleshooting.",
       "MCP retrieval preview:",
@@ -451,8 +661,8 @@ export function createCodexSetupPreview(env: CliEnvironment): HostSetupPreview {
         {
           mcpServers: {
             "fixel-recall-retrieval": {
-              args: ["mcp", "retrieval"],
-              command: "fixel-recall",
+              args: launcherWith(cliLauncher(), "mcp", "retrieval"),
+              command: cliLauncher().command,
               env: {}
             }
           }
@@ -508,7 +718,7 @@ export function createClaudeCodeSetupPreview(env: CliEnvironment): HostSetupPrev
           hooks: {
             SessionStart: [
               {
-                command: "fixel-recall status --no-credentials",
+                command: launcherCommandLine(cliLauncher(), "status", "--no-credentials"),
                 description: "Local Fixel Recall status check"
               }
             ]
@@ -520,6 +730,7 @@ export function createClaudeCodeSetupPreview(env: CliEnvironment): HostSetupPrev
       "```",
       "",
       "Hooks are optional and must not be required for Fixel Recall to operate.",
+      "Claude Code CLI and its VS Code integration use the same Claude Code runtime and settings.",
       "Skill discovery: Claude Code should discover .claude/skills/fixel-recall and may invoke it for context audits, benchmarks, retrieval and setup troubleshooting.",
       "MCP retrieval preview:",
       "```json",
@@ -527,8 +738,8 @@ export function createClaudeCodeSetupPreview(env: CliEnvironment): HostSetupPrev
         {
           mcpServers: {
             "fixel-recall-retrieval": {
-              args: ["mcp", "retrieval"],
-              command: "fixel-recall",
+              args: launcherWith(cliLauncher(), "mcp", "retrieval"),
+              command: cliLauncher().command,
               env: {}
             }
           }
@@ -728,7 +939,20 @@ async function runGatewayProcess(argv: readonly string[]): Promise<number> {
     process.stderr.write("Choose --codex-auth api or --codex-auth subscription\n");
     return 2;
   }
-  const gateway = createLocalGateway({ ...planned, bindHost });
+  const gateway = createLocalGateway({
+    ...planned,
+    bindHost,
+    dashboardRenderer: (status) =>
+      renderGatewayActivityDashboard({
+        gatewayRunning: true,
+        mode: status.mode,
+        killSwitchActive: status.killSwitchActive,
+        compressionState: status.compression.state,
+        lastTransformation: status.compression.lastRequest,
+        exactRecoveryAvailable: status.compression.exactRecoveryAvailable,
+        secretsRendered: status.compression.secretsRendered
+      })
+  });
 
   return new Promise((resolve) => {
     gateway.server.once("error", (error) => {
@@ -741,6 +965,7 @@ async function runGatewayProcess(argv: readonly string[]): Promise<number> {
           "Fixel Recall gateway listening",
           "",
           `Gateway URL: http://${bindHost}:${port}`,
+          `Dashboard: http://${bindHost}:${port}/dashboard`,
           "Safety mode: Safe",
           `Upstream allowlist: ${planned.upstreamAllowlist?.join(", ")}`,
           ...(planned.canary
@@ -785,6 +1010,43 @@ async function probeLocalGateway(baseUrl: string): Promise<boolean> {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function renderHelp(): string {
+  return [
+    "Fixel Recall - image memory with exact recovery for Claude Code and Codex CLI.",
+    "",
+    "Usage: fixel-recall <command> [options]",
+    "",
+    "Get started:",
+    "  setup [codex|claude-code|both]   Preview the changes, then ask before applying them",
+    "  status                           Show routing and safety mode (no credentials shown)",
+    "  doctor                           Check the local environment",
+    "  platform doctor                  Show OS and editor compatibility without reading credentials",
+    "",
+    "Day to day:",
+    "  start [--port N]                 Run the local loopback gateway",
+    "  stop                             Stop managed local routing",
+    "  benchmark                        Original vs compressed input cost (synthetic)",
+    "  explain                          Why a block was shrunk, protected or passed through",
+    "  retrieve --block-id BLOCK_ID     Authorised exact recovery from the local vault",
+    "  preset                           Choose a policy preset",
+    "  audit                            Compatibility audit",
+    "",
+    "Undo:",
+    "  rollback                         Restore the files setup changed",
+    "  uninstall                        Remove what setup installed",
+    "",
+    "Options for setup, rollback and uninstall:",
+    "  --yes, -y        Apply without asking",
+    "  --dry-run        Preview only, never ask",
+    "  --confirm        Apply without asking (scripting)",
+    "",
+    "Set FIXEL_RECALL_CONFIG_ROOT to use a different config root than your home directory.",
+    "Configured surfaces: Codex CLI/IDE and Claude Code CLI/VS Code on macOS, Linux, WSL and Windows.",
+    "Run `fixel-recall platform doctor`; non-macOS release claims require a green platform canary.",
+    `Version: ${cliVersion()}`
+  ].join("\n");
 }
 
 function formatFromArgs(argv: readonly string[]): CliOutputFormat {
@@ -1510,7 +1772,7 @@ function seedOptions(options: RendererDoctorOptions): RendererDoctorOptions {
           {
             bytes: new TextEncoder().encode("FAKE_SECRET_CANARY_RENDERER_DOCTOR"),
             heightPx: 728,
-            mimeType: "image/svg+xml",
+            mimeType: "image/png",
             pageIndex: 0,
             stableImageId: "unsafe",
             widthPx: 1_568
@@ -1827,7 +2089,24 @@ function createStaticRenderer(result: ContextRendererResult): ContextRenderer {
   return { render: async () => result };
 }
 
-if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1]) {
+/**
+ * True when this file is the program being run. npm links a package's bin as a symlink,
+ * so process.argv[1] is the symlink while import.meta.url is the real file; compare real
+ * paths or the CLI silently does nothing when installed.
+ */
+function isMainModule(): boolean {
+  const entry = process.argv[1];
+  if (entry === undefined) {
+    return false;
+  }
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (isMainModule()) {
   runCli().then((code) => {
     process.exitCode = code;
   });

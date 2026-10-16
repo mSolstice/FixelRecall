@@ -2,15 +2,15 @@
 
 ## Status Summary
 
-Fixel Recall is currently a local fake-provider beta. OS support is based on repository evidence
-available in this working tree, not on intended future support.
+Fixel Recall now includes cross-platform configuration and test targets. Release support remains
+evidence-based: implementation alone does not turn a platform into a public support claim.
 
-| Platform       | Release status                                     | Evidence                                                                                                          |
-| -------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| macOS          | Supported for local fake-provider beta             | Local checks have run on Darwin arm64 with Node.js 26 and pnpm 11.                                                |
-| Linux          | CI-targeted, not locally reverified in this review | GitHub Actions targets Ubuntu with Node.js 24 and 26, but remote CI results were not reviewed in this local pass. |
-| Windows native | Unsupported for this release                       | No native Windows install, path, permission, gateway or CLI evidence is present.                                  |
-| WSL            | Unsupported for this release                       | WSL is not tested separately from native Linux and has no install or gateway evidence in this release review.     |
+| Platform       | Release status                                     | Evidence                                                                                       |
+| -------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| macOS          | Supported for local fake-provider beta             | Local checks have run on Darwin arm64 with Node.js 26 and pnpm 11.                             |
+| Linux          | Implemented; current-commit CI validation required | GitHub Actions targets Ubuntu with Node.js 24 and 26.                                          |
+| Windows native | Implemented; current-commit CI validation required | Windows CI, OS-aware paths and `cmd /c npx` MCP launchers are included.                        |
+| WSL            | Implemented; separate canary required              | Linux-compatible setup and WSL detection exist; a real WSL 2 release canary is still required. |
 
 ## macOS Tested Status
 
@@ -43,7 +43,8 @@ Before release, a clean Linux CI run should verify:
 
 ## Windows Native Status
 
-Windows native is unsupported for this release.
+Windows native support is implemented and test-targeted. Do not publish the support claim until the
+Windows job for the release commit is green and the native setup/rollback canary passes.
 
 Known unproven areas:
 
@@ -57,7 +58,8 @@ Known unproven areas:
 
 ## WSL Status
 
-WSL is unsupported for this release.
+WSL setup is implemented, but it remains `validation-required` until the separate WSL 2 canary
+passes.
 
 WSL may behave like Linux for many Node.js APIs, but it still needs separate validation because host
 configuration, Windows-mounted paths, file permissions, firewall rules and loopback behavior can

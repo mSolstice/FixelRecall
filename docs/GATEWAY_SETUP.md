@@ -56,10 +56,9 @@ base_url = "http://127.0.0.1:PORT/v1"
 Requests to `/v1/responses` will go through Fixel Recall and then to the allowlisted OpenAI
 upstream.
 
-ChatGPT subscription routing is a separate opt-in path; an API URL plus a subscription token is not
-sufficient. See [Astra canary readiness](ASTRA_CANARY_READINESS.md) for the new local-tested
-subscription routes, authentication requirements and remaining budget blockers. No real subscription
-test was performed for this change.
+ChatGPT subscription routing is not supported or claimed by the default setup. The gateway's
+documented authentication path is an API key kept in the normal provider secret store. No real
+subscription test has been performed.
 
 ## Connecting Claude Code
 
@@ -79,8 +78,10 @@ Check `/status` and confirm:
 - `mode` is `safe` unless bypass was intentionally enabled
 - `killSwitchActive` is `false`
 - provider request counts increase when Codex or Claude Code sends traffic
-- `rawBodiesPersisted` is `false`
-- `authValuesRetained` is `false`
+- `metrics.rawBodiesPersisted` is `false`
+- `metrics.authValuesRetained` is `false`
+
+These two safety fields are nested under `metrics`, not at the top level of the `/status` response.
 
 ## Runtime Controls
 

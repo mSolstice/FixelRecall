@@ -53,6 +53,7 @@ export interface OpenAIParseResult {
 }
 
 export interface OpenAIRebuildOptions {
+  readonly imagesByBlockId?: ReadonlyMap<BlockId, readonly string[]>;
   readonly transformedTextByBlockId?:
     | ReadonlyMap<BlockId, string>
     | Readonly<Record<string, string>>;
@@ -134,6 +135,16 @@ export function rebuildOpenAIResponsesRequest(
       continue;
     }
     patchTextContent(item, itemState.blockIds, replacements);
+    const images = options.imagesByBlockId?.get(itemState.blockIds[0]!);
+    if (images !== undefined && typeof item["content"] === "string" && item["role"] === "user") {
+      (item as MutableJsonObject)["content"] = [
+        { type: "input_text", text: item["content"] },
+        ...images.map((data) => ({
+          type: "input_image",
+          image_url: `data:image/png;base64,${data}`
+        }))
+      ];
+    }
   }
 
   return rebuilt;

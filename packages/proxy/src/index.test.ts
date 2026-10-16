@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import {
   createFakeGateway,
   createLocalGateway,
+  dashboardRoute,
   healthRoute,
   type ProviderFamily,
   type StructuredLogEvent
@@ -22,6 +23,12 @@ const rawBodyPersistenceProviders = [
 describe("healthRoute", () => {
   it("declares the local health endpoint", () => {
     expect(healthRoute).toEqual({ method: "GET", path: "/health" });
+  });
+});
+
+describe("dashboardRoute", () => {
+  it("declares the local dashboard endpoint", () => {
+    expect(dashboardRoute).toEqual({ method: "GET", path: "/dashboard" });
   });
 });
 
@@ -118,8 +125,25 @@ describe("createFakeGateway", () => {
     const { baseUrl, close } = await startGateway();
     try {
       const openAI = await postStream(`${baseUrl}/v1/responses`);
-      expect(openAI).toContain("response.output_text.delta");
-      expect(openAI).toContain("[DONE]");
+      const openAIEvents = parseServerSentEvents(openAI);
+      expect(openAIEvents.map((event) => event.type)).toEqual([
+        "response.created",
+        "response.in_progress",
+        "response.output_item.added",
+        "response.content_part.added",
+        "response.output_text.delta",
+        "response.output_text.done",
+        "response.content_part.done",
+        "response.output_item.done",
+        "response.completed"
+      ]);
+      expect(openAIEvents.at(-1)).toMatchObject({
+        type: "response.completed",
+        response: {
+          status: "completed",
+          output: [{ type: "message", status: "completed" }]
+        }
+      });
 
       const anthropic = await postStream(`${baseUrl}/v1/messages`);
       expect(anthropic).toContain("message_start");
@@ -149,6 +173,13 @@ describe("createFakeGateway", () => {
   });
 });
 
+function parseServerSentEvents(stream: string): Record<string, unknown>[] {
+  return stream
+    .split("\n\n")
+    .filter((entry) => entry.startsWith("data: "))
+    .map((entry) => JSON.parse(entry.slice("data: ".length)) as Record<string, unknown>);
+}
+
 describe("createLocalGateway", () => {
   it("defaults to loopback and Safe mode with privacy-safe status", async () => {
     const { baseUrl, close } = await startProductionGateway();
@@ -173,6 +204,55 @@ describe("createLocalGateway", () => {
       });
     } finally {
       await close();
+    }
+  });
+
+  it("serves a local dashboard and retains only safe transformation metadata", async () => {
+    const captured: { declared?: string; body: Buffer } = { body: Buffer.alloc(0) };
+    const upstream = await startBodyCaptureUpstream(captured);
+    const audit = {
+      outcome: "transformed" as const,
+      strategy: "mixed" as const,
+      reasonCodes: ["transformed_mixed"],
+      blocksConsidered: 8,
+      blocksTransformed: 3,
+      bytesBefore: 100,
+      bytesAfter: 2
+    };
+    const gateway = createLocalGateway({
+      upstreams: { openai: upstream.baseUrl },
+      upstreamAllowlist: [upstream.baseUrl],
+      exactRecoveryAvailable: true,
+      dashboardRenderer: (status) =>
+        `<main>${status.compression.state}:${status.compression.lastRequest?.strategy ?? "none"}</main>`,
+      transformRequest: async () => ({ body: Buffer.from("{}"), audit })
+    });
+    await listen(gateway.server);
+    const address = gateway.server.address();
+    if (!address || typeof address === "string") throw new Error("missing address");
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    try {
+      const before = await fetch(`${baseUrl}/dashboard`);
+      expect(before.headers.get("content-security-policy")).toContain("default-src 'none'");
+      expect(await before.text()).toBe("<main>active:none</main>");
+
+      await fetch(`${baseUrl}/v1/responses`, {
+        method: "POST",
+        headers: { authorization: "Bearer fake", "content-type": "application/json" },
+        body: JSON.stringify({ model: "synthetic", input: "safe synthetic history" })
+      });
+      await expect((await fetch(`${baseUrl}/status`)).json()).resolves.toMatchObject({
+        compression: {
+          state: "active",
+          exactRecoveryAvailable: true,
+          secretsRendered: 0,
+          lastRequest: audit
+        }
+      });
+      expect(await (await fetch(`${baseUrl}/dashboard`)).text()).toBe("<main>active:mixed</main>");
+    } finally {
+      await gateway.close();
+      await upstream.close();
     }
   });
 
@@ -234,6 +314,73 @@ describe("createLocalGateway", () => {
       await upstream.close();
     }
   });
+
+  it("sets outbound content length to the actual forwarded bytes", async () => {
+    const captured: { declared?: string; body: Buffer } = { body: Buffer.alloc(0) };
+    const upstream = await startBodyCaptureUpstream(captured);
+    const gateway = await startProductionGateway([], {
+      openai: `${upstream.baseUrl}/v1/responses`
+    });
+    try {
+      const body = Buffer.from(JSON.stringify({ model: "synthetic", input: "length canary" }));
+      const response = await fetch(`${gateway.baseUrl}/v1/responses`, {
+        method: "POST",
+        headers: { authorization: "Bearer fake", "content-type": "application/json" },
+        body
+      });
+      expect(response.status).toBe(200);
+      expect(captured.declared).toBe(String(captured.body.length));
+      expect(captured.body.equals(body)).toBe(true);
+    } finally {
+      await gateway.close();
+      await upstream.close();
+    }
+  });
+
+  it.each(["timeout", "throw", "invalid-json", "mutation"])(
+    "preserves original bytes on transformation %s",
+    async (failure) => {
+      const captured: { declared?: string; body: Buffer } = { body: Buffer.alloc(0) };
+      const logs: StructuredLogEvent[] = [];
+      const upstream = await startBodyCaptureUpstream(captured);
+      const gateway = createLocalGateway({
+        log: (event) => logs.push(event),
+        upstreams: { openai: upstream.baseUrl },
+        upstreamAllowlist: [upstream.baseUrl],
+        transformationTimeoutMs: 5,
+        transformRequest: async (copy) => {
+          if (failure === "timeout") return new Promise<Buffer>(() => {});
+          if (failure === "invalid-json") return Buffer.from("{");
+          if (failure === "mutation") copy.fill(0);
+          throw new Error("synthetic failure");
+        }
+      });
+      await listen(gateway.server);
+      const address = gateway.server.address();
+      if (!address || typeof address === "string") throw new Error("missing address");
+      try {
+        const body = Buffer.from('{ "model": "synthetic", "input": "unchanged" }');
+        const response = await fetch(`http://127.0.0.1:${address.port}/v1/responses`, {
+          method: "POST",
+          headers: { authorization: "Bearer fake", "content-type": "application/json" },
+          body
+        });
+        await response.text();
+        expect(response.status).toBe(200);
+        expect(captured.body.equals(body)).toBe(true);
+        expect(logs[0]?.transformation).toMatchObject({
+          outcome: "original",
+          strategy: "native",
+          reasonCodes: ["transformation_failed_keep_native"],
+          bytesBefore: body.length,
+          bytesAfter: body.length
+        });
+      } finally {
+        await gateway.close();
+        await upstream.close();
+      }
+    }
+  );
 
   it("blocks upstream redirects without forwarding credentials to the redirected host", async () => {
     const redirectedHeaders: Record<string, string> = {};
@@ -575,6 +722,36 @@ async function startHeaderCaptureUpstream(capturedHeaders: Record<string, string
         server.close((error) => (error ? reject(error) : resolve()));
       })
   };
+}
+
+async function startBodyCaptureUpstream(captured: { declared?: string; body: Buffer }) {
+  const server = createServer(async (request, response) => {
+    captured.declared =
+      typeof request.headers["content-length"] === "string"
+        ? request.headers["content-length"]
+        : undefined;
+    captured.body = await readRequestBytes(request);
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify({ ok: true }));
+  });
+  await listen(server);
+  const address = server.address();
+  if (address === null || typeof address === "string")
+    throw new Error("Expected TCP server address");
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    close: () =>
+      new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve()))
+      )
+  };
+}
+
+async function readRequestBytes(request: IncomingMessage): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of request)
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  return Buffer.concat(chunks);
 }
 
 async function startRedirectUpstream(location: string) {

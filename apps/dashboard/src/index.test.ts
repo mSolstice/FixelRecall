@@ -6,6 +6,7 @@ import {
   dashboardBoundary,
   renderCompatibilityLeaderboardPage,
   renderDashboard,
+  renderGatewayActivityDashboard,
   runLocalDashboardSmokeTest
 } from "./index.js";
 
@@ -20,6 +21,36 @@ describe("dashboardBoundary", () => {
 });
 
 describe("local dashboard components", () => {
+  it("renders live privacy-safe gateway activity", () => {
+    const html = renderGatewayActivityDashboard({
+      gatewayRunning: true,
+      mode: "safe",
+      killSwitchActive: false,
+      compressionState: "active",
+      lastTransformation: {
+        outcome: "transformed",
+        strategy: "mixed",
+        reasonCodes: ["transformed_mixed"],
+        blocksConsidered: 8,
+        blocksTransformed: 3,
+        bytesBefore: 88901,
+        bytesAfter: 61279
+      },
+      exactRecoveryAvailable: true,
+      secretsRendered: 0
+    });
+
+    expect(html).toContain("Gateway running");
+    expect(html).toContain('Compression</span><strong class="value">Active');
+    expect(html).toContain("Mixed transformation");
+    expect(html).toContain("88,901 bytes");
+    expect(html).toContain("61,279 bytes");
+    expect(html).toContain('Secrets rendered</span><strong class="value">0');
+    expect(html).toContain("No remote analytics or raw-context endpoint");
+    expect(html).not.toContain("authorization");
+    expect(html).not.toContain("rawContextBody");
+  });
+
   it("renders the five main cards", () => {
     const html = renderDashboard();
 

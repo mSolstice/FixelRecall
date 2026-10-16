@@ -5,35 +5,30 @@ Use this as a content handoff for the Fixel Recall website page.
 ## Main Message
 
 ```text
-No key paste. No hosted proxy. No extra cloud account.
+No key paste into Fixel Recall. No hosted proxy. No extra Fixel Recall account.
 
-Fixel Recall runs locally and works with your coding CLI's normal auth flow.
+Fixel Recall runs locally. Its documented gateway path uses API-key authentication kept in the
+provider CLI's normal secret store.
 ```
 
 ## Short Section
 
-### Works With Your Existing CLI Login
+### Authentication Boundary
 
 Fixel Recall does not require you to paste provider API keys into the app.
 
-For Codex CLI, Fixel Recall uses Codex custom-provider routing with `requires_openai_auth = true`,
-so Codex can reuse the auth state you already signed in with.
+For Codex CLI, the default custom-provider setup uses an API key through `OPENAI_API_KEY`.
 
-For Claude Code CLI, Fixel Recall routes through `ANTHROPIC_BASE_URL`. If `ANTHROPIC_API_KEY` is
-unset, Claude Code can keep using its normal signed-in subscription auth.
+For Claude Code CLI, Fixel Recall routes through `ANTHROPIC_BASE_URL` with API-key authentication.
 
-API keys are optional for users who intentionally want API-key billing.
+Subscription-session routing through a third-party gateway is unproven and is not claimed.
 
 ## FAQ Copy
 
 ### Do I need an API key?
 
-Not necessarily.
-
-If you use Codex CLI or Claude Code CLI with a normal signed-in account, Fixel Recall is designed to
-route through that local CLI flow.
-
-API keys are only needed if you intentionally choose API-key billing.
+The documented gateway setup requires the provider API key to remain in the provider CLI's normal
+secret store or environment. Fixel Recall never stores or prints it.
 
 ### Does Fixel Recall store my login token?
 

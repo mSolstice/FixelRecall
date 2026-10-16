@@ -27,10 +27,12 @@ const generatedRoots = [".agents/skills/fixel-recall", ".claude/skills/fixel-rec
 const requiredReferences = [
   "OPERATIONS.md",
   "SAFETY.md",
+  "STRUCTURED_LOGS.md",
   "BENCHMARKING.md",
   "TROUBLESHOOTING.md",
   "CODEX_SETUP.md",
-  "CLAUDE_CODE_SETUP.md"
+  "CLAUDE_CODE_SETUP.md",
+  "PLATFORMS.md"
 ] as const;
 const explicitExamples = [
   "Use the fixel-recall skill to diagnose my local gateway.",

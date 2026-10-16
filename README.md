@@ -2,9 +2,9 @@
 
 **Make coding-agent context cheaper, safer and easier to understand.**
 
-Fixel Recall is a local safety and efficiency layer for coding agents. It helps Codex CLI and Claude
-Code CLI carry less wasteful context while protecting the exact details that should never be
-compressed, rendered or guessed.
+Fixel Recall is a local Safe-mode gateway for coding agents. It gives Codex CLI and Claude Code CLI
+local routing, safety controls, diagnostics and reversible configuration. Context compression is an
+in-development capability and is not currently performed on every live provider request.
 
 <p align="center">
   <img src="docs/assets/fixel-recall-overview.png" alt="Fixel Recall overview showing a local loopback gateway that keeps exact code and secrets protected, shrinks safe old context, uses a local vault, and reports savings honestly." width="900">
@@ -24,21 +24,23 @@ Long coding-agent sessions can quietly collect a lot of baggage: old chat, repea
 logs, file snippets, previous attempts and context that no longer matters. That can make requests
 larger, slower, more expensive and harder for the model to reason about.
 
-Fixel Recall helps by:
+Fixel Recall currently helps by:
 
-- reducing token and context waste where it is safe
+- routing supported CLI traffic through a local loopback gateway
 - keeping code, commands, paths, IDs, hashes, secrets and active tool state protected
-- preserving exact context through local retrieval when recovery is needed
-- explaining why something was transformed or left untouched
-- benchmarking whether Fixel Recall is worth using for a setup
+- providing local status, safety controls, rollback and uninstall
+- preserving exact context through local retrieval components when configured
+- testing and measuring future context-reduction behavior with synthetic fixtures
 - supporting both Codex CLI and Claude Code CLI through one local engine
-- providing rollback and uninstall commands for local configuration changes
 
-The goal is not to compress everything. The goal is **safe context reduction with evidence**.
+The goal is to make context reduction safe and evidence-based before enabling it in the live
+gateway.
 
 ## Shrink The Context. Keep The Details.
 
-Fixel Recall turns safe old context into images, while exact text stays protected and recoverable.
+Fixel Recall is designed to turn eligible old context into compact image memory while exact text
+stays protected and recoverable. That transformation is currently in development and is not claimed
+as active for every live request.
 
 It is not just compression. Instead of sending every old message, log and repeated note back to the
 model as text, Fixel Recall decides what can safely become a compact visual memory.
@@ -47,9 +49,17 @@ model as text, Fixel Recall decides what can safely become a compact visual memo
 - Secrets are never rendered.
 - The local vault keeps authorised original text for exact recovery.
 - MCP retrieval can fetch a narrow exact section later.
-- pxpipe sits behind the renderer interface to create approved images.
+- pxpipe sits behind the renderer interface for the in-development rendering path.
 - If rendering fails, the original text is preserved.
-- Image compression only happens when policy says it is safe and worthwhile.
+- Image compression will only happen when policy says it is safe and worthwhile.
+
+### Current Gateway Reality
+
+The live gateway currently provides local routing, authentication forwarding, request limits,
+streaming, kill-switch controls, Safe mode, privacy-safe metrics and reversible setup. The firewall,
+renderer and vault are implemented as protected components and testable interfaces, but they are not
+yet connected to transform every live `/v1/responses` or `/v1/messages` request. Until that wiring
+is complete, supported requests are forwarded unchanged.
 
 ## What This Adds Around OpenAI And Anthropic
 
@@ -92,13 +102,12 @@ raw-body absence checks in
 
 Fixel Recall does not ask you to paste provider keys into the app, the repository or chat.
 
-- Codex CLI uses custom-provider routing with `requires_openai_auth = true`, so Codex can reuse the
-  Codex auth state you already signed in with.
-- Claude Code CLI can route through `ANTHROPIC_BASE_URL`. API-key mode is the documented default for
-  this gateway because it has the clearest third-party routing and billing boundary.
-- Subscription-based routing is an optional user choice, not a compliance promise. Users must review
-  Anthropic's current Claude Code and consumer terms before enabling it. Fixel Recall does not
-  extract or store subscription tokens.
+- Codex CLI uses API-key custom-provider routing by default. Fixel Recall does not claim to reuse a
+  signed-in Codex subscription session through the gateway.
+- Claude Code CLI can route through `ANTHROPIC_BASE_URL`; API-key mode is the documented and tested
+  authentication path for this gateway.
+- Subscription-based routing is unproven and not supported by the default setup. Do not assume that
+  a provider's signed-in subscription credential may be forwarded through a third-party gateway.
 - API keys remain in the user's normal secret store or environment and are never written by Context
   Diet.
 
@@ -112,7 +121,7 @@ or persist provider credentials.
 
 ## Current Release Status
 
-**Fixel Recall for macOS CLI**
+**Fixel Recall across CLI and supported IDE integrations**
 
 Fixel Recall is available for macOS CLI users of Codex CLI and Claude Code CLI.
 
@@ -127,12 +136,20 @@ Supported now:
 - local MCP retrieval in tested flows
 - dry-run setup, confirmed setup, rollback and uninstall on macOS CLI
 
-Not included in this release:
+Additional configuration support is implemented for:
 
-- Codex IDE
-- Claude Code IDE
-- Windows native
-- WSL
+- Codex IDE in VS Code and Cursor, through the same Codex configuration as the CLI
+- Claude Code in VS Code, through the same Claude Code runtime and settings as the CLI
+- Linux, Windows native and WSL 2
+
+Run `fixel-recall platform doctor` for the current machine. Windows, Linux and WSL public release
+claims remain gated on the current commit's OS-specific CI and canary evidence. Cursor's native AI
+features are not routed through Fixel Recall.
+
+Not yet claimed:
+
+- Windows, Linux or WSL release validation for this exact commit
+- Cursor native AI routing
 - broad hosted or enterprise production deployment
 - proven real-world savings across private repositories
 - third-party security review
@@ -201,10 +218,9 @@ Setup places the Codex `model_provider` key at the TOML root before any table he
 Codex MCP entry inside the managed Codex block, writes Claude Code `ANTHROPIC_BASE_URL` as a
 settings environment value, and registers Claude MCP in the user Claude configuration.
 
-Subscription users do not need to add provider API keys just to route through Fixel Recall. Codex
-uses `requires_openai_auth = true` so Codex can reuse its own signed-in auth state. Claude Code uses
-`ANTHROPIC_BASE_URL`; keep `ANTHROPIC_API_KEY` unset if you want Claude Code to keep using your
-subscription instead of API billing.
+The default setup uses API-key authentication. Keep provider keys in the provider CLI's normal
+secret store or environment; Fixel Recall never writes or prints them. Subscription routing through
+the gateway is not supported or claimed.
 
 ### 5. Confirm Setup
 
@@ -493,10 +509,8 @@ Do not manually maintain three different skill versions.
 Do not claim:
 
 - broad hosted/enterprise deployment
-- Codex IDE support
-- Claude Code IDE support
-- Windows native support
-- WSL support
+- native Cursor AI routing
+- Windows, Linux or WSL release validation before the matching CI and canary pass
 - hosted or multi-user deployment support
 - proven real-world savings across private repositories
 - approved real model profiles
@@ -506,6 +520,6 @@ Do not claim:
 The honest current claim is:
 
 ```text
-Fixel Recall is available for macOS CLI users of Codex CLI and Claude Code CLI.
-IDE, Windows native, WSL, and broad hosted/enterprise production deployment are not included in this release.
+Fixel Recall supports Codex CLI/IDE and Claude Code CLI/VS Code configuration on macOS, Linux, Windows and WSL.
+macOS remains the release-validated scope until the new OS-specific CI and canaries pass; Cursor support is through the Codex extension only.
 ```

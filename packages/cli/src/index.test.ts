@@ -21,6 +21,7 @@ import {
   runRendererDoctor,
   type CompatibilityAuditVerdict
 } from "./index.js";
+import { cliEntryPath } from "./launcher.js";
 import { installLocalConfig, uninstallLocalConfig } from "./local-config.js";
 
 const execFileAsync = promisify(execFile);
@@ -165,7 +166,14 @@ describe("fixel-recall CLI commands", () => {
 
     expect(result.exitCode).toBeGreaterThanOrEqual(0);
     expect(result.stderr).toBe("");
-    expect(result.stdout.replaceAll(tmpdir(), "<tmp>")).toMatchSnapshot();
+    const entryPath = cliEntryPath();
+    const jsonEntryPath = JSON.stringify(entryPath).slice(1, -1);
+    const normalisedOutput = result.stdout
+      .replaceAll(jsonEntryPath, "<cli-entry>")
+      .replaceAll(entryPath, "<cli-entry>")
+      .replaceAll("\\", "/")
+      .replaceAll(tmpdir().replaceAll("\\", "/"), "<tmp>");
+    expect(normalisedOutput).toMatchSnapshot();
     expect(result.stdout).not.toContain("SECRET_VALUE");
     expect(result.stdout).not.toContain("token:SECRET");
   });
@@ -175,6 +183,14 @@ describe("fixel-recall CLI commands", () => {
 
     expect(result.exitCode).toBe(64);
     expect(result.stderr).toContain("Unknown command");
+  });
+
+  it("reports platform and editor support without credentials", async () => {
+    const result = await runCliCommand(["platform", "doctor"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Fixel Recall platform doctor");
+    expect(result.stdout).toContain("Cursor native AI: unsupported");
+    expect(result.stdout).toContain("Credentials: not read or displayed");
   });
 
   it("requires confirmation before destructive actions", async () => {
@@ -360,7 +376,8 @@ describe("fixel-recall CLI commands", () => {
       expect(applied.stdout).toContain("Confirmed");
       expect(codexConfig).toContain('model = "existing-model"');
       expect(codexConfig).toContain("BEGIN fixel-recall managed");
-      expect(codexConfig).toContain("requires_openai_auth = true");
+      expect(codexConfig).toContain("requires_openai_auth = false");
+      expect(codexConfig).toContain('env_key = "OPENAI_API_KEY"');
       expect(codexConfig.indexOf('model_provider = "fixel_recall_local"')).toBeLessThan(
         codexConfig.indexOf("[mcp_servers.node_repl.env]")
       );

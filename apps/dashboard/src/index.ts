@@ -127,6 +127,24 @@ export interface DashboardSmokeResult {
   readonly rawContextApiAvailable: false;
 }
 
+export interface GatewayActivityDashboardInput {
+  readonly gatewayRunning: boolean;
+  readonly mode: "safe" | "bypass";
+  readonly killSwitchActive: boolean;
+  readonly compressionState: "active" | "pass-through";
+  readonly lastTransformation: {
+    readonly outcome: "transformed" | "original";
+    readonly strategy: "template" | "image" | "mixed" | "native";
+    readonly blocksConsidered: number;
+    readonly blocksTransformed: number;
+    readonly bytesBefore: number;
+    readonly bytesAfter: number;
+    readonly reasonCodes: readonly string[];
+  } | null;
+  readonly exactRecoveryAvailable: boolean;
+  readonly secretsRendered: 0;
+}
+
 const cardTitles = [
   "Context X-ray",
   "Safe savings",
@@ -142,6 +160,69 @@ export function dashboardBoundary(): DashboardBoundary {
     rawContextApiAvailable: false,
     remoteAnalyticsEnabledByDefault: false
   };
+}
+
+export function renderGatewayActivityDashboard(input: GatewayActivityDashboardInput): string {
+  const last = input.lastTransformation;
+  const requestLabel =
+    last === null
+      ? "No transformed request yet"
+      : last.outcome === "transformed"
+        ? `${labelDimension(last.strategy)} transformation`
+        : "Original content preserved";
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="refresh" content="2">
+  <title>Fixel Recall Activity</title>
+  <style>
+    :root { color-scheme: light dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    body { margin: 0; background: #f5f7f9; color: #171a1f; }
+    main { max-width: 880px; margin: 0 auto; padding: 28px 20px; }
+    header { display: flex; justify-content: space-between; gap: 16px; align-items: start; margin-bottom: 20px; }
+    h1 { margin: 0; font-size: 1.5rem; letter-spacing: 0; }
+    p { color: #58616e; line-height: 1.5; }
+    .badge { border: 1px solid #2e7650; color: #185c38; background: #f1fbf5; border-radius: 6px; padding: 6px 9px; font-weight: 700; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 1px solid #d8dee7; background: #fff; }
+    .metric { min-width: 0; padding: 16px; border-right: 1px solid #e7ebf0; border-bottom: 1px solid #e7ebf0; }
+    .metric:nth-child(2n) { border-right: 0; }
+    .label { display: block; color: #687281; font-size: .82rem; margin-bottom: 6px; }
+    .value { display: block; font-size: 1.08rem; overflow-wrap: anywhere; }
+    .note { margin-top: 18px; border-left: 3px solid #667eea; padding-left: 12px; }
+    code { font-size: .85rem; }
+    @media (prefers-color-scheme: dark) { body { background: #12151a; color: #f4f6f8; } .grid { background: #1b2028; border-color: #39414d; } .metric { border-color: #303743; } p, .label { color: #aeb7c4; } .badge { background: #162b20; color: #8ee0ad; } }
+    @media (max-width: 620px) { header { flex-direction: column; } .grid { grid-template-columns: 1fr; } .metric, .metric:nth-child(2n) { border-right: 0; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div><h1>Fixel Recall activity</h1><p>Local gateway metadata only. Raw context and credentials are never displayed.</p></div>
+      <span class="badge">${input.gatewayRunning ? "Gateway running" : "Gateway stopped"}</span>
+    </header>
+    <section class="grid" aria-label="Live gateway status">
+      ${activityMetric("Mode", input.mode === "safe" ? "Safe" : "Bypass")}
+      ${activityMetric("Compression", input.compressionState === "active" ? "Active" : "Pass-through")}
+      ${activityMetric("Last request", requestLabel)}
+      ${activityMetric("Kill switch", input.killSwitchActive ? "On" : "Off")}
+      ${activityMetric("Blocks considered", last === null ? "0" : formatNumber(last.blocksConsidered))}
+      ${activityMetric("Blocks transformed", last === null ? "0" : formatNumber(last.blocksTransformed))}
+      ${activityMetric("Original", last === null ? "Unavailable" : `${formatNumber(last.bytesBefore)} bytes`)}
+      ${activityMetric("Forwarded", last === null ? "Unavailable" : `${formatNumber(last.bytesAfter)} bytes`)}
+      ${activityMetric("Exact recovery", input.exactRecoveryAvailable ? "Available" : "Unavailable")}
+      ${activityMetric("Secrets rendered", String(input.secretsRendered))}
+    </section>
+    <p class="note">${last === null ? "Waiting for a supported request." : `Reason codes: ${escapeHtml(last.reasonCodes.join(", ") || "none")}`}</p>
+    <p><small>Refreshes locally every 2 seconds. No remote analytics or raw-context endpoint.</small></p>
+  </main>
+</body>
+</html>`;
+}
+
+function activityMetric(label: string, value: string): string {
+  return `<div class="metric"><span class="label">${escapeHtml(label)}</span><strong class="value">${escapeHtml(value)}</strong></div>`;
 }
 
 export function createDashboardViewModel(

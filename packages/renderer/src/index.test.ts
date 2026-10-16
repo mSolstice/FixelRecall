@@ -78,6 +78,15 @@ describe("createDeterministicFakeRenderer", () => {
 });
 
 describe("createPxpipeCompatibleRenderer", () => {
+  it("fails instead of silently clipping text beyond image dimensions", async () => {
+    const result = await createPxpipeCompatibleRenderer().render({
+      ...input,
+      sourceText: "Readable prose. ".repeat(1000),
+      pageLimits: { maxPages: 1, maxCharsPerPage: 20000 },
+      dimensionLimits: { maxWidthPx: 100, maxHeightPx: 100, minFontSizePx: 12 }
+    });
+    expect(result).toMatchObject({ status: "failure", failureReason: "unsupported_format" });
+  });
   it("renders deterministic golden pages with stable labels and exact sidecar metadata", async () => {
     const logEvents: RendererLogEvent[] = [];
     const renderer = createPxpipeCompatibleRenderer({
@@ -94,12 +103,14 @@ describe("createPxpipeCompatibleRenderer", () => {
         pageIndex: 0,
         widthPx: 640,
         heightPx: 480,
-        mimeType: "image/svg+xml",
+        mimeType: "image/png",
         stableImageId: "CTX-TEST-BLOCK-pxpipe-page-0"
       });
-      expect(new TextDecoder().decode(result.images[0].bytes)).toMatchInlineSnapshot(
-        `"<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480"><rect width="100%" height="100%" fill="#ffffff"/><text x="16" y="24" font-family="monospace" font-size="14" fill="#111111">CTX-TEST-BLOCK page 1</text><text x="16" y="44" font-family="monospace" font-size="10" fill="#555555">sidecar sha256:synthetic-sidecar-hash</text><text x="16" y="68" font-family="monospace" font-size="12" fill="#111111">Synthetic renderable con</text></svg>"`
-      );
+      expect(Array.from(result.images[0].bytes.slice(0, 8))).toEqual([
+        137, 80, 78, 71, 13, 10, 26, 10
+      ]);
+      expect(new TextDecoder().decode(result.images[0].bytes)).not.toContain("<svg");
+      expect(result.images[0].bytes.some((byte) => byte !== 255)).toBe(true);
     }
     expect(logEvents).toEqual([
       {
@@ -134,6 +145,18 @@ describe("createPxpipeCompatibleRenderer", () => {
     ).resolves.toMatchObject({
       status: "failure",
       failureReason: "renderer_failure"
+    });
+  });
+
+  it("fails closed when the source contains an unsupported glyph", async () => {
+    const renderer = createPxpipeCompatibleRenderer({ nowMs: 7_000 });
+
+    await expect(
+      renderer.render({ ...input, sourceText: "Safe text \u2603" })
+    ).resolves.toMatchObject({
+      status: "failure",
+      failureReason: "unsupported_glyphs",
+      glyphCoverage: { unsupportedGlyphs: ["\u2603"] }
     });
   });
 

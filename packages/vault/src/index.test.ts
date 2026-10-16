@@ -253,20 +253,23 @@ describe("local context vault", () => {
     expect(storedFile).not.toContain(projectPath);
   });
 
-  it("uses restricted permissions where supported", async () => {
-    const { block, rootDir, vault } = await fixture();
-    await vault.storeBlock({
-      identity: block,
-      sourceCategory: "conversation_history",
-      authorisedOriginalContent: "permission test",
-      expiresAt: new Date("2026-07-16T00:10:00.000Z")
-    });
+  it.skipIf(process.platform === "win32")(
+    "uses restricted permissions where supported",
+    async () => {
+      const { block, rootDir, vault } = await fixture();
+      await vault.storeBlock({
+        identity: block,
+        sourceCategory: "conversation_history",
+        authorisedOriginalContent: "permission test",
+        expiresAt: new Date("2026-07-16T00:10:00.000Z")
+      });
 
-    const rootMode = (await stat(rootDir)).mode & 0o777;
-    const fileMode = (await stat(blockFile(rootDir, block))).mode & 0o777;
-    expect(rootMode).toBe(0o700);
-    expect(fileMode).toBe(0o600);
-  });
+      const rootMode = (await stat(rootDir)).mode & 0o777;
+      const fileMode = (await stat(blockFile(rootDir, block))).mode & 0o777;
+      expect(rootMode).toBe(0o700);
+      expect(fileMode).toBe(0o600);
+    }
+  );
 
   it("enforces size limits and rejects secret-sensitive spans", async () => {
     const { block, vault } = await fixture();

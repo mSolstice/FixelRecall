@@ -1,22 +1,54 @@
 {
-  "name": "@fixel-recall/cli",
-  "version": "0.0.0",
-  "private": true,
+  "name": "fixel-recall",
+  "version": "0.1.0",
+  "description": "Image memory with exact recovery for Claude Code and Codex CLI. Local-first, macOS CLI release candidate.",
+  "keywords": [
+    "claude-code",
+    "codex",
+    "context",
+    "cli",
+    "local-first",
+    "macos"
+  ],
+  "homepage": "https://fixel-skills.vercel.app/fixel-recall.html",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mSolstice/FixelRecall.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/mSolstice/FixelRecall/issues"
+  },
   "type": "module",
   "bin": {
-    "fixel-recall": "./dist/index.js"
+    "fixel-recall": "bundle/index.js"
   },
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./bundle/index.js"
+  },
+  "files": [
+    "bundle",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "bundle": "node ../../scripts/bundle-cli.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
-  "dependencies": {
+  "devDependencies": {
     "@fixel-recall/benchmark": "workspace:*",
     "@fixel-recall/core": "workspace:*",
+    "@fixel-recall/dashboard": "workspace:*",
     "@fixel-recall/renderer": "workspace:*",
-    "@fixel-recall/proxy": "workspace:*"
+    "@fixel-recall/proxy": "workspace:*",
+    "@fixel-recall/retrieval-mcp": "workspace:*",
+    "@fixel-recall/vault": "workspace:*"
   }
 }

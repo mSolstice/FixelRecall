@@ -12,6 +12,21 @@ export { createCanaryAdmission, CanaryAdmissionError, type CanaryLimits } from "
 export type ProviderFamily = "openai" | "anthropic";
 export type GatewayMode = "safe" | "bypass";
 
+export interface TransformationAudit {
+  readonly outcome: "transformed" | "original";
+  readonly strategy: "template" | "image" | "mixed" | "native";
+  readonly reasonCodes: readonly string[];
+  readonly blocksConsidered: number;
+  readonly blocksTransformed: number;
+  readonly bytesBefore: number;
+  readonly bytesAfter: number;
+}
+
+export interface RequestTransformationResult {
+  readonly body: Buffer;
+  readonly audit: TransformationAudit;
+}
+
 export interface ProxyRoute {
   readonly method: "GET" | "POST";
   readonly path: string;
@@ -31,6 +46,7 @@ export interface StructuredLogEvent {
   readonly killSwitchActive: boolean;
   readonly requestBytes: number;
   readonly responseStreamed: boolean;
+  readonly transformation?: TransformationAudit;
 }
 
 export interface GatewayMetrics {
@@ -44,6 +60,15 @@ export interface GatewayMetrics {
 }
 
 export interface LocalGatewayOptions {
+  /** Optional host-configured transformation. Absent by default; receives a copy, never the original buffer. */
+  readonly transformRequest?: (
+    body: Buffer,
+    provider: ProviderFamily,
+    signal: AbortSignal
+  ) => Promise<Buffer | RequestTransformationResult>;
+  readonly transformationTimeoutMs?: number;
+  readonly exactRecoveryAvailable?: boolean;
+  readonly dashboardRenderer?: (status: GatewayStatus) => string;
   readonly requestTimeoutMs?: number;
   readonly maxRequestBytes?: number;
   readonly bindHost?: "127.0.0.1" | "::1";
@@ -73,6 +98,12 @@ export interface GatewayStatus {
   readonly routes: readonly string[];
   readonly upstreamAllowlist: readonly string[];
   readonly metrics: GatewayMetrics;
+  readonly compression: {
+    readonly state: "active" | "pass-through";
+    readonly lastRequest: TransformationAudit | null;
+    readonly exactRecoveryAvailable: boolean;
+    readonly secretsRendered: 0;
+  };
 }
 
 export interface FakeGatewayOptions {
@@ -90,6 +121,11 @@ export const healthRoute: ProxyRoute = {
 export const statusRoute: ProxyRoute = {
   method: "GET",
   path: "/status"
+};
+
+export const dashboardRoute: ProxyRoute = {
+  method: "GET",
+  path: "/dashboard"
 };
 
 export const openAIResponsesRoute: ProxyRoute = {
@@ -123,6 +159,7 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
     options.canary === undefined ? undefined : createCanaryAdmission(options.canary);
   const activeRequests = new Set<AbortController>();
   let canaryModelLookups = 0;
+  let lastTransformation: TransformationAudit | null = null;
 
   const server = createServer(async (request, response) => {
     const startedAt = Date.now();
@@ -133,6 +170,7 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
     let provider: ProviderFamily | undefined;
     let requestBytes = 0;
     let responseStreamed = false;
+    let transformation: TransformationAudit | undefined;
 
     const abortController = new AbortController();
     activeRequests.add(abortController);
@@ -155,7 +193,8 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
         setKillSwitch: (enabled) => {
           killSwitchActive = enabled;
           if (enabled) for (const controller of activeRequests) controller.abort();
-        }
+        },
+        renderDashboard: options.dashboardRenderer
       });
       if (controlResult !== null) {
         statusCode = controlResult;
@@ -235,10 +274,78 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
         }
         canaryModelLookups += 1;
       }
+      let forwardedBody = body;
+      if (
+        options.transformRequest &&
+        mode === "safe" &&
+        method === "POST" &&
+        !subscriptionRoute &&
+        !admitCanary
+      ) {
+        transformation = {
+          outcome: "original",
+          strategy: "native",
+          reasonCodes: ["transformation_failed_keep_native"],
+          blocksConsidered: 0,
+          blocksTransformed: 0,
+          bytesBefore: body.length,
+          bytesAfter: body.length
+        };
+        const controller = new AbortController();
+        const abort = () => controller.abort();
+        abortController.signal.addEventListener("abort", abort, { once: true });
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          const candidateResult = await Promise.race([
+            options.transformRequest(Buffer.from(body), provider, controller.signal),
+            new Promise<Buffer | RequestTransformationResult>((resolve) => {
+              timer = setTimeout(() => {
+                controller.abort();
+                resolve(body);
+              }, options.transformationTimeoutMs ?? 1000);
+            })
+          ]);
+          const candidate = Buffer.isBuffer(candidateResult)
+            ? candidateResult
+            : candidateResult.body;
+          if (!Buffer.isBuffer(candidateResult)) transformation = candidateResult.audit;
+          if (
+            !controller.signal.aborted &&
+            !abortController.signal.aborted &&
+            !killSwitchActive &&
+            mode === "safe" &&
+            Buffer.isBuffer(candidate) &&
+            candidate.length < body.length
+          ) {
+            validateJsonBody(candidate);
+            forwardedBody = Buffer.from(candidate);
+          } else if (transformation?.outcome === "transformed") {
+            transformation = {
+              ...transformation,
+              outcome: "original",
+              strategy: "native",
+              reasonCodes: [...transformation.reasonCodes, "gateway_candidate_rejected"],
+              blocksTransformed: 0,
+              bytesAfter: body.length
+            };
+          }
+        } catch {
+          /* Transformation failure preserves the original request. */
+        } finally {
+          clearTimeout(timer);
+          controller.abort();
+          abortController.signal.removeEventListener("abort", abort);
+        }
+      }
       const upstreamResponse = await fetch(upstreamUrl, {
         method,
-        headers: forwardHeaders(request, provider, subscriptionRoute !== undefined),
-        body: method === "POST" ? body : undefined,
+        headers: forwardHeaders(
+          request,
+          provider,
+          subscriptionRoute !== undefined,
+          method === "POST" ? forwardedBody.length : undefined
+        ),
+        body: method === "POST" ? forwardedBody : undefined,
         redirect: "manual",
         signal: abortController.signal
       });
@@ -288,6 +395,7 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
       clearTimeout(timeout);
       activeRequests.delete(abortController);
       metrics.totalRequests += 1;
+      if (transformation !== undefined) lastTransformation = transformation;
       options.log?.({
         authRedacted: true,
         bodyLogged: false,
@@ -300,6 +408,7 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
         requestBytes,
         requestId,
         responseStreamed,
+        transformation,
         route,
         statusCode
       });
@@ -338,10 +447,20 @@ export function createLocalGateway(options: LocalGatewayOptions = {}): LocalGate
         ...metrics,
         providerRequests: { ...metrics.providerRequests }
       },
+      compression: {
+        state:
+          options.transformRequest !== undefined && mode === "safe" && !killSwitchActive
+            ? "active"
+            : "pass-through",
+        lastRequest: lastTransformation,
+        exactRecoveryAvailable: options.exactRecoveryAvailable === true,
+        secretsRendered: 0
+      },
       mode,
       routes: [
         healthRoute.path,
         statusRoute.path,
+        ...(options.dashboardRenderer === undefined ? [] : [dashboardRoute.path]),
         openAIResponsesRoute.path,
         anthropicMessagesRoute.path,
         ...(subscriptionBase === undefined ? [] : Object.values(codexSubscriptionPaths))
@@ -481,6 +600,12 @@ export function createFakeGateway(options: FakeGatewayOptions = {}): FakeGateway
     },
     status: () => ({
       bindHost,
+      compression: {
+        state: "pass-through",
+        lastRequest: null,
+        exactRecoveryAvailable: false,
+        secretsRendered: 0
+      },
       gateway: "fixel-recall-local",
       killSwitchActive,
       metrics: { ...metrics, providerRequests: { ...metrics.providerRequests } },
@@ -526,6 +651,7 @@ async function maybeHandleControlRoute(input: {
   readonly status: () => GatewayStatus;
   readonly setBypass: (enabled: boolean) => void;
   readonly setKillSwitch: (enabled: boolean) => void;
+  readonly renderDashboard?: (status: GatewayStatus) => string;
 }): Promise<number | null> {
   if (input.method === "GET" && input.route === healthRoute.path) {
     writeJson(input.response, 200, input.requestId, {
@@ -542,6 +668,14 @@ async function maybeHandleControlRoute(input: {
       input.requestId,
       input.status() as unknown as Record<string, unknown>
     );
+    return 200;
+  }
+  if (
+    input.method === "GET" &&
+    input.route === dashboardRoute.path &&
+    input.renderDashboard !== undefined
+  ) {
+    writeHtml(input.response, 200, input.requestId, input.renderDashboard(input.status()));
     return 200;
   }
   if (input.method === "POST" && input.route === "/runtime/bypass") {
@@ -581,11 +715,7 @@ async function handleOpenAIResponses(
   }
 
   if (body["stream"] === true) {
-    writeStream(response, requestId, [
-      'data: {"type":"response.output_text.delta","delta":"Fake OpenAI stream chunk 1"}\n\n',
-      'data: {"type":"response.output_text.done","text":"Fake OpenAI stream done"}\n\n',
-      "data: [DONE]\n\n"
-    ]);
+    writeStream(response, requestId, createOpenAIResponseStream(requestId, body));
     return 200;
   }
 
@@ -601,6 +731,129 @@ async function handleOpenAIResponses(
     ]
   });
   return 200;
+}
+
+function createOpenAIResponseStream(
+  requestId: string,
+  body: Record<string, unknown>
+): readonly string[] {
+  const responseId = `resp_${requestId}`;
+  const itemId = `msg_${requestId}`;
+  const text = "Fake OpenAI response";
+  const model = typeof body["model"] === "string" ? body["model"] : "fake-openai-model";
+  const outputText = { type: "output_text", annotations: [], logprobs: [], text };
+  const completedItem = {
+    id: itemId,
+    type: "message",
+    status: "completed",
+    role: "assistant",
+    content: [outputText]
+  };
+  const responseBase = {
+    id: responseId,
+    object: "response",
+    created_at: Math.floor(Date.now() / 1000),
+    error: null,
+    incomplete_details: null,
+    instructions: null,
+    max_output_tokens: null,
+    model,
+    output: [],
+    parallel_tool_calls: true,
+    previous_response_id: null,
+    reasoning: { effort: null, summary: null },
+    store: false,
+    temperature: 1,
+    text: { format: { type: "text" }, verbosity: "medium" },
+    tool_choice: "auto",
+    tools: [],
+    top_p: 1,
+    truncation: "disabled",
+    usage: null,
+    metadata: {}
+  };
+  const events = [
+    {
+      type: "response.created",
+      sequence_number: 0,
+      response: { ...responseBase, status: "in_progress" }
+    },
+    {
+      type: "response.in_progress",
+      sequence_number: 1,
+      response: { ...responseBase, status: "in_progress" }
+    },
+    {
+      type: "response.output_item.added",
+      sequence_number: 2,
+      output_index: 0,
+      item: {
+        id: itemId,
+        type: "message",
+        status: "in_progress",
+        role: "assistant",
+        content: []
+      }
+    },
+    {
+      type: "response.content_part.added",
+      sequence_number: 3,
+      item_id: itemId,
+      output_index: 0,
+      content_index: 0,
+      part: { type: "output_text", annotations: [], logprobs: [], text: "" }
+    },
+    {
+      type: "response.output_text.delta",
+      sequence_number: 4,
+      item_id: itemId,
+      output_index: 0,
+      content_index: 0,
+      delta: text,
+      logprobs: []
+    },
+    {
+      type: "response.output_text.done",
+      sequence_number: 5,
+      item_id: itemId,
+      output_index: 0,
+      content_index: 0,
+      text,
+      logprobs: []
+    },
+    {
+      type: "response.content_part.done",
+      sequence_number: 6,
+      item_id: itemId,
+      output_index: 0,
+      content_index: 0,
+      part: outputText
+    },
+    {
+      type: "response.output_item.done",
+      sequence_number: 7,
+      output_index: 0,
+      item: completedItem
+    },
+    {
+      type: "response.completed",
+      sequence_number: 8,
+      response: {
+        ...responseBase,
+        status: "completed",
+        output: [completedItem],
+        usage: {
+          input_tokens: 8,
+          input_tokens_details: { cached_tokens: 0 },
+          output_tokens: 4,
+          output_tokens_details: { reasoning_tokens: 0 },
+          total_tokens: 12
+        }
+      }
+    }
+  ];
+
+  return events.map((event) => `data: ${JSON.stringify(event)}\n\n`);
 }
 
 async function handleAnthropicMessages(
@@ -697,10 +950,12 @@ async function streamUpstreamResponse(
 function forwardHeaders(
   request: IncomingMessage,
   provider: ProviderFamily,
-  subscription = false
+  subscription = false,
+  bodyLength?: number
 ): Headers {
   const headers = new Headers();
   headers.set("content-type", "application/json");
+  if (bodyLength !== undefined) headers.set("content-length", String(bodyLength));
   copyHeader(request, headers, "x-request-id");
   if (provider === "openai") {
     copyHeader(request, headers, "authorization");
@@ -760,6 +1015,24 @@ function writeJson(
     "x-request-id": requestId
   });
   response.end(JSON.stringify(payload));
+}
+
+function writeHtml(
+  response: ServerResponse,
+  statusCode: number,
+  requestId: string,
+  html: string
+): void {
+  response.writeHead(statusCode, {
+    "cache-control": "no-store",
+    "content-security-policy":
+      "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
+    "content-type": "text/html; charset=utf-8",
+    "referrer-policy": "no-referrer",
+    "x-content-type-options": "nosniff",
+    "x-request-id": requestId
+  });
+  response.end(html);
 }
 
 function writeStream(response: ServerResponse, requestId: string, chunks: readonly string[]): void {

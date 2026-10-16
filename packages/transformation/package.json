@@ -1,0 +1,17 @@
+{
+  "name": "@fixel-recall/transformation",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "dependencies": {
+    "@fixel-recall/core": "workspace:*",
+    "@fixel-recall/firewall": "workspace:*",
+    "@fixel-recall/renderer": "workspace:*",
+    "@fixel-recall/vault": "workspace:*",
+    "@fixel-recall/providers-openai": "workspace:*",
+    "@fixel-recall/providers-anthropic": "workspace:*"
+  }
+}

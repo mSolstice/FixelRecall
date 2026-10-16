@@ -197,6 +197,88 @@ support claim. CLI canary preparation intentionally remains blocked without veri
 upstream output-limit support. Budgets are process-local; multiple starts are separate reservations.
 No production dependency was added. See `docs/ASTRA_CANARY_READINESS.md`.
 
+## ADR-022: Bind context retrieval to host authority
+
+**Status:** Accepted
+
+**Decision:** Bind each retrieval service instance to a host-supplied project and session. Missing
+authority denies reads. Tool arguments select within that scope and cannot grant authority. The CLI
+receives scope through `FIXEL_RECALL_PROJECT_ID` and `FIXEL_RECALL_SESSION_ID` at launch.
+
+**Reason:** Valid identifiers and correct vault paths alone do not authenticate a caller.
+
+**Consequences:** Unscoped MCP configurations must supply host-generated scope before retrieval
+works. The scope is fixed for the process lifetime. This does not isolate processes running as the
+same OS user. Catalogue, discovery and context replacement remain separate development stages; see
+`CONTEXT_CELL_RETRIEVAL_PLAN.md`.
+
+## ADR-023: Host-registered context catalogue
+
+**Status:** Accepted
+
+**Decision:** Catalogue entries come from a bounded host registration list. Revalidate each
+reference through the scoped vault on reads. Return only allowlisted metadata with fixed category
+descriptions. Mark source freshness unknown until independent revision evidence exists.
+
+**Reason:** Automatic filesystem enumeration and content-derived summaries introduce additional
+privacy, discovery and resource-control requirements. Registration matches the host-controlled
+retrieval design and permits a bounded first catalogue implementation.
+
+**Consequences:** Hosts must register stored block references explicitly. The catalogue does not
+automatically discover blocks, remove context or prove savings. MCP discovery is the next stage.
+
+## ADR-024: Retrieval lease before context replacement
+
+**Status:** Accepted
+
+**Decision:** Context replacement requires a typed, short-lived lease bound to one project, one
+session, an explicit `get_exact_context` capability, an expiry time and a bounded block set. The
+gateway preserves original bytes when the lease is missing, expired, over its block limit, or does
+not match the trusted session.
+
+**Reason:** A block ID in a model message is not authorization. A lease makes authority an
+out-of-band host decision and gives the transformation hook a small, testable contract.
+
+**Consequences:** Lease creation and trusted session wiring remain host responsibilities. The
+current implementation is experimental and synthetic-only until the end-to-end gateway test is
+stable and both provider rebuild paths pass the full failure matrix.
+
+## ADR-025: Opt-in combined log and image transformation
+
+**Status:** Accepted for local synthetic validation; real-model approvals remain host
+responsibilities.
+
+**Decision:** Put composition in a separate transformation package and expose a bounded optional
+gateway callback. Preserve original request bytes on failure. Supported historical user blocks may
+use either exact template rows or policy-approved PNG prose, never both for one block. Explicit
+host-approved log templates are the narrow exception allowing protected values to remain literal
+native strings in a reversible representation. Current instructions, code and active tool state
+remain unchanged. Unknown/critical logs remain native. No production dependency is added.
+
+**Consequences:** Hosts must supply provenance, profile approval, scoped MCP recovery and
+model-aware cost estimates; no guessed model or global CLI switch silently enables this path. The
+old deleted reference-only experiment and its incomplete lease are not restored. The gateway remains
+independent of the composition package. Tests prove transport and reconstruction, not model
+comprehension.
+
+## ADR-026: Deterministic transformation fallback
+
+**Status:** Accepted
+
+**Decision:** Choose one strategy per block from trusted host classification. Approved repetitive
+historical logs use template deduplication or native text. Approved gist-only historical prose uses
+PNG rendering or native text. Never cross-fallback between those strategies. A request may contain
+both strategies only when they apply to separate eligible blocks. Emit content-free route, reason,
+block-count and byte-count metadata.
+
+**Reason:** Exact log values cannot safely become image-only evidence, while arbitrary prose cannot
+become a verified log template after a rendering failure. Cross-fallback would turn a component
+failure into new transformation authority.
+
+**Consequences:** The pipeline is less aggressive but deterministic. Missing interpretation
+instructions, absent vision capability, parser failure, renderer failure or recovery failure ends at
+native content without a retry loop.
+
 ## ADR template
 
 When adding a decision, use:

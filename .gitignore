@@ -3,3 +3,5 @@
 dist/
 node_modules/
 *.tsbuildinfo
+packages/cli/bundle/
+packages/cli/npm-package/
