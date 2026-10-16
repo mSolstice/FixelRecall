@@ -1,18 +1,18 @@
 # Release Readiness
 
-Review date: 2026-10-14
+Review date: 2026-10-16
 
-Decision: **GO for macOS CLI-only; NO-GO for broad hosted/enterprise production deployment**
+Decision: **GO for validated CLI scope; NO-GO for broad hosted/enterprise production deployment**
 
-This is **Fixel Recall for macOS CLI**. Fixel Recall is available for macOS CLI users of Codex CLI
-and Claude Code CLI. The current repository passes local fake-provider checks, local skill
-validation, limited real-provider route canaries, a generated toy-project real-provider benchmark
-canary, real macOS user-level install/rollback/uninstall canary and Linux CI for the pushed
-release-readiness commit.
+Fixel Recall is validated for Codex CLI and Claude Code CLI on macOS, Ubuntu Linux and Windows
+native. The current repository passes local fake-provider checks, local skill validation, limited
+real-provider route canaries, a generated toy-project real-provider benchmark canary, a real macOS
+user-level install/rollback/uninstall canary, and cross-platform CI with official-host fake-provider
+smoke tests.
 
-Broad hosted/enterprise production deployment is not included in this release because Windows native
-and WSL support are not included, IDE surfaces are not included, broad workload evidence is still
-synthetic and no third-party security review has been completed.
+Broad hosted/enterprise production deployment is not included because WSL and IDE surfaces remain
+unvalidated, broad workload evidence is still synthetic and no third-party security review has been
+completed.
 
 ## Version
 
@@ -23,18 +23,18 @@ synthetic and no third-party security review has been completed.
 
 ## Commit And Tree
 
-- Commit reviewed: `e305ada` plus the current uncommitted cleanup changes
-- Short commit: `e305ada`
-- GitHub Actions evidence: user reported Linux CI green for pushed commit
-  `1e74a4500429801bc040e45ce02a2d170466f547`.
-- Tree status: dirty while cleanup changes are under review
+- Commit reviewed: `94c2a6f04c13e35e759c0dae53cbc1d019d766e9`
+- Short commit: `94c2a6f`
+- GitHub Actions run `38789129158` passed Ubuntu, macOS and Windows native validation for commit
+  `1ba1b19`.
+- Tree status: clean at the reviewed commit
 
 ## Supported OS
 
 - macOS: local fake-provider validation tested on Darwin 24.6.0 arm64 with Node.js 26 and pnpm 11.
-- Linux: GitHub Actions is configured for Ubuntu with Node.js 24 and 26. The user reported a green
-  Linux CI run for commit `1e74a4500429801bc040e45ce02a2d170466f547`.
-- Windows native: not included in this release.
+- Linux: validated in Ubuntu CI with Node.js 24 and 26, including official-host fake-provider smoke.
+- Windows native: validated in Windows CI with Node.js 24, including official-host fake-provider
+  smoke.
 - WSL: not included in this release.
 
 See `docs/OS_SUPPORT.md` for path, permission, temp directory, symlink and loopback notes.
@@ -137,13 +137,13 @@ Pass or mostly pass locally:
 - Proxy: loopback default, allowlist, request limits, timeouts, kill switch, raw-body and credential
   tests exist.
 - Metrics, dashboard, benchmark and skills have synthetic/local tests.
-- Windows native and WSL are clearly marked as not included in this release.
+- WSL and IDE surfaces are clearly marked as not included in this release.
 
-No-go outside macOS CLI-only scope:
+No-go outside the validated CLI scope:
 
 - Real-provider canaries are limited canary evidence only, not broad real-world benchmark evidence.
 - Codex IDE and Claude Code IDE are not release-tested.
-- Windows native and WSL are not release-tested.
+- WSL is not release-tested.
 
 ## Security Findings
 
@@ -154,8 +154,8 @@ From `SECURITY_REVIEW.md`:
 - Open medium: user-defined firewall regexes can be expensive if exposed to untrusted users.
 - Open medium: MCP retrieval logs full opaque IDs; privacy hardening should hash or truncate them.
 - Open low: dashboard serving boundary is not implemented in this package.
-- Open low: installer/uninstaller have temp-directory coverage and one macOS CLI real user-level
-  canary, but no Linux, Windows, WSL or IDE user-config migration canary.
+- Open low: installer/uninstaller have cross-platform temp-directory coverage and one macOS CLI real
+  user-level canary, but no Linux, Windows, WSL or IDE real user-config migration canary.
 
 Current review notes:
 
@@ -169,21 +169,22 @@ Current review notes:
 ## Known Limitations
 
 - Current evidence is fake-provider, synthetic-data and limited real-provider canary evidence only.
-- This is Fixel Recall for macOS CLI, not a broad hosted/enterprise production deployment.
+- This is Fixel Recall for validated CLI use on macOS, Linux and Windows native, not a broad
+  hosted/enterprise production deployment.
 - Real-provider canaries passed for route checks and one generated toy-project benchmark canary, but
   they do not prove production savings or broad model compatibility.
 - The real-provider benchmark canary used generated public-safe toy code only. It is not a private
   workload, broad workload, long-session or production benchmark.
 - No production database is present.
-- Install, uninstall and rollback have temp-directory evidence plus one macOS CLI real user-level
-  canary.
+- Install, uninstall and rollback have cross-platform temp-directory evidence plus one macOS CLI
+  real user-level canary.
 - Dashboard is static/local-rendered in this package; no release-grade dashboard server boundary is
   proven.
 - Model-profile approval is synthetic only.
 - Benchmarks are synthetic and must not be marketed as real savings.
 - Highly cached or code-heavy workloads may produce neutral or negative value.
 - Codex IDE and Claude Code IDE are not release-tested.
-- Windows native and WSL are not included in this release.
+- WSL is not included in this release.
 
 ## Privacy Statement
 
@@ -201,8 +202,8 @@ Current local fake-provider evidence shows:
 Release caveat:
 
 - This privacy statement is supported by synthetic/fake tests, limited real-provider canaries, one
-  macOS CLI real user-level install canary and a green Linux CI run for commit `1e74a45`. It is not
-  yet backed by broad real workload evidence or third-party security review.
+  macOS CLI real user-level install canary and green cross-platform CI. It is not yet backed by
+  broad real workload evidence or third-party security review.
 
 ## Install, Uninstall And Rollback
 
@@ -244,8 +245,8 @@ MacOS CLI real user-level canary evidence:
 
 Release limitation:
 
-- Real user-level host config install/uninstall/rollback is canaried only on macOS CLI, not Linux,
-  Windows, WSL or IDE surfaces.
+- Real user-level host config install/uninstall/rollback is canaried only on macOS CLI. Linux and
+  Windows have isolated CI transaction coverage; WSL and IDE surfaces remain unvalidated.
 
 ## Benchmark Evidence
 
@@ -311,11 +312,11 @@ This is not real-provider cost evidence and must remain labelled synthetic.
 
 ## Go Or No-Go Decision
 
-**GO for macOS CLI-only.**
+**GO for validated CLI scope.**
 
 Approved narrow scope:
 
-- macOS only.
+- macOS, Ubuntu Linux and Windows native.
 - Codex CLI only.
 - Claude Code CLI only.
 - Safe mode default.
@@ -323,7 +324,8 @@ Approved narrow scope:
 - Real OpenAI/Codex and Anthropic/Claude Code route canaries.
 - Generated toy-project real-provider benchmark canary.
 - Real macOS user-level install, rollback and uninstall canary.
-- Linux CI green for commit `1e74a4500429801bc040e45ce02a2d170466f547`.
+- Cross-platform CI and official-host fake-provider smoke passed on Ubuntu, macOS and Windows
+  native.
 
 **NO-GO for broad hosted/enterprise production deployment.**
 
@@ -335,8 +337,9 @@ Reasons:
 
 1. Real-provider route and generated toy-project benchmark canary evidence is not broad real-world
    benchmark evidence.
-2. Windows native, WSL, Codex IDE and Claude Code IDE are not included in this release.
-3. Real user-level install/uninstall/rollback is canaried only for macOS CLI.
+2. WSL, Codex IDE and Claude Code IDE are not included in this release.
+3. Real user-level install/uninstall/rollback is canaried only for macOS CLI; Linux and Windows use
+   isolated CI transaction tests.
 4. Broad benchmark evidence remains synthetic only.
 5. No third-party security review has been completed.
 
@@ -344,5 +347,4 @@ Recommended next release blockers:
 
 1. Commit and push this updated release-readiness decision.
 2. Confirm GitHub Actions remains green for the final macOS CLI release commit.
-3. Decide whether this release is scoped to macOS CLI only, or add tested support for Linux, WSL,
-   Windows native and IDE surfaces before claiming them.
+3. Add genuine WSL 2 and IDE runtime canaries before claiming those surfaces.

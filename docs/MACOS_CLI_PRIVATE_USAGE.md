@@ -7,6 +7,9 @@ Release evidence commit: `2df94b1`
 This guide is for macOS CLI users. It does not publish a package, create a GitHub release or claim
 broad hosted/enterprise production deployment.
 
+Linux and Windows native CLI validation is documented separately in
+`docs/CROSS_PLATFORM_VALIDATION.md`; this guide intentionally keeps macOS commands only.
+
 ## Who This Is For
 
 - A local developer using macOS.
@@ -30,8 +33,9 @@ broad hosted/enterprise production deployment.
 
 - Codex IDE.
 - Claude Code IDE.
-- Windows native.
-- WSL.
+- WSL runtime validation.
+- Linux and Windows instructions, which are covered by the platform documentation rather than this
+  macOS guide.
 - Public hosted deployment.
 - Published npm/package release.
 - Broad hosted/enterprise production deployment.
@@ -198,5 +202,5 @@ Primary release evidence:
 - `docs/INSTALL_UNINSTALL_EVIDENCE.md`
 - `docs/REAL_PROVIDER_CANARY_PLAN.md`
 
-Current release scope is macOS CLI. Broad hosted/enterprise production deployment is not included in
-this release.
+Current validated CLI scope includes macOS, Ubuntu Linux and Windows native. This document remains
+the macOS-specific usage guide. Broad hosted/enterprise production deployment is not included.

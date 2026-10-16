@@ -8,9 +8,13 @@ Status: **Fixel Recall for macOS CLI**
 
 Broad hosted/enterprise production deployment: **not included in this release**
 
+This checklist preserves the macOS-specific release evidence. The current cross-platform CLI scope
+and later CI evidence are recorded in `docs/CROSS_PLATFORM_VALIDATION.md` and
+`RELEASE_READINESS.md`.
+
 ## Supported Scope
 
-- macOS CLI use only.
+- macOS CLI use for this checklist.
 - Codex CLI through the local OpenAI Responses-compatible route.
 - Claude Code CLI through the local Anthropic Messages-compatible route.
 - Safe mode default.
@@ -24,8 +28,8 @@ Broad hosted/enterprise production deployment: **not included in this release**
 
 - Codex IDE.
 - Claude Code IDE.
-- Windows native.
-- WSL.
+- WSL runtime validation.
+- Linux and Windows real user-home install canaries; isolated CI transaction tests are available.
 - Broad hosted or enterprise production deployment.
 - Public hosted service.
 - Production database.
@@ -103,8 +107,7 @@ manifest.
 - Do not claim broad hosted or enterprise production deployment.
 - Do not claim Codex IDE support.
 - Do not claim Claude Code IDE support.
-- Do not claim Windows native support.
-- Do not claim WSL support.
+- Do not claim WSL support before a genuine WSL runtime canary passes.
 - Do not claim proven real-world savings across private repositories.
 - Do not claim approved real model profiles.
 - Do not claim third-party security review.
